@@ -408,7 +408,9 @@ body {
   color: #dc2626;
 }
 .dark .edge-trash:hover {
-  background: rgba(220, 38, 38, 0.2);
+  /* Nền phải ĐỤC (không dùng rgba trong suốt) để dây phía sau không lộ qua nút.
+     Trộn đỏ vào surface -> vẫn ám đỏ nhẹ nhưng opaque. */
+  background: color-mix(in srgb, #dc2626 26%, var(--bk-surface));
   border-color: rgba(248, 113, 113, 0.5);
   color: #f87171;
 }
