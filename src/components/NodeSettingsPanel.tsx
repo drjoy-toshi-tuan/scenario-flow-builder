@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
-import type { FlowNode } from '../ir/types';
+import type { FlowNode, NodeType } from '../ir/types';
 import { NODE_CONFIG } from '../ui/nodeConfig';
 import { Icon } from '../ui/icons';
-import { useT } from '../ui/i18n';
+import { useT, type TKey } from '../ui/i18n';
+
+// Key giải thích ý nghĩa loại node trong từ điển i18n (exStart, exAnnounce, …).
+function explainKey(type: NodeType): TKey {
+  return ('ex' + type.charAt(0).toUpperCase() + type.slice(1)) as TKey;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Panel setting: sửa tên module (label), MÔ TẢ (data.description — hiện trên node)
@@ -38,7 +43,7 @@ export function NodeSettingsPanel() {
   return (
     <aside
       className={[
-        'absolute right-0 top-0 z-10 flex h-full w-80 flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)] shadow-[var(--bk-shadow)]',
+        'absolute right-0 top-0 z-10 flex h-full w-[560px] max-w-[85vw] flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)] shadow-[var(--bk-shadow)]',
         'transition-transform duration-300 ease-out will-change-transform',
         open ? 'translate-x-0' : 'translate-x-full pointer-events-none',
       ].join(' ')}
@@ -90,7 +95,10 @@ function PanelContent({ node, t, onClose, onUpdate }: PanelContentProps) {
             <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: cfg.color }}>
               {cfg.typeLabel}
             </div>
-            <div className="text-sm font-semibold text-[var(--bk-text)]">{node.id}</div>
+            {/* Giải thích ý nghĩa loại node (thay cho id thô trước đây). */}
+            <div className="text-sm font-medium text-[var(--bk-text-muted)]">
+              {t(explainKey(node.type))}
+            </div>
           </div>
         </div>
         <button

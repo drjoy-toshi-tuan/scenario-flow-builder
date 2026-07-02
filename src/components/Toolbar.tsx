@@ -51,6 +51,36 @@ export function Toolbar() {
             {ir ? t('stats', { n: ir.nodes.length, e: ir.edges.length }) : '…'}
           </div>
         </div>
+
+        {/* Toggle ngôn ngữ & theme — đặt bên TRÁI cho header phải đỡ chật. */}
+        <div className="ml-2 flex items-center gap-2 border-l border-[var(--bk-border)] pl-3">
+          <Icon
+            icon="fa6-solid:language"
+            width={18}
+            height={18}
+            className="text-[var(--bk-text-muted)]"
+          />
+          <SlideToggle
+            value={lang}
+            options={[
+              { key: 'vi', label: 'Tiếng Việt' },
+              { key: 'ja', label: '日本語' },
+            ]}
+            onChange={(k) => setLang(k as 'vi' | 'ja')}
+            ariaLabel="Language"
+            title={lang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : '言語: 日本語'}
+          />
+          <SlideToggle
+            value={theme}
+            options={[
+              { key: 'light', icon: 'lucide:sun' },
+              { key: 'dark', icon: 'lucide:moon' },
+            ]}
+            onChange={(k) => setTheme(k as 'light' | 'dark')}
+            ariaLabel="Theme"
+            title={theme === 'dark' ? t('themeDark') : t('themeLight')}
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -73,32 +103,7 @@ export function Toolbar() {
           {t('exportYaml')}
         </button>
 
-        <div className="ml-1 flex items-center gap-2 border-l border-[var(--bk-border)] pl-3">
-          {/* Toggle ngôn ngữ VI / 日本語 */}
-          <SlideToggle
-            value={lang}
-            options={[
-              { key: 'vi', label: 'Tiếng Việt' },
-              { key: 'ja', label: '日本語' },
-            ]}
-            onChange={(k) => setLang(k as 'vi' | 'ja')}
-            ariaLabel="Language"
-            title={lang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : '言語: 日本語'}
-          />
-          {/* Toggle theme sáng / tối */}
-          <SlideToggle
-            value={theme}
-            options={[
-              { key: 'light', icon: 'lucide:sun' },
-              { key: 'dark', icon: 'lucide:moon' },
-            ]}
-            onChange={(k) => setTheme(k as 'light' | 'dark')}
-            ariaLabel="Theme"
-            title={theme === 'dark' ? t('themeDark') : t('themeLight')}
-          />
-        </div>
-
-        <div className="ml-1 flex items-center gap-2 border-l border-[var(--bk-border)] pl-3">
+        <div className="flex items-center gap-2 border-l border-[var(--bk-border)] pl-3">
           {user?.picture && <img src={user.picture} alt="" className="h-7 w-7 rounded-full" />}
           <span
             className="max-w-[140px] truncate text-xs text-[var(--bk-text-muted)]"
@@ -108,7 +113,7 @@ export function Toolbar() {
           </span>
           <button
             type="button"
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+            className="flex items-center gap-1.5 rounded-lg bg-[#ef4444] px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#dc2626]"
             onClick={signOut}
           >
             <Icon icon="lucide:log-out" width={14} height={14} />

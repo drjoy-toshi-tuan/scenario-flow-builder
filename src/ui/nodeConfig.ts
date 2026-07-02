@@ -25,8 +25,9 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
 };
 
-// Loại có thể thêm qua "Thêm module" — bỏ 'start' (node tổng hợp từ field flow.start).
+// Loại có thể thêm qua "Thêm node". 'start' chỉ được thêm 1 lần (xem AddModulePanel).
 export const ADDABLE_NODE_TYPES: readonly NodeType[] = [
+  'start',
   'announce',
   'input',
   'condition',

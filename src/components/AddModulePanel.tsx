@@ -20,10 +20,15 @@ export function AddModulePanel() {
   const [open, setOpen] = useState(false);
   const addNode = useFlowStore((s) => s.addNode);
   const nodeCount = useFlowStore((s) => s.ir?.nodes.length ?? 0);
+  // Đã có node start? -> không cho thêm start nữa (start là điểm bắt đầu duy nhất).
+  const hasStart = useFlowStore((s) => s.ir?.nodes.some((n) => n.type === 'start') ?? false);
   const { screenToFlowPosition } = useReactFlow();
   const t = useT();
 
+  const isDisabled = (type: (typeof ADDABLE_NODE_TYPES)[number]) => type === 'start' && hasStart;
+
   const handleAdd = (type: (typeof ADDABLE_NODE_TYPES)[number]) => {
+    if (isDisabled(type)) return;
     // Giữa vùng nhìn, lệch nhẹ theo số node để các node mới không đè khít lên nhau.
     const stagger = (nodeCount % 6) * 28;
     const center = screenToFlowPosition({
@@ -63,18 +68,30 @@ export function AddModulePanel() {
           </div>
           {ADDABLE_NODE_TYPES.map((type) => {
             const cfg = NODE_CONFIG[type];
+            const disabled = isDisabled(type);
             return (
               <button
                 key={type}
                 type="button"
                 role="menuitem"
-                draggable
+                disabled={disabled}
+                draggable={!disabled}
+                title={disabled ? t('startExists') : undefined}
                 onDragStart={(e) => {
+                  if (disabled) {
+                    e.preventDefault();
+                    return;
+                  }
                   e.dataTransfer.setData(DND_MIME, type);
                   e.dataTransfer.effectAllowed = 'move';
                 }}
                 onClick={() => handleAdd(type)}
-                className="flex w-full cursor-grab items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-[var(--bk-surface-2)] active:cursor-grabbing"
+                className={[
+                  'flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition',
+                  disabled
+                    ? 'cursor-not-allowed opacity-40'
+                    : 'cursor-grab hover:bg-[var(--bk-surface-2)] active:cursor-grabbing',
+                ].join(' ')}
               >
                 <span
                   className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-[17px]"

@@ -27,6 +27,7 @@ export function makeNode(nodeType: NodeType) {
     const handles = d.sourceHandles;
     const selectNode = useFlowStore((s) => s.selectNode);
     const removeNode = useFlowStore((s) => s.removeNode);
+    const isPanning = useFlowStore((s) => s.isPanning);
     const t = useT();
 
     return (
@@ -34,8 +35,14 @@ export function makeNode(nodeType: NodeType) {
         className={['bk-node', selected ? 'bk-node--selected' : ''].join(' ')}
         style={{ '--accent': cfg.color } as CSSProperties}
       >
-        {/* Thanh công cụ nổi phía trên node khi được chọn (bấm vào node). */}
-        <NodeToolbar position={Position.Top} offset={10} align="center">
+        {/* Thanh công cụ nổi phía trên node khi được chọn (bấm vào node).
+            Ẩn trong lúc kéo/di chuyển canvas để không hiện lơ lửng sai chỗ. */}
+        <NodeToolbar
+          isVisible={selected && !isPanning}
+          position={Position.Top}
+          offset={10}
+          align="center"
+        >
           <div className="bk-node-toolbar">
             <button
               type="button"

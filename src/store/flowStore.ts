@@ -14,6 +14,9 @@ import { NODE_CONFIG } from '../ui/nodeConfig';
 interface FlowState {
   ir: FlowIR | null;
   selectedNodeId: string | null;
+  // Đang kéo/di chuyển canvas (pan/zoom) -> ẩn thanh công cụ nổi trên node.
+  isPanning: boolean;
+  setPanning: (value: boolean) => void;
 
   // Nạp YAML -> IR -> auto-layout, rồi set vào store.
   loadYaml: (text: string) => Promise<void>;
@@ -43,6 +46,8 @@ interface FlowState {
 export const useFlowStore = create<FlowState>((set, get) => ({
   ir: null,
   selectedNodeId: null,
+  isPanning: false,
+  setPanning: (value) => set({ isPanning: value }),
 
   loadYaml: async (text) => {
     const ir = fromYaml(text);
@@ -98,6 +103,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   addNode: (type, position) => {
     const { ir } = get();
     if (!ir) return '';
+    // Start là điểm bắt đầu duy nhất — chỉ cho phép 1 node start trong flow.
+    if (type === 'start' && ir.nodes.some((n) => n.type === 'start')) return '';
     // id duy nhất theo loại: announce_1, announce_2, …
     const existing = new Set(ir.nodes.map((n) => n.id));
     let i = 1;

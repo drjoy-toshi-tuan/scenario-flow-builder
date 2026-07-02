@@ -50,6 +50,7 @@ export function FlowCanvas() {
   const addNode = useFlowStore((s) => s.addNode);
   const removeNode = useFlowStore((s) => s.removeNode);
   const removeEdge = useFlowStore((s) => s.removeEdge);
+  const setPanning = useFlowStore((s) => s.setPanning);
   const selectNode = useFlowStore((s) => s.selectNode);
   const theme = useTheme((s) => s.theme);
   const { screenToFlowPosition } = useReactFlow();
@@ -197,6 +198,8 @@ export function FlowCanvas() {
       onDragOver={onDragOver}
       onNodesDelete={onNodesDelete}
       onEdgesDelete={onEdgesDelete}
+      onMoveStart={() => setPanning(true)}
+      onMoveEnd={() => setPanning(false)}
       deleteKeyCode={DELETE_KEYS}
       defaultEdgeOptions={{ type: 'deletable' }}
       snapToGrid
