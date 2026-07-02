@@ -148,7 +148,8 @@ body {
 .bk-node {
   position: relative;
   width: 244px;
-  border-radius: 14px;
+  height: 92px;
+  border-radius: 10px;
   background: var(--bk-surface);
   border: 1px solid var(--bk-border);
   box-shadow: var(--bk-shadow);
