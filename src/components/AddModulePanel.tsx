@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import { NODE_CONFIG, ADDABLE_NODE_TYPES } from '../ui/nodeConfig';
@@ -18,6 +18,11 @@ export const DND_MIME = 'application/bk-node-type';
 
 export function AddModulePanel() {
   const [open, setOpen] = useState(false);
+  // `render` giữ menu mounted trong lúc chạy animation ĐÓNG (thu nhỏ + mờ dần).
+  const [render, setRender] = useState(false);
+  useEffect(() => {
+    if (open) setRender(true);
+  }, [open]);
   const addNode = useFlowStore((s) => s.addNode);
   const nodeCount = useFlowStore((s) => s.ir?.nodes.length ?? 0);
   // Đã có node start? -> không cho thêm start nữa (start là điểm bắt đầu duy nhất).
@@ -58,10 +63,14 @@ export function AddModulePanel() {
         />
       </button>
 
-      {open && (
+      {render && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-20 mt-2 w-60 overflow-hidden rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1.5 shadow-[var(--bk-shadow)]"
+          onAnimationEnd={(e) => {
+            // Kết thúc animation ĐÓNG -> gỡ menu khỏi DOM.
+            if (e.target === e.currentTarget && !open) setRender(false);
+          }}
+          className={`bk-addmenu ${open ? 'bk-addmenu--in' : 'bk-addmenu--out'} absolute left-0 top-full z-20 mt-2 w-60 overflow-hidden rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1.5 shadow-[var(--bk-shadow)]`}
         >
           <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
             {t('chooseType')}

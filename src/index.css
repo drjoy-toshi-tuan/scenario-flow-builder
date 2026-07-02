@@ -244,6 +244,38 @@ body {
   animation: bk-panel-in 0.22s ease;
 }
 
+/* Menu "Thêm node": phóng to ra khi mở, thu nhỏ + mờ dần khi đóng.
+   Gốc phóng ở góc trên-trái (sát nút bấm). */
+@keyframes bk-addmenu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bk-addmenu-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.82) translateY(-8px);
+  }
+}
+.bk-addmenu {
+  transform-origin: top left;
+}
+.bk-addmenu--in {
+  animation: bk-addmenu-in 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.bk-addmenu--out {
+  animation: bk-addmenu-out 0.13s ease-in forwards;
+}
+
 /* Toggle gạt trái/phải (theme, ngôn ngữ). */
 .bk-slide {
   position: relative;
