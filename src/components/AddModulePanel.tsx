@@ -3,6 +3,7 @@ import { useReactFlow } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import { NODE_CONFIG, ADDABLE_NODE_TYPES } from '../ui/nodeConfig';
 import { Icon } from '../ui/icons';
+import { useT } from '../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // "Thêm module": nút + mở palette liệt kê các loại node có thể thêm (icon + tên).
@@ -20,6 +21,7 @@ export function AddModulePanel() {
   const addNode = useFlowStore((s) => s.addNode);
   const nodeCount = useFlowStore((s) => s.ir?.nodes.length ?? 0);
   const { screenToFlowPosition } = useReactFlow();
+  const t = useT();
 
   const handleAdd = (type: (typeof ADDABLE_NODE_TYPES)[number]) => {
     // Giữa vùng nhìn, lệch nhẹ theo số node để các node mới không đè khít lên nhau.
@@ -42,7 +44,7 @@ export function AddModulePanel() {
         aria-haspopup="menu"
       >
         <Icon icon="lucide:plus" className="text-[var(--bk-accent)]" width={17} height={17} />
-        <span>Thêm module</span>
+        <span>{t('addModule')}</span>
         <Icon
           icon="lucide:chevron-down"
           width={15}
@@ -57,7 +59,7 @@ export function AddModulePanel() {
           className="absolute left-0 top-full z-20 mt-2 w-60 overflow-hidden rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1.5 shadow-[var(--bk-shadow)]"
         >
           <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-            Chọn loại module
+            {t('chooseType')}
           </div>
           {ADDABLE_NODE_TYPES.map((type) => {
             const cfg = NODE_CONFIG[type];

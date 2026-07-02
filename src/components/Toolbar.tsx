@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import { useAuth } from '../auth/useAuth';
 import { useTheme } from '../ui/theme';
+import { useLang, useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
+import { SlideToggle } from './SlideToggle';
 
-// Thanh công cụ trên cùng: tên flow, nút Auto layout / Export YAML, toggle theme, user.
+// Thanh công cụ trên cùng: tên flow, nút Tự sắp xếp / Xuất YAML, toggle theme & ngôn ngữ, user.
 export function Toolbar() {
   const ir = useFlowStore((s) => s.ir);
   const autoLayout = useFlowStore((s) => s.autoLayout);
   const exportYaml = useFlowStore((s) => s.exportYaml);
   const { user, signOut } = useAuth();
-  const { theme, toggle } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const { lang, setLang } = useLang();
+  const t = useT();
   const [busy, setBusy] = useState(false);
 
   const handleAutoLayout = async () => {
@@ -44,7 +48,7 @@ export function Toolbar() {
             {ir?.meta.name ?? 'AI電話 Flow Builder'}
           </div>
           <div className="text-[11px] text-[var(--bk-text-faint)]">
-            {ir ? `${ir.nodes.length} nodes · ${ir.edges.length} edges` : '…'}
+            {ir ? t('stats', { n: ir.nodes.length, e: ir.edges.length }) : '…'}
           </div>
         </div>
       </div>
@@ -57,7 +61,7 @@ export function Toolbar() {
           disabled={busy || !ir}
         >
           <Icon icon="lucide:layout-dashboard" width={16} height={16} />
-          {busy ? 'Đang sắp xếp…' : 'Auto layout'}
+          {busy ? t('autoLayoutBusy') : t('autoLayout')}
         </button>
         <button
           type="button"
@@ -66,18 +70,33 @@ export function Toolbar() {
           disabled={!ir}
         >
           <Icon icon="lucide:download" width={16} height={16} />
-          Export YAML
+          {t('exportYaml')}
         </button>
 
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--bk-border)] text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
-          onClick={toggle}
-          title={theme === 'dark' ? 'Chuyển sang Light mode' : 'Chuyển sang Dark mode'}
-          aria-label="Đổi chế độ sáng/tối"
-        >
-          <Icon icon={theme === 'dark' ? 'lucide:sun' : 'lucide:moon'} width={17} height={17} />
-        </button>
+        <div className="ml-1 flex items-center gap-2 border-l border-[var(--bk-border)] pl-3">
+          {/* Toggle ngôn ngữ VI / 日本語 */}
+          <SlideToggle
+            value={lang}
+            options={[
+              { key: 'vi', label: 'Tiếng Việt' },
+              { key: 'ja', label: '日本語' },
+            ]}
+            onChange={(k) => setLang(k as 'vi' | 'ja')}
+            ariaLabel="Language"
+            title={lang === 'vi' ? 'Ngôn ngữ: Tiếng Việt' : '言語: 日本語'}
+          />
+          {/* Toggle theme sáng / tối */}
+          <SlideToggle
+            value={theme}
+            options={[
+              { key: 'light', icon: 'lucide:sun' },
+              { key: 'dark', icon: 'lucide:moon' },
+            ]}
+            onChange={(k) => setTheme(k as 'light' | 'dark')}
+            ariaLabel="Theme"
+            title={theme === 'dark' ? t('themeDark') : t('themeLight')}
+          />
+        </div>
 
         <div className="ml-1 flex items-center gap-2 border-l border-[var(--bk-border)] pl-3">
           {user?.picture && <img src={user.picture} alt="" className="h-7 w-7 rounded-full" />}
@@ -93,7 +112,7 @@ export function Toolbar() {
             onClick={signOut}
           >
             <Icon icon="lucide:log-out" width={14} height={14} />
-            Đăng xuất
+            {t('logout')}
           </button>
         </div>
       </div>

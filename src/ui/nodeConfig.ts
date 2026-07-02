@@ -20,6 +20,7 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   condition: { icon: 'lucide:git-fork', typeLabel: 'Condition', color: '#f59e0b' },
   script: { icon: 'tabler:file-code-filled', typeLabel: 'Script', color: '#22c55e' },
   llm: { icon: 'mingcute:ai-fill', typeLabel: 'LLM', color: '#d946ef' },
+  faq: { icon: 'lucide:messages-square', typeLabel: 'FAQ', color: '#6366f1' },
   transfer: { icon: 'lucide:phone-forwarded', typeLabel: 'Transfer', color: '#06b6d4' },
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
 };
@@ -31,6 +32,7 @@ export const ADDABLE_NODE_TYPES: readonly NodeType[] = [
   'condition',
   'script',
   'llm',
+  'faq',
   'transfer',
   'hangup',
 ] as const;

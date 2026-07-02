@@ -227,13 +227,140 @@ body {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-/* Handle (điểm nối dây) — chấm tròn viền accent. */
-.react-flow__handle.bk-handle {
-  width: 10px;
-  height: 10px;
-  background: var(--bk-surface);
-  border: 2px solid var(--accent);
+/* Nội dung panel setting fade/slide nhẹ khi đổi sang module khác. */
+@keyframes bk-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bk-panel-content {
+  animation: bk-panel-in 0.22s ease;
+}
+
+/* Toggle gạt trái/phải (theme, ngôn ngữ). */
+.bk-slide {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  padding: 3px;
   border-radius: 9999px;
+  background: var(--bk-surface-2);
+  border: 1px solid var(--bk-border);
+  cursor: pointer;
+  user-select: none;
+  height: 32px;
+}
+.bk-slide-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 9999px;
+  background: var(--bk-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: left 0.2s cubic-bezier(0.3, 0.9, 0.4, 1.1);
+}
+.bk-slide-thumb[data-right='true'] {
+  left: 50%;
+}
+.bk-slide-opt {
+  position: relative;
+  z-index: 1;
+  /* Hai nửa LUÔN bằng nhau -> thumb 50% khớp đúng, không lệch dù nhãn khác độ dài. */
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--bk-text-faint);
+  transition: color 0.18s ease;
+}
+.bk-slide-opt--on {
+  color: var(--bk-accent);
+}
+
+/* Thanh công cụ nổi trên node khi chọn (NodeToolbar): Sửa / Xoá. */
+.bk-node-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--bk-surface);
+  border: 1px solid var(--bk-border);
+  box-shadow: var(--bk-shadow);
+}
+.bk-node-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bk-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bk-node-toolbar-btn:hover {
+  background: var(--bk-surface-2);
+  color: var(--bk-text);
+}
+.bk-node-toolbar-btn--danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.dark .bk-node-toolbar-btn--danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
+.bk-node-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--bk-border);
+}
+
+/* Handle (điểm nối dây) — chấm ĐẶC màu accent để dây nối liền mạch (không còn
+   ruột rỗng trắng trông như bị hở). Giữ kích thước nhỏ, chỉ mở rộng VÙNG BẮT chuột.
+   Lưu ý: KHÔNG đụng `transform` vì React Flow dùng nó để canh vị trí handle. */
+.react-flow__handle.bk-handle {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 9999px;
+  transition: box-shadow 0.12s ease;
+}
+/* Handle output (đáy) to hơn chút — đây là điểm hay phải kéo. */
+.react-flow__handle-bottom.bk-handle {
+  width: 14px;
+  height: 14px;
+}
+/* Vùng bắt chuột rộng hơn phần nhìn thấy (đệm trong suốt) -> dễ trỏ trúng dù chấm nhỏ. */
+.react-flow__handle.bk-handle::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 9999px;
+}
+/* Hover/kéo: vòng sáng quanh chấm cho rõ (không dùng transform). */
+.react-flow__handle.bk-handle:hover,
+.react-flow__handle.bk-handle.connectingfrom,
+.react-flow__handle.bk-handle.connectingto {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -246,6 +373,9 @@ body {
   gap: 4px;
   font-size: 11px;
   pointer-events: all;
+  /* Nổi TRÊN dây: React Flow có thể vẽ path dây đè lên lớp label, nên nâng
+     z-index để nút xoá luôn nằm trên dây (tránh dây đè lên icon xoá). */
+  z-index: 50;
 }
 .edge-label {
   background: var(--bk-surface);
@@ -260,8 +390,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   line-height: 1;
   font-size: 12px;
   color: var(--bk-text-muted);
@@ -269,6 +399,7 @@ body {
   border: 1px solid var(--bk-border);
   border-radius: 9999px;
   cursor: pointer;
+  box-shadow: var(--bk-shadow); /* tách khỏi dây nền, đọc rõ là "nổi lên trên" */
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .edge-trash:hover {

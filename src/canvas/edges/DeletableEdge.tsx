@@ -7,6 +7,7 @@ import {
 } from '@xyflow/react';
 import { useFlowStore } from '../../store/flowStore';
 import { Icon } from '../../ui/icons';
+import { useT } from '../../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom edge có nút xoá (thùng rác) hiện khi hover vào dây — hành vi giống n8n.
@@ -28,6 +29,7 @@ export function DeletableEdge({
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const removeEdge = useFlowStore((s) => s.removeEdge);
+  const t = useT();
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -64,8 +66,8 @@ export function DeletableEdge({
           {typeof label === 'string' && label && <span className="edge-label">{label}</span>}
           <button
             type="button"
-            title="Xoá dây"
-            aria-label="Xoá dây"
+            title={t('deleteEdgeTitle')}
+            aria-label={t('deleteEdgeTitle')}
             className="edge-trash"
             style={{ opacity: hovered ? 1 : 0 }}
             onClick={(e) => {

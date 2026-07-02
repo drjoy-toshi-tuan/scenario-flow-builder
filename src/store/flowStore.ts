@@ -29,6 +29,8 @@ interface FlowState {
 
   // Thêm 1 module (node) mới vào flow tại vị trí cho trước; trả về id vừa tạo.
   addNode: (type: NodeType, position: { x: number; y: number }) => string;
+  // Xoá 1 module (node) + mọi dây nối tới/từ nó.
+  removeNode: (id: string) => void;
 
   // Nối / xoá dây.
   addEdge: (edge: FlowEdge) => void;
@@ -118,6 +120,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedNodeId: id,
     });
     return id;
+  },
+
+  removeNode: (id) => {
+    const { ir, selectedNodeId } = get();
+    if (!ir) return;
+    set({
+      ir: {
+        ...ir,
+        meta: { ...ir.meta, updatedAt: new Date().toISOString() },
+        nodes: ir.nodes.filter((n) => n.id !== id),
+        // Xoá luôn các dây nối liên quan để không còn edge "treo".
+        edges: ir.edges.filter((e) => e.source !== id && e.target !== id),
+      },
+      selectedNodeId: selectedNodeId === id ? null : selectedNodeId,
+    });
   },
 
   addEdge: (edge) => {
