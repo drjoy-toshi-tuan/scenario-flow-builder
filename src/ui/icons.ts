@@ -2,10 +2,11 @@
 // (src/ui/iconData.ts) nên KHÔNG gọi API api.iconify.design lúc runtime —
 // hoạt động ngay cả khi deploy tĩnh trên GitHub Pages / mạng nội bộ.
 import { addCollection, Icon } from '@iconify/react';
-import { lucideSubset, mingcuteSubset } from './iconData';
+import { lucideSubset, mingcuteSubset, tablerSubset } from './iconData';
 
 addCollection(lucideSubset);
 addCollection(mingcuteSubset);
+addCollection(tablerSubset);
 
 // Re-export để cả app import 1 chỗ (đảm bảo addCollection đã chạy trước khi render).
 export { Icon };
