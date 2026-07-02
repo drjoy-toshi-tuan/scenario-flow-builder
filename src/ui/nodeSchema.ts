@@ -150,7 +150,7 @@ const FAILED_NEXT: BranchDescriptor[] = [
 ];
 
 export const BRANCH_SCHEMA: Record<NodeType, BranchSchema> = {
-  start: { mode: 'fixed', fixed: [{ id: 'default' }] },
+  start: { mode: 'fixed', fixed: [{ id: 'default', label: 'NEXT' }] },
   announce: { mode: 'fixed', fixed: [{ id: 'default', label: 'NEXT' }] },
   input: { mode: 'fixed', fixed: FAILED_NEXT },
   condition: { mode: 'editable' },

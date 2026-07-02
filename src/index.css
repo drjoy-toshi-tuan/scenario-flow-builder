@@ -249,6 +249,81 @@ body {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   Tab của panel setting — tràn hết bề rộng, có vách chia, tab chọn nổi bật.
+   ────────────────────────────────────────────────────────────────────────── */
+.bk-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 8px;
+}
+.bk-tab {
+  position: relative;
+  flex: 1 1 0;
+  padding: 10px 8px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bk-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+/* Vách chia mảnh giữa các tab (không vẽ cho tab đầu). */
+.bk-tab + .bk-tab::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 1px;
+  background: var(--bk-border);
+}
+.bk-tab:not(.bk-tab--disabled):hover {
+  color: var(--bk-text);
+  background: color-mix(in srgb, var(--bk-surface-2) 70%, transparent);
+}
+.bk-tab--active,
+.bk-tab--active:hover {
+  color: var(--bk-accent);
+  border-bottom-color: var(--bk-accent);
+  background: var(--bk-accent-soft);
+}
+.bk-tab--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Modal cảnh báo thay đổi chưa lưu — phủ mờ trong panel. */
+.bk-modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bk-bg) 55%, transparent);
+  backdrop-filter: blur(2px);
+  animation: bk-fade-in 0.15s ease;
+}
+.bk-modal {
+  width: 100%;
+  max-width: 380px;
+  border-radius: 14px;
+  border: 1px solid var(--bk-border);
+  background: var(--bk-surface);
+  box-shadow: var(--bk-shadow);
+  padding: 18px;
+}
+@keyframes bk-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    Code editor (node Script) — textarea trong suốt chồng lên <pre> highlight.
    Cùng font/size/padding để 2 lớp trùng khít; textarea nổi trên nhận thao tác.
    ────────────────────────────────────────────────────────────────────────── */
@@ -292,6 +367,12 @@ body {
   background: color-mix(in srgb, var(--bk-accent) 30%, transparent);
 }
 /* Bảng màu token — dịu, đọc rõ trên cả 2 theme. */
+.bk-code-pre code {
+  color: var(--bk-text); /* định danh thường + mặc định không bị "trắng" */
+}
+.tok-identifier {
+  color: var(--bk-text);
+}
 .tok-keyword {
   color: #c026d3;
   font-weight: 600;
@@ -309,6 +390,25 @@ body {
 .tok-literal {
   color: #2563eb;
 }
+.tok-regex {
+  color: #db2777;
+}
+.tok-global {
+  color: #0891b2;
+  font-weight: 600;
+}
+.tok-function {
+  color: #4f46e5;
+}
+.tok-method {
+  color: #4f46e5;
+}
+.tok-property {
+  color: #0f766e;
+}
+.tok-punct {
+  color: var(--bk-text-muted);
+}
 .dark .tok-keyword {
   color: #e879f9;
 }
@@ -320,6 +420,22 @@ body {
 }
 .dark .tok-literal {
   color: #60a5fa;
+}
+.dark .tok-regex {
+  color: #f472b6;
+}
+.dark .tok-global {
+  color: #22d3ee;
+}
+.dark .tok-function,
+.dark .tok-method {
+  color: #a5b4fc;
+}
+.dark .tok-property {
+  color: #5eead4;
+}
+.dark .tok-punct {
+  color: #9aa4b5;
 }
 
 /* Menu "Thêm node": phóng to ra khi mở, thu nhỏ + mờ dần khi đóng.

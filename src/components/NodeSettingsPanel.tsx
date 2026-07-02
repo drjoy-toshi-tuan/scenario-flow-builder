@@ -2,12 +2,7 @@ import { useEffect, useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import type { FlowNode, NodeType } from '../ir/types';
 import { NODE_CONFIG } from '../ui/nodeConfig';
-import {
-  PROPERTY_FIELDS,
-  BRANCH_SCHEMA,
-  readBranches,
-  type PropertyField,
-} from '../ui/nodeSchema';
+import { PROPERTY_FIELDS, BRANCH_SCHEMA, readBranches, type PropertyField } from '../ui/nodeSchema';
 import { Icon } from '../ui/icons';
 import { useT, type TKey } from '../ui/i18n';
 import { CodeEditor } from './CodeEditor';
@@ -19,11 +14,9 @@ function explainKey(type: NodeType): TKey {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Panel setting: 3 tab chọn từ header —
-//   General  (基本設定)    : tên node + mô tả.
-//   Property (プロパティ設定): tham số riêng theo loại node (nodeSchema).
-//   Branch   (分岐設定)     : điều kiện rẽ nhánh (thêm/bớt cho condition/script).
-// Panel luôn mount, TRƯỢT vào/ra từ phải; giữ node cuối trong lúc trượt ra.
+// Panel setting: 3 tab chọn từ header (General/Property/Branch, tràn hết bề rộng).
+// Mọi chỉnh sửa ghi vào DRAFT trong store; LƯU mới commit vào IR, HỦY thì bỏ.
+// Rời panel khi còn thay đổi -> hiện modal cảnh báo (pendingSelect trong store).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -65,15 +58,25 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
   const t = useT();
   const cfg = NODE_CONFIG[node.type];
 
+  const draft = useFlowStore((s) => s.draft);
+  const commitDraft = useFlowStore((s) => s.commitDraft);
+  const cancelEdit = useFlowStore((s) => s.cancelEdit);
+  const pendingSelect = useFlowStore((s) => s.pendingSelect);
+  const confirmPendingSelect = useFlowStore((s) => s.confirmPendingSelect);
+  const cancelPendingSelect = useFlowStore((s) => s.cancelPendingSelect);
+
+  // Nguồn hiển thị: draft khi đang mở; lúc trượt ra (draft=null) dùng data đã commit.
+  const editing = draft ?? { label: node.label, data: node.data };
+  const dirty =
+    !!draft &&
+    (draft.label !== node.label || JSON.stringify(draft.data) !== JSON.stringify(node.data));
+
   const hasProperty = PROPERTY_FIELDS[node.type].length > 0;
   const hasBranch = BRANCH_SCHEMA[node.type].mode !== 'none';
 
   const [tab, setTab] = useState<Tab>('general');
-  // Nếu tab đang chọn không khả dụng cho node này -> lùi về General.
   useEffect(() => {
-    if ((tab === 'property' && !hasProperty) || (tab === 'branch' && !hasBranch)) {
-      setTab('general');
-    }
+    if ((tab === 'property' && !hasProperty) || (tab === 'branch' && !hasBranch)) setTab('general');
   }, [tab, hasProperty, hasBranch]);
 
   return (
@@ -106,8 +109,8 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
           </button>
         </div>
 
-        {/* Tab chọn từ header. Property/Branch mờ đi (disabled) nếu node không có. */}
-        <div className="flex gap-1 px-3">
+        {/* Tab tràn hết bề rộng panel; tab đang chọn có nền + gạch chân accent. */}
+        <div className="bk-tabs">
           <TabButton label={t('tabGeneral')} active={tab === 'general'} onClick={() => setTab('general')} />
           <TabButton
             label={t('tabProperty')}
@@ -125,10 +128,60 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {tab === 'general' && <GeneralTab node={node} />}
-        {tab === 'property' && <PropertyTab node={node} />}
-        {tab === 'branch' && <BranchTab node={node} />}
+        {tab === 'general' && <GeneralTab label={editing.label} />}
+        {tab === 'property' && <PropertyTab type={node.type} data={editing.data} />}
+        {tab === 'branch' && <BranchTab node={node} data={editing.data} />}
       </div>
+
+      {/* Nút LƯU / HỦY ở đáy panel. */}
+      <footer className="flex items-center justify-end gap-2 border-t border-[var(--bk-border)] px-4 py-3">
+        <button
+          type="button"
+          onClick={cancelEdit}
+          className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+        >
+          {t('btnCancel')}
+        </button>
+        <button
+          type="button"
+          onClick={commitDraft}
+          disabled={!dirty}
+          className={[
+            'rounded-lg px-5 py-2 text-sm font-semibold text-white transition',
+            dirty
+              ? 'bg-[var(--bk-accent)] hover:brightness-95'
+              : 'cursor-not-allowed bg-[var(--bk-text-faint)] opacity-60',
+          ].join(' ')}
+        >
+          {t('btnSave')}
+        </button>
+      </footer>
+
+      {/* Modal cảnh báo khi rời panel lúc còn thay đổi chưa lưu. */}
+      {pendingSelect && (
+        <div className="bk-modal-overlay" role="dialog" aria-modal="true">
+          <div className="bk-modal">
+            <div className="mb-1 text-sm font-bold text-[var(--bk-text)]">{t('unsavedTitle')}</div>
+            <p className="mb-4 text-sm leading-relaxed text-[var(--bk-text-muted)]">{t('unsavedMessage')}</p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelPendingSelect}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('keepEditing')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmPendingSelect}
+                className="rounded-lg bg-[#dc2626] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+              >
+                {t('discardChanges')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -150,11 +203,9 @@ function TabButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        'relative -mb-px border-b-2 px-3 py-2 text-xs font-semibold transition',
-        active
-          ? 'border-[var(--bk-accent)] text-[var(--bk-accent)]'
-          : 'border-transparent text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]',
-        disabled ? 'cursor-not-allowed opacity-35 hover:text-[var(--bk-text-muted)]' : '',
+        'bk-tab',
+        active ? 'bk-tab--active' : '',
+        disabled ? 'bk-tab--disabled' : '',
       ].join(' ')}
     >
       {label}
@@ -163,20 +214,18 @@ function TabButton({
 }
 
 // ── General ─────────────────────────────────────────────────────────────────
-function GeneralTab({ node }: { node: FlowNode }) {
+function GeneralTab({ label }: { label: string }) {
   const t = useT();
-  const updateNode = useFlowStore((s) => s.updateNode);
-  const description = typeof node.data.description === 'string' ? node.data.description : '';
+  const setDraftLabel = useFlowStore((s) => s.setDraftLabel);
+  const setDraftField = useFlowStore((s) => s.setDraftField);
+  const draft = useFlowStore((s) => s.draft);
+  const description = typeof draft?.data.description === 'string' ? draft.data.description : '';
 
   return (
     <>
       <label className="block">
         <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('nodeName')}</span>
-        <input
-          className={inputClass}
-          value={node.label}
-          onChange={(e) => updateNode(node.id, { label: e.target.value })}
-        />
+        <input className={inputClass} value={label} onChange={(e) => setDraftLabel(e.target.value)} />
       </label>
       <label className="block">
         <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('description')}</span>
@@ -185,7 +234,7 @@ function GeneralTab({ node }: { node: FlowNode }) {
           className={inputClass}
           placeholder={t('descriptionPlaceholder')}
           value={description}
-          onChange={(e) => updateNode(node.id, { data: { description: e.target.value } })}
+          onChange={(e) => setDraftField('description', e.target.value)}
         />
       </label>
     </>
@@ -193,29 +242,29 @@ function GeneralTab({ node }: { node: FlowNode }) {
 }
 
 // ── Property ──────────────────────────────────────────────────────────────────
-function PropertyTab({ node }: { node: FlowNode }) {
+function PropertyTab({ type, data }: { type: NodeType; data: Record<string, unknown> }) {
   const t = useT();
-  const fields = PROPERTY_FIELDS[node.type].filter((f) => !f.showIf || f.showIf(node.data));
+  const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
   if (fields.length === 0) {
     return <p className="text-sm text-[var(--bk-text-faint)]">{t('noPropertyNote')}</p>;
   }
   return (
     <div className="space-y-4">
       {fields.map((f) => (
-        <FieldControl key={f.key} node={node} field={f} />
+        <FieldControl key={f.key} field={f} data={data} />
       ))}
     </div>
   );
 }
 
-function FieldControl({ node, field }: { node: FlowNode; field: PropertyField }) {
+function FieldControl({ field, data }: { field: PropertyField; data: Record<string, unknown> }) {
   const t = useT();
-  const updateNode = useFlowStore((s) => s.updateNode);
-  const raw = node.data[field.key];
+  const setDraftField = useFlowStore((s) => s.setDraftField);
+  const raw = data[field.key];
   // YAML có thể trả số (retryCount: 2) -> ép về chuỗi để hiển thị/sửa nhất quán.
   const value =
     typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : field.default ?? '';
-  const set = (v: string) => updateNode(node.id, { data: { [field.key]: v } });
+  const set = (v: string) => setDraftField(field.key, v);
   const label = <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t(field.labelKey)}</span>;
 
   switch (field.kind) {
@@ -306,7 +355,7 @@ function FieldControl({ node, field }: { node: FlowNode; field: PropertyField })
         </div>
       );
     case 'collapsibleTextarea':
-      return <CollapsibleField node={node} field={field} value={value} onChange={set} />;
+      return <CollapsibleField field={field} value={value} onChange={set} />;
   }
 }
 
@@ -316,7 +365,6 @@ function CollapsibleField({
   value,
   onChange,
 }: {
-  node: FlowNode;
   field: PropertyField;
   value: string;
   onChange: (v: string) => void;
@@ -356,19 +404,27 @@ function CollapsibleField({
 }
 
 // ── Branch ────────────────────────────────────────────────────────────────────
-function BranchTab({ node }: { node: FlowNode }) {
+function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknown> }) {
   const t = useT();
   const schema = BRANCH_SCHEMA[node.type];
-  const addBranch = useFlowStore((s) => s.addBranch);
-  const updateBranch = useFlowStore((s) => s.updateBranch);
-  const removeBranch = useFlowStore((s) => s.removeBranch);
+  const ir = useFlowStore((s) => s.ir);
+  const draftAddBranch = useFlowStore((s) => s.draftAddBranch);
+  const draftUpdateBranch = useFlowStore((s) => s.draftUpdateBranch);
+  const draftRemoveBranch = useFlowStore((s) => s.draftRemoveBranch);
+
+  // Đích jump của 1 nhánh = target của edge xuất phát từ handle đó (IR đã commit).
+  const targetLabel = (handleId: string): string | null => {
+    const edge = ir?.edges.find((e) => e.source === node.id && (e.sourceHandle ?? 'default') === handleId);
+    if (!edge) return null;
+    return ir?.nodes.find((n) => n.id === edge.target)?.label ?? edge.target;
+  };
 
   if (schema.mode === 'none') {
     return <p className="text-sm text-[var(--bk-text-faint)]">{t('branchNoneNote')}</p>;
   }
 
   if (schema.mode === 'fixed') {
-    // Nhánh cố định (FAILED / NEXT …): chỉ xem, không sửa được.
+    // Nhánh cố định (FAILED / NEXT …): chỉ xem, kèm đích jump bên phải.
     return (
       <div className="space-y-3">
         <p className="text-xs text-[var(--bk-text-faint)]">{t('branchFixedNote')}</p>
@@ -376,10 +432,11 @@ function BranchTab({ node }: { node: FlowNode }) {
           {(schema.fixed ?? []).map((b) => (
             <div
               key={b.id}
-              className="flex items-center gap-2 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-sm font-medium text-[var(--bk-text-muted)]"
+              className="flex items-center gap-2 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-sm"
             >
               <span className="h-2 w-2 flex-none rounded-full bg-[var(--bk-text-faint)]" />
-              {b.label ?? b.id}
+              <span className="font-medium text-[var(--bk-text-muted)]">{b.label ?? b.id}</span>
+              <BranchTarget label={targetLabel(b.id)} />
             </div>
           ))}
         </div>
@@ -388,22 +445,26 @@ function BranchTab({ node }: { node: FlowNode }) {
   }
 
   // Nhánh tự do (condition/script): thêm/sửa/xoá. Nhánh đầu không xoá được.
-  const branches = readBranches(node.data);
+  const branches = readBranches(data);
   return (
     <div className="space-y-3">
       <div className="space-y-2">
         {branches.map((b, i) => (
           <div key={b.id} className="flex items-center gap-2">
             <RegexBranchInput
-              className={`${inputClass} !mt-0 flex-1 font-mono`}
+              className={`${inputClass} !mt-0 min-w-0 flex-1 font-mono`}
               value={b.value}
               placeholder={t('branchConditionPlaceholder')}
-              onChange={(v) => updateBranch(node.id, b.id, v)}
+              onChange={(v) => draftUpdateBranch(b.id, v)}
             />
+            <div className="flex w-28 flex-none items-center gap-1">
+              <span className="flex-none text-[var(--bk-text-faint)]" aria-hidden>→</span>
+              <BranchTarget label={targetLabel(b.id)} />
+            </div>
             <button
               type="button"
               disabled={i === 0}
-              onClick={() => removeBranch(node.id, b.id)}
+              onClick={() => draftRemoveBranch(b.id)}
               title={t('deleteBranch')}
               aria-label={t('deleteBranch')}
               className={[
@@ -420,12 +481,25 @@ function BranchTab({ node }: { node: FlowNode }) {
       </div>
       <button
         type="button"
-        onClick={() => addBranch(node.id)}
+        onClick={draftAddBranch}
         className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--bk-border)] px-3 py-2 text-sm font-medium text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
       >
         <Icon icon="lucide:plus" width={16} height={16} />
         {t('addBranch')}
       </button>
     </div>
+  );
+}
+
+// Nhãn đích jump: tên node tiếp theo, hoặc "chưa nối" nếu handle chưa có dây.
+function BranchTarget({ label }: { label: string | null }) {
+  const t = useT();
+  if (!label) {
+    return <span className="truncate text-xs italic text-[var(--bk-text-faint)]">{t('branchTargetNone')}</span>;
+  }
+  return (
+    <span className="truncate text-xs font-medium text-[var(--bk-text)]" title={label}>
+      {label}
+    </span>
   );
 }
