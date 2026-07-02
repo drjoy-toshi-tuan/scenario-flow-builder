@@ -24,6 +24,7 @@ export type NodeType =
   | 'condition' // phân nhánh theo điều kiện (jump)
   | 'script' // ES5 script (Brekeke)
   | 'llm' // gọi OpenAI / LLM
+  | 'faq' // hỏi-đáp (FAQ)
   | 'transfer' // chuyển máy
   | 'hangup';
 
@@ -34,6 +35,7 @@ export const NODE_TYPES: readonly NodeType[] = [
   'condition',
   'script',
   'llm',
+  'faq',
   'transfer',
   'hangup',
 ] as const;

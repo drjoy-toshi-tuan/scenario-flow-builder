@@ -11,6 +11,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStoreApi,
   type Connection,
   type Node,
   type Edge,
@@ -52,6 +53,7 @@ export function FlowCanvas() {
   const selectNode = useFlowStore((s) => s.selectNode);
   const theme = useTheme((s) => s.theme);
   const { screenToFlowPosition } = useReactFlow();
+  const store = useStoreApi();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -63,6 +65,25 @@ export function FlowCanvas() {
     setNodes(rf.nodes);
     setEdges(rf.edges);
   }, [ir, setNodes, setEdges]);
+
+  // Phím tắt Ctrl/⌘ + Shift + L: bật/tắt tương tác (Toggle Interactivity) — đồng
+  // bộ với nút khoá trong Controls (cùng sửa store nodesDraggable/Connectable/Selectable).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyL') {
+        e.preventDefault();
+        const s = store.getState();
+        const next = !(s.nodesDraggable && s.nodesConnectable && s.elementsSelectable);
+        store.setState({
+          nodesDraggable: next,
+          nodesConnectable: next,
+          elementsSelectable: next,
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [store]);
 
   // Kéo xong 1 node -> commit vị trí vào IR (để auto-layout/re-derive không mất chỗ).
   const onNodeDragStop = useCallback(() => {
@@ -180,8 +201,6 @@ export function FlowCanvas() {
       defaultEdgeOptions={{ type: 'deletable' }}
       snapToGrid
       snapGrid={SNAP_GRID}
-      nodesDraggable
-      elementsSelectable
       selectionOnDrag
       selectionMode={SelectionMode.Partial}
       panOnDrag={PAN_BUTTONS}

@@ -1,12 +1,17 @@
+import { useEffect, useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
+import type { FlowNode } from '../ir/types';
 import { NODE_CONFIG } from '../ui/nodeConfig';
 import { Icon } from '../ui/icons';
 import { useT } from '../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Panel setting: sửa tên module (label), MÔ TẢ (data.description — hiện trên node)
-// và các field chuỗi khác trong `data`. Mở khi double-click node.
-// Mọi thay đổi cập nhật thẳng vào IR store.
+// và các field chuỗi khác trong `data`. Mở khi double-click / bấm "Sửa".
+//
+// Hiệu ứng: panel luôn mount, TRƯỢT vào/ra từ phải (transition-transform). Khi
+// đang trượt ra vẫn giữ nội dung node cuối (shownNode) để không biến mất đột ngột;
+// khi đổi sang module khác, nội dung fade/slide nhẹ (key theo node.id).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -17,12 +22,49 @@ export function NodeSettingsPanel() {
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
   const selectNode = useFlowStore((s) => s.selectNode);
   const updateNode = useFlowStore((s) => s.updateNode);
-
   const t = useT();
 
-  const node = ir?.nodes.find((n) => n.id === selectedNodeId);
-  if (!node) return null;
+  const node = ir?.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  const open = !!node;
 
+  // Giữ node cuối để nội dung còn hiển thị trong lúc panel trượt ra.
+  const [shownNode, setShownNode] = useState<FlowNode | null>(node);
+  useEffect(() => {
+    if (node) setShownNode(node);
+  }, [node]);
+
+  const display = node ?? shownNode;
+
+  return (
+    <aside
+      className={[
+        'absolute right-0 top-0 z-10 flex h-full w-80 flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)] shadow-[var(--bk-shadow)]',
+        'transition-transform duration-300 ease-out will-change-transform',
+        open ? 'translate-x-0' : 'translate-x-full pointer-events-none',
+      ].join(' ')}
+      aria-hidden={!open}
+    >
+      {display && (
+        <PanelContent
+          key={display.id}
+          node={display}
+          t={t}
+          onClose={() => selectNode(null)}
+          onUpdate={updateNode}
+        />
+      )}
+    </aside>
+  );
+}
+
+interface PanelContentProps {
+  node: FlowNode;
+  t: ReturnType<typeof useT>;
+  onClose: () => void;
+  onUpdate: (id: string, patch: { label?: string; data?: Record<string, unknown> }) => void;
+}
+
+function PanelContent({ node, t, onClose, onUpdate }: PanelContentProps) {
   const cfg = NODE_CONFIG[node.type];
   const description = typeof node.data.description === 'string' ? node.data.description : '';
 
@@ -32,7 +74,7 @@ export function NodeSettingsPanel() {
   ) as [string, string][];
 
   return (
-    <aside className="absolute right-0 top-0 z-10 flex h-full w-80 flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)] shadow-[var(--bk-shadow)]">
+    <div className="bk-panel-content flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] px-4 py-3">
         <div className="flex items-center gap-3">
           <span
@@ -45,10 +87,7 @@ export function NodeSettingsPanel() {
             <Icon icon={cfg.icon} />
           </span>
           <div>
-            <div
-              className="text-[11px] font-bold uppercase tracking-wide"
-              style={{ color: cfg.color }}
-            >
+            <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: cfg.color }}>
               {cfg.typeLabel}
             </div>
             <div className="text-sm font-semibold text-[var(--bk-text)]">{node.id}</div>
@@ -57,7 +96,7 @@ export function NodeSettingsPanel() {
         <button
           type="button"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
-          onClick={() => selectNode(null)}
+          onClick={onClose}
           aria-label={t('close')}
         >
           <Icon icon="lucide:x" width={16} height={16} />
@@ -70,7 +109,7 @@ export function NodeSettingsPanel() {
           <input
             className={inputClass}
             value={node.label}
-            onChange={(e) => updateNode(node.id, { label: e.target.value })}
+            onChange={(e) => onUpdate(node.id, { label: e.target.value })}
           />
         </label>
 
@@ -81,7 +120,7 @@ export function NodeSettingsPanel() {
             rows={3}
             placeholder={t('descriptionPlaceholder')}
             value={description}
-            onChange={(e) => updateNode(node.id, { data: { description: e.target.value } })}
+            onChange={(e) => onUpdate(node.id, { data: { description: e.target.value } })}
           />
         </label>
 
@@ -98,7 +137,7 @@ export function NodeSettingsPanel() {
                     className={`${inputClass} resize-y`}
                     rows={key === 'text' || key === 'prompt' ? 3 : 1}
                     value={value}
-                    onChange={(e) => updateNode(node.id, { data: { [key]: e.target.value } })}
+                    onChange={(e) => onUpdate(node.id, { data: { [key]: e.target.value } })}
                   />
                 </label>
               ))}
@@ -106,6 +145,6 @@ export function NodeSettingsPanel() {
           </div>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
