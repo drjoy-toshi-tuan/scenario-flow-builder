@@ -27,7 +27,7 @@ export function LoginScreen() {
         <SlideToggle
           value={lang}
           options={[
-            { key: 'vi', label: 'VI' },
+            { key: 'vi', label: 'Tiếng Việt' },
             { key: 'ja', label: '日本語' },
           ]}
           onChange={(k) => setLang(k as 'vi' | 'ja')}

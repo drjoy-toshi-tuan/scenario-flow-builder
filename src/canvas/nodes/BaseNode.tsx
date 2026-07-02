@@ -70,12 +70,10 @@ export function makeNode(nodeType: NodeType) {
             <div className="bk-node-name" title={d.label}>
               {d.label}
             </div>
-            {description ? (
+            {description && (
               <div className="bk-node-desc" title={description}>
                 {description}
               </div>
-            ) : (
-              <div className="bk-node-desc bk-node-desc--empty">{t('noDescription')}</div>
             )}
           </div>
         </div>
