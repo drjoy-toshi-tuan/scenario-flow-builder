@@ -22,7 +22,7 @@ function explainKey(type: NodeType): TKey {
 const inputClass =
   'mt-1 w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none transition focus:border-[var(--bk-accent)]';
 
-const DESC_MAX_H = 58;
+const DESC_MAX_H = 38;
 
 export function NodeSettingsPanel() {
   const ir = useFlowStore((s) => s.ir);
