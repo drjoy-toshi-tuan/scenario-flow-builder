@@ -1,16 +1,17 @@
 import type { CSSProperties } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import type { RFNodeData } from '../irAdapter';
 import type { NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
 import { Icon } from '../../ui/icons';
+import { useFlowStore } from '../../store/flowStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node card. Bố cục theo yêu cầu:
 //   - Bên TRÁI: icon của loại node (tile màu accent).
 //   - Bên phải xếp dọc: (trên) tên LOẠI module · (giữa) TÊN module · (dưới) mô tả.
 // Node 'condition' có nhiều handle output ở đáy (mỗi nhánh 1 chấm), chia đều & giữa.
-// Màu accent lấy từ NODE_CONFIG, truyền vào CSS qua biến --accent.
+// Khi node được chọn -> hiện thanh công cụ phía trên (Sửa / Xoá) qua NodeToolbar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Factory tạo 1 component node cho mỗi NodeType — tránh lặp markup.
@@ -19,16 +20,43 @@ export function makeNode(nodeType: NodeType) {
   const showTarget = cfg.showTarget !== false;
   const showSource = cfg.showSource !== false;
 
-  function TypedNode({ data, selected }: NodeProps) {
+  function TypedNode({ id, data, selected }: NodeProps) {
     const d = data as unknown as RFNodeData;
     const description = pickDescription(d.nodeData);
     const handles = d.sourceHandles;
+    const selectNode = useFlowStore((s) => s.selectNode);
+    const removeNode = useFlowStore((s) => s.removeNode);
 
     return (
       <div
         className={['bk-node', selected ? 'bk-node--selected' : ''].join(' ')}
         style={{ '--accent': cfg.color } as CSSProperties}
       >
+        {/* Thanh công cụ nổi phía trên node khi được chọn (bấm vào node). */}
+        <NodeToolbar position={Position.Top} offset={10} align="center">
+          <div className="bk-node-toolbar">
+            <button
+              type="button"
+              className="bk-node-toolbar-btn"
+              onClick={() => selectNode(id)}
+              title="Chỉnh sửa"
+            >
+              <Icon icon="lucide:pencil" width={14} height={14} />
+              <span>Sửa</span>
+            </button>
+            <span className="bk-node-toolbar-sep" />
+            <button
+              type="button"
+              className="bk-node-toolbar-btn bk-node-toolbar-btn--danger"
+              onClick={() => removeNode(id)}
+              title="Xoá module"
+            >
+              <Icon icon="lucide:trash-2" width={14} height={14} />
+              <span>Xoá</span>
+            </button>
+          </div>
+        </NodeToolbar>
+
         {showTarget && <Handle type="target" position={Position.Top} className="bk-handle" />}
 
         <div className="bk-node-body">

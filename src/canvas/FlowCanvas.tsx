@@ -38,11 +38,16 @@ const SNAP_GRID: [number, number] = [16, 16];
 // chuột giữa (1) / phải (2). Nhờ vậy left-drag trên nền = khung chọn, không pan.
 const PAN_BUTTONS: number[] = [1, 2];
 
+// Phím xoá node/edge đang chọn.
+const DELETE_KEYS = ['Delete', 'Backspace'];
+
 export function FlowCanvas() {
   const ir = useFlowStore((s) => s.ir);
   const setNodePositions = useFlowStore((s) => s.setNodePositions);
   const addEdge = useFlowStore((s) => s.addEdge);
   const addNode = useFlowStore((s) => s.addNode);
+  const removeNode = useFlowStore((s) => s.removeNode);
+  const removeEdge = useFlowStore((s) => s.removeEdge);
   const selectNode = useFlowStore((s) => s.selectNode);
   const theme = useTheme((s) => s.theme);
   const { screenToFlowPosition } = useReactFlow();
@@ -104,6 +109,16 @@ export function FlowCanvas() {
     [screenToFlowPosition, addNode],
   );
 
+  // Xoá bằng phím Delete/Backspace -> commit vào IR (React Flow gọi 2 callback này).
+  const onNodesDelete = useCallback(
+    (deleted: Node[]) => deleted.forEach((n) => removeNode(n.id)),
+    [removeNode],
+  );
+  const onEdgesDelete = useCallback(
+    (deleted: Edge[]) => deleted.forEach((e) => removeEdge(e.id)),
+    [removeEdge],
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -119,6 +134,9 @@ export function FlowCanvas() {
       onPaneClick={() => selectNode(null)}
       onDrop={onDrop}
       onDragOver={onDragOver}
+      onNodesDelete={onNodesDelete}
+      onEdgesDelete={onEdgesDelete}
+      deleteKeyCode={DELETE_KEYS}
       defaultEdgeOptions={{ type: 'deletable' }}
       snapToGrid
       snapGrid={SNAP_GRID}

@@ -227,6 +227,49 @@ body {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* Thanh công cụ nổi trên node khi chọn (NodeToolbar): Sửa / Xoá. */
+.bk-node-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--bk-surface);
+  border: 1px solid var(--bk-border);
+  box-shadow: var(--bk-shadow);
+}
+.bk-node-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bk-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bk-node-toolbar-btn:hover {
+  background: var(--bk-surface-2);
+  color: var(--bk-text);
+}
+.bk-node-toolbar-btn--danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.dark .bk-node-toolbar-btn--danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
+.bk-node-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--bk-border);
+}
+
 /* Handle (điểm nối dây) — chấm tròn viền accent. */
 .react-flow__handle.bk-handle {
   width: 10px;
@@ -246,6 +289,9 @@ body {
   gap: 4px;
   font-size: 11px;
   pointer-events: all;
+  /* Nổi TRÊN dây: React Flow có thể vẽ path dây đè lên lớp label, nên nâng
+     z-index để nút xoá luôn nằm trên dây (tránh dây đè lên icon xoá). */
+  z-index: 50;
 }
 .edge-label {
   background: var(--bk-surface);
@@ -260,8 +306,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   line-height: 1;
   font-size: 12px;
   color: var(--bk-text-muted);
@@ -269,6 +315,7 @@ body {
   border: 1px solid var(--bk-border);
   border-radius: 9999px;
   cursor: pointer;
+  box-shadow: var(--bk-shadow); /* tách khỏi dây nền, đọc rõ là "nổi lên trên" */
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .edge-trash:hover {
