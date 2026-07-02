@@ -84,6 +84,27 @@ body {
   border: none;
   box-shadow: none;
 }
+/* Type node 'input' (và output/default/group) TRÙNG tên node dựng sẵn của React Flow.
+   Khi chọn, RF thêm box-shadow "ring" qua selector .selectable.selected (đặc hiệu 0,3,0)
+   -> lộ viền vuông quanh card. Trạng thái chọn đã thể hiện bằng .bk-node--selected nên
+   tắt hẳn ring/viền/outline mặc định ở mọi trạng thái (cùng đặc hiệu, đặt sau -> thắng). */
+.react-flow__node-input.selectable.selected,
+.react-flow__node-input.selectable:focus,
+.react-flow__node-input.selectable:focus-visible,
+.react-flow__node-output.selectable.selected,
+.react-flow__node-output.selectable:focus,
+.react-flow__node-output.selectable:focus-visible,
+.react-flow__node-default.selectable.selected,
+.react-flow__node-default.selectable:focus,
+.react-flow__node-default.selectable:focus-visible,
+.react-flow__node-group.selectable.selected,
+.react-flow__node-group.selectable:focus,
+.react-flow__node-group.selectable:focus-visible {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
 /* Bỏ khung chọn mặc định — trạng thái chọn đã thể hiện bằng .bk-node--selected. */
 .react-flow__node.selected {
   box-shadow: none;
