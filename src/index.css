@@ -227,6 +227,51 @@ body {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* Toggle gạt trái/phải (theme, ngôn ngữ). */
+.bk-slide {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 9999px;
+  background: var(--bk-surface-2);
+  border: 1px solid var(--bk-border);
+  cursor: pointer;
+  user-select: none;
+  height: 32px;
+}
+.bk-slide-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 9999px;
+  background: var(--bk-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: left 0.2s cubic-bezier(0.3, 0.9, 0.4, 1.1);
+}
+.bk-slide-thumb[data-right='true'] {
+  left: 50%;
+}
+.bk-slide-opt {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bk-text-faint);
+  transition: color 0.18s ease;
+}
+.bk-slide-opt--on {
+  color: var(--bk-accent);
+}
+
 /* Thanh công cụ nổi trên node khi chọn (NodeToolbar): Sửa / Xoá. */
 .bk-node-toolbar {
   display: flex;
@@ -270,13 +315,34 @@ body {
   background: var(--bk-border);
 }
 
-/* Handle (điểm nối dây) — chấm tròn viền accent. */
+/* Handle (điểm nối dây) — chấm tròn viền accent, to hơn để dễ bắt kéo dây.
+   Lưu ý: KHÔNG đụng `transform` vì React Flow dùng nó để canh vị trí handle. */
 .react-flow__handle.bk-handle {
-  width: 10px;
-  height: 10px;
+  width: 13px;
+  height: 13px;
   background: var(--bk-surface);
   border: 2px solid var(--accent);
   border-radius: 9999px;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+/* Handle output (đáy) to hơn chút — đây là điểm hay phải kéo. */
+.react-flow__handle-bottom.bk-handle {
+  width: 15px;
+  height: 15px;
+}
+/* Vùng bắt chuột rộng hơn phần nhìn thấy (đệm trong suốt) -> dễ trỏ trúng. */
+.react-flow__handle.bk-handle::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 9999px;
+}
+/* Hover/kéo: tô đầy accent + vòng sáng cho rõ (không dùng transform). */
+.react-flow__handle.bk-handle:hover,
+.react-flow__handle.bk-handle.connectingfrom,
+.react-flow__handle.bk-handle.connectingto {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

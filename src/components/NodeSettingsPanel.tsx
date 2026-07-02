@@ -1,6 +1,7 @@
 import { useFlowStore } from '../store/flowStore';
 import { NODE_CONFIG } from '../ui/nodeConfig';
 import { Icon } from '../ui/icons';
+import { useT } from '../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Panel setting: sửa tên module (label), MÔ TẢ (data.description — hiện trên node)
@@ -16,6 +17,8 @@ export function NodeSettingsPanel() {
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
   const selectNode = useFlowStore((s) => s.selectNode);
   const updateNode = useFlowStore((s) => s.updateNode);
+
+  const t = useT();
 
   const node = ir?.nodes.find((n) => n.id === selectedNodeId);
   if (!node) return null;
@@ -55,7 +58,7 @@ export function NodeSettingsPanel() {
           type="button"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
           onClick={() => selectNode(null)}
-          aria-label="Đóng"
+          aria-label={t('close')}
         >
           <Icon icon="lucide:x" width={16} height={16} />
         </button>
@@ -63,7 +66,7 @@ export function NodeSettingsPanel() {
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <label className="block">
-          <span className="text-xs font-medium text-[var(--bk-text-muted)]">Tên module</span>
+          <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('nodeName')}</span>
           <input
             className={inputClass}
             value={node.label}
@@ -72,11 +75,11 @@ export function NodeSettingsPanel() {
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-[var(--bk-text-muted)]">Mô tả</span>
+          <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('description')}</span>
           <textarea
             className={`${inputClass} resize-y`}
             rows={3}
-            placeholder="Mô tả ngắn hiển thị trên node…"
+            placeholder={t('descriptionPlaceholder')}
             value={description}
             onChange={(e) => updateNode(node.id, { data: { description: e.target.value } })}
           />
@@ -85,7 +88,7 @@ export function NodeSettingsPanel() {
         {editableEntries.length > 0 && (
           <div className="border-t border-[var(--bk-border)] pt-3">
             <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-              Tham số
+              {t('params')}
             </div>
             <div className="space-y-3">
               {editableEntries.map(([key, value]) => (

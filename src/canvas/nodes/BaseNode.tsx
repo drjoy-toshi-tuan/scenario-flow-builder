@@ -5,6 +5,7 @@ import type { NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
 import { Icon } from '../../ui/icons';
 import { useFlowStore } from '../../store/flowStore';
+import { useT } from '../../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node card. Bố cục theo yêu cầu:
@@ -26,6 +27,7 @@ export function makeNode(nodeType: NodeType) {
     const handles = d.sourceHandles;
     const selectNode = useFlowStore((s) => s.selectNode);
     const removeNode = useFlowStore((s) => s.removeNode);
+    const t = useT();
 
     return (
       <div
@@ -39,20 +41,20 @@ export function makeNode(nodeType: NodeType) {
               type="button"
               className="bk-node-toolbar-btn"
               onClick={() => selectNode(id)}
-              title="Chỉnh sửa"
+              title={t('editTitle')}
             >
               <Icon icon="lucide:pencil" width={14} height={14} />
-              <span>Sửa</span>
+              <span>{t('edit')}</span>
             </button>
             <span className="bk-node-toolbar-sep" />
             <button
               type="button"
               className="bk-node-toolbar-btn bk-node-toolbar-btn--danger"
               onClick={() => removeNode(id)}
-              title="Xoá module"
+              title={t('deleteNodeTitle')}
             >
               <Icon icon="lucide:trash-2" width={14} height={14} />
-              <span>Xoá</span>
+              <span>{t('delete')}</span>
             </button>
           </div>
         </NodeToolbar>
@@ -73,7 +75,7 @@ export function makeNode(nodeType: NodeType) {
                 {description}
               </div>
             ) : (
-              <div className="bk-node-desc bk-node-desc--empty">Chưa có mô tả</div>
+              <div className="bk-node-desc bk-node-desc--empty">{t('noDescription')}</div>
             )}
           </div>
         </div>
