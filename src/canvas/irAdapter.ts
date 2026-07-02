@@ -12,6 +12,8 @@ export interface RFNodeData {
   label: string;
   nodeType: NodeType;
   nodeData: Record<string, unknown>;
+  // Với node nhiều nhánh (condition): danh sách handle output ở đáy (mỗi nhánh 1 chấm).
+  sourceHandles?: { id: string; label?: string }[];
   [key: string]: unknown; // React Flow yêu cầu data thoả Record<string, unknown>
 }
 
@@ -22,6 +24,20 @@ export interface RFEdgeData {
 }
 
 export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
+  // Gom các nhánh output cho node 'condition' (mỗi edge đi ra = 1 handle ở đáy).
+  const branchHandles = new Map<string, { id: string; label?: string }[]>();
+  for (const n of ir.nodes) {
+    if (n.type !== 'condition') continue;
+    const outs = ir.edges.filter((e) => e.source === n.id);
+    branchHandles.set(
+      n.id,
+      outs.map((e, i) => ({
+        id: e.sourceHandle ?? `b${i}`,
+        label: e.label ?? e.condition,
+      })),
+    );
+  }
+
   const nodes: Node[] = ir.nodes.map((n) => ({
     id: n.id,
     type: n.type, // khớp key trong nodeTypes map
@@ -30,15 +46,18 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
       label: n.label,
       nodeType: n.type,
       nodeData: n.data,
+      ...(branchHandles.has(n.id) ? { sourceHandles: branchHandles.get(n.id) } : {}),
     } satisfies RFNodeData,
   }));
 
+  const conditionIds = new Set(branchHandles.keys());
   const edges: Edge[] = ir.edges.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
-    // Không truyền sourceHandle xuống React Flow: các node dùng 1 handle output
-    // duy nhất, nhánh được thể hiện bằng label trên dây (đủ cho phase demo UI).
+    // Chỉ node 'condition' có nhiều handle nên mới cần gắn sourceHandle để dây
+    // xuất phát đúng chấm; node thường dùng 1 handle mặc định (bỏ sourceHandle).
+    sourceHandle: conditionIds.has(e.source) ? e.sourceHandle : undefined,
     type: 'deletable',
     label: e.label ?? e.condition,
     data: { condition: e.condition } satisfies RFEdgeData,

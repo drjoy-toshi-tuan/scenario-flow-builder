@@ -10,19 +10,18 @@ export interface NodeVisual {
   typeLabel: string; // tên loại module hiển thị
   color: string; // màu accent (hex) — dùng cho viền, icon tile, chữ loại
   showTarget?: boolean; // false: node không có input (start)
-  showSource?: boolean; // false: node không có output (hangup/end)
+  showSource?: boolean; // false: node không có output (hangup)
 }
 
 export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   start: { icon: 'lucide:play', typeLabel: 'Start', color: '#10b981', showTarget: false },
   announce: { icon: 'lucide:volume-2', typeLabel: 'Announce', color: '#0ea5e9' },
-  input: { icon: 'lucide:keyboard', typeLabel: 'Input', color: '#8b5cf6' },
+  input: { icon: 'mingcute:voice-fill', typeLabel: 'Input', color: '#8b5cf6' },
   condition: { icon: 'lucide:git-fork', typeLabel: 'Condition', color: '#f59e0b' },
-  script: { icon: 'lucide:file-code', typeLabel: 'Script', color: '#64748b' },
+  script: { icon: 'lucide:file-code', typeLabel: 'Script', color: '#22c55e' },
   llm: { icon: 'lucide:bot', typeLabel: 'LLM', color: '#d946ef' },
   transfer: { icon: 'lucide:phone-forwarded', typeLabel: 'Transfer', color: '#06b6d4' },
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
-  end: { icon: 'lucide:flag', typeLabel: 'End', color: '#6b7280', showSource: false },
 };
 
 // Loại có thể thêm qua "Thêm module" — bỏ 'start' (node tổng hợp từ field flow.start).
@@ -34,5 +33,4 @@ export const ADDABLE_NODE_TYPES: readonly NodeType[] = [
   'llm',
   'transfer',
   'hangup',
-  'end',
 ] as const;

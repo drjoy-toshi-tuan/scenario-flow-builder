@@ -6,9 +6,11 @@ import {
   Controls,
   MiniMap,
   Panel,
+  SelectionMode,
   addEdge as rfAddEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Connection,
   type Node,
   type Edge,
@@ -16,10 +18,11 @@ import {
 } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import { useTheme } from '../ui/theme';
+import type { NodeType } from '../ir/types';
 import { irToReactFlow } from './irAdapter';
 import { nodeTypes } from './nodes';
 import { edgeTypes } from './edges/DeletableEdge';
-import { AddModulePanel } from '../components/AddModulePanel';
+import { AddModulePanel, DND_MIME } from '../components/AddModulePanel';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canvas React Flow. IR là source of truth:
@@ -31,12 +34,18 @@ import { AddModulePanel } from '../components/AddModulePanel';
 // Cữ (grid) khi kéo node — bắt điểm theo lưới 16px giống n8n, tránh lệch tự do.
 const SNAP_GRID: [number, number] = [16, 16];
 
+// Chuột trái để KÉO CHỌN nhiều node (selectionOnDrag) + KÉO node; pan bằng
+// chuột giữa (1) / phải (2). Nhờ vậy left-drag trên nền = khung chọn, không pan.
+const PAN_BUTTONS: number[] = [1, 2];
+
 export function FlowCanvas() {
   const ir = useFlowStore((s) => s.ir);
   const setNodePositions = useFlowStore((s) => s.setNodePositions);
   const addEdge = useFlowStore((s) => s.addEdge);
+  const addNode = useFlowStore((s) => s.addNode);
   const selectNode = useFlowStore((s) => s.selectNode);
   const theme = useTheme((s) => s.theme);
+  const { screenToFlowPosition } = useReactFlow();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -78,6 +87,23 @@ export function FlowCanvas() {
     [selectNode],
   );
 
+  // Kéo-thả module từ palette xuống canvas: thả tại đúng vị trí con trỏ.
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData(DND_MIME) as NodeType;
+      if (!type) return;
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      addNode(type, position);
+    },
+    [screenToFlowPosition, addNode],
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -91,10 +117,16 @@ export function FlowCanvas() {
       onConnect={onConnect}
       onNodeDoubleClick={onNodeDoubleClick}
       onPaneClick={() => selectNode(null)}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
       defaultEdgeOptions={{ type: 'deletable' }}
       snapToGrid
       snapGrid={SNAP_GRID}
+      nodesDraggable
+      elementsSelectable
       selectionOnDrag
+      selectionMode={SelectionMode.Partial}
+      panOnDrag={PAN_BUTTONS}
       multiSelectionKeyCode={['Meta', 'Shift']}
       fitView
       proOptions={{ hideAttribution: true }}
