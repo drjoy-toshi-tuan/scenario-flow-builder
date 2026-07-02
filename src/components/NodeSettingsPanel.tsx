@@ -22,6 +22,8 @@ function explainKey(type: NodeType): TKey {
 const inputClass =
   'mt-1 w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none transition focus:border-[var(--bk-accent)]';
 
+const DESC_MAX_H = 58;
+
 export function NodeSettingsPanel() {
   const ir = useFlowStore((s) => s.ir);
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
@@ -123,9 +125,6 @@ function PanelContent({ node, t, onClose, onUpdate }: PanelContentProps) {
 
         <label className="block">
           <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('description')}</span>
-          
-          const MAX_H = 58;
-          
           <textarea
             className={inputClass}
             placeholder={t('descriptionPlaceholder')}
@@ -134,7 +133,7 @@ function PanelContent({ node, t, onClose, onUpdate }: PanelContentProps) {
               const el = e.currentTarget;
               const keep = el.style.height;
               el.style.height = 'auto';
-              const tooTall = el.scrollHeight > MAX_H + 1;
+              const tooTall = el.scrollHeight > DESC_MAX_H + 1;
               el.style.height = keep;
               if (tooTall && e.target.value.length > description.length) return;
               onUpdate(node.id, { data: { description: e.target.value } });
