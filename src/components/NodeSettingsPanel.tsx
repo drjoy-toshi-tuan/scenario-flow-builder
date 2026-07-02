@@ -138,7 +138,7 @@ function PanelContent({ node, t, onClose, onUpdate }: PanelContentProps) {
               if (tooTall && e.target.value.length > description.length) return;
               onUpdate(node.id, { data: { description: e.target.value } });
             }}
-            style={{ minHeight: '38px', maxHeight: '58px', overflowY: 'hidden' } as React.CSSProperties}
+            style={{ minHeight: '38px', maxHeight: DESC_MAX_H + 'px', overflowY: 'hidden' } as React.CSSProperties}
           />
         </label>
 
