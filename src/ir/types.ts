@@ -25,8 +25,7 @@ export type NodeType =
   | 'script' // ES5 script (Brekeke)
   | 'llm' // gọi OpenAI / LLM
   | 'transfer' // chuyển máy
-  | 'hangup'
-  | 'end';
+  | 'hangup';
 
 export const NODE_TYPES: readonly NodeType[] = [
   'start',
@@ -37,7 +36,6 @@ export const NODE_TYPES: readonly NodeType[] = [
   'llm',
   'transfer',
   'hangup',
-  'end',
 ] as const;
 
 export interface FlowNode {

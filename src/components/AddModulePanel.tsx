@@ -6,9 +6,14 @@ import { Icon } from '../ui/icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // "Thêm module": nút + mở palette liệt kê các loại node có thể thêm (icon + tên).
-// Click 1 loại -> tạo node mới tại giữa vùng nhìn hiện tại rồi chọn nó (mở setting).
+// 2 cách thêm:
+//   - Click 1 loại -> tạo node tại giữa vùng nhìn hiện tại rồi chọn nó (mở setting).
+//   - Kéo-thả 1 loại xuống canvas -> tạo node tại đúng vị trí thả (xem FlowCanvas.onDrop).
 // Đặt trong <Panel> của React Flow nên dùng được useReactFlow (screenToFlowPosition).
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Kiểu dữ liệu dataTransfer khi kéo module từ palette -> canvas.
+export const DND_MIME = 'application/bk-node-type';
 
 export function AddModulePanel() {
   const [open, setOpen] = useState(false);
@@ -61,8 +66,13 @@ export function AddModulePanel() {
                 key={type}
                 type="button"
                 role="menuitem"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DND_MIME, type);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
                 onClick={() => handleAdd(type)}
-                className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-[var(--bk-surface-2)]"
+                className="flex w-full cursor-grab items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-[var(--bk-surface-2)] active:cursor-grabbing"
               >
                 <span
                   className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-[17px]"

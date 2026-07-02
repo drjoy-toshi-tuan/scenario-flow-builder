@@ -30,13 +30,13 @@
   --bk-bg: #0f1117;
   --bk-surface: #1a1c23;
   --bk-surface-2: #22252e;
-  --bk-border: #2c2f3a;
+  --bk-border: #454b5c; /* sáng hơn để viền node/panel đủ tương phản trên nền tối */
   --bk-text: #e8e8ec;
   --bk-text-muted: #9a9aa2;
-  --bk-text-faint: #6f6f77;
+  --bk-text-faint: #7c8290;
   --bk-canvas: #14161d;
-  --bk-dot: #2b2e38;
-  --bk-edge: #4b5060;
+  --bk-dot: #3a4050;
+  --bk-edge: #8a92a6; /* dây nối sáng rõ trên dark mode */
   --bk-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
@@ -62,6 +62,41 @@ body {
 }
 .react-flow__background {
   color: var(--bk-dot);
+}
+
+/* Vô hiệu style node mặc định của React Flow (viền/nền/căn giữa) — ta tự render
+   card riêng. Đặc biệt sửa node 'input'/'output'/'default' (trùng tên type dựng sẵn
+   nên bị bọc thêm 1 ô vuông + căn giữa khác các node khác). */
+.react-flow__node {
+  border-radius: 0;
+  width: auto;
+  padding: 0;
+  text-align: left;
+  font-size: inherit;
+  color: inherit;
+}
+.react-flow__node-input,
+.react-flow__node-output,
+.react-flow__node-default,
+.react-flow__node-group {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+/* Bỏ khung chọn mặc định — trạng thái chọn đã thể hiện bằng .bk-node--selected. */
+.react-flow__node.selected {
+  box-shadow: none;
+}
+.react-flow__node:focus,
+.react-flow__node:focus-visible,
+.react-flow__node.selected:focus {
+  outline: none;
+}
+/* Khung kéo-chọn nhiều node (rubber band) + viền node đang chọn theo nhóm. */
+.react-flow__selection {
+  background: var(--bk-accent-soft);
+  border: 1px solid var(--bk-accent);
+  border-radius: 6px;
 }
 
 /* Dây nối: dùng token màu; nhánh được chọn/hover đổi sang accent. */

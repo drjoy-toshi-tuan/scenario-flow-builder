@@ -7,8 +7,9 @@ import { Icon } from '../../ui/icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node card. Bố cục theo yêu cầu:
-//   - Bên phải: icon của loại node (tile màu accent).
-//   - Bên trái xếp dọc: (trên) tên LOẠI module · (giữa) TÊN module · (dưới) mô tả.
+//   - Bên TRÁI: icon của loại node (tile màu accent).
+//   - Bên phải xếp dọc: (trên) tên LOẠI module · (giữa) TÊN module · (dưới) mô tả.
+// Node 'condition' có nhiều handle output ở đáy (mỗi nhánh 1 chấm), chia đều & giữa.
 // Màu accent lấy từ NODE_CONFIG, truyền vào CSS qua biến --accent.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ export function makeNode(nodeType: NodeType) {
   function TypedNode({ data, selected }: NodeProps) {
     const d = data as unknown as RFNodeData;
     const description = pickDescription(d.nodeData);
+    const handles = d.sourceHandles;
 
     return (
       <div
@@ -30,6 +32,9 @@ export function makeNode(nodeType: NodeType) {
         {showTarget && <Handle type="target" position={Position.Top} className="bk-handle" />}
 
         <div className="bk-node-body">
+          <div className="bk-node-icon">
+            <Icon icon={cfg.icon} />
+          </div>
           <div className="bk-node-text">
             <div className="bk-node-type">{cfg.typeLabel}</div>
             <div className="bk-node-name" title={d.label}>
@@ -43,12 +48,25 @@ export function makeNode(nodeType: NodeType) {
               <div className="bk-node-desc bk-node-desc--empty">Chưa có mô tả</div>
             )}
           </div>
-          <div className="bk-node-icon">
-            <Icon icon={cfg.icon} />
-          </div>
         </div>
 
-        {showSource && <Handle type="source" position={Position.Bottom} className="bk-handle" />}
+        {showSource &&
+          (handles && handles.length > 0 ? (
+            // Nhiều nhánh: chia đều dọc đáy node, đối xứng qua tâm.
+            handles.map((h, i) => (
+              <Handle
+                key={h.id}
+                id={h.id}
+                type="source"
+                position={Position.Bottom}
+                className="bk-handle"
+                title={h.label}
+                style={{ left: `${((i + 1) / (handles.length + 1)) * 100}%` }}
+              />
+            ))
+          ) : (
+            <Handle type="source" position={Position.Bottom} className="bk-handle" />
+          ))}
       </div>
     );
   }
