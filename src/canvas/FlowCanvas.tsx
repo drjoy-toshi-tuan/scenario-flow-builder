@@ -15,6 +15,7 @@ import {
   type Node,
   type Edge,
   type NodeMouseHandler,
+  type FinalConnectionState,
 } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import { useTheme } from '../ui/theme';
@@ -86,6 +87,43 @@ export function FlowCanvas() {
     [setEdges, addEdge],
   );
 
+  // Kết thúc kéo dây MÀ KHÔNG trúng handle: nếu thả trên vùng 1 module thì vẫn nối
+  // vào module đó (khỏi phải nhắm đúng chấm input). Tìm node dưới con trỏ bằng
+  // elementFromPoint rồi nối source(handle đang kéo) -> node đích (handle mặc định).
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+      if (connectionState.isValid) return; // đã nối trúng handle -> onConnect lo
+      const fromHandle = connectionState.fromHandle;
+      if (!fromHandle?.nodeId) return;
+
+      const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+      const el = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
+      const nodeEl = el?.closest('.react-flow__node') as HTMLElement | null;
+      const dropId = nodeEl?.getAttribute('data-id');
+      if (!dropId) return;
+
+      // Xác định chiều: kéo từ output (source) -> đích là node thả; ngược lại thì đảo.
+      let source: string;
+      let target: string;
+      let sourceHandle: string | undefined;
+      if (fromHandle.type === 'source') {
+        source = fromHandle.nodeId;
+        target = dropId;
+        sourceHandle = fromHandle.id ?? undefined;
+      } else {
+        source = dropId;
+        target = fromHandle.nodeId;
+        sourceHandle = undefined;
+      }
+      if (source === target) return;
+
+      const id = `${source}->${target}#${Date.now()}`;
+      setEdges((eds) => rfAddEdge({ source, target, sourceHandle, id, type: 'deletable' }, eds));
+      addEdge({ id, source, target, sourceHandle });
+    },
+    [setEdges, addEdge],
+  );
+
   // Double-click node -> mở panel setting.
   const onNodeDoubleClick: NodeMouseHandler = useCallback(
     (_event, node) => selectNode(node.id),
@@ -129,9 +167,11 @@ export function FlowCanvas() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onNodeDragStop={onNodeDragStop}
-      onConnect={onConnect}
       onNodeDoubleClick={onNodeDoubleClick}
       onPaneClick={() => selectNode(null)}
+      onConnect={onConnect}
+      onConnectEnd={onConnectEnd}
+      connectionRadius={45}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onNodesDelete={onNodesDelete}
