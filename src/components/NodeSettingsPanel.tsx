@@ -149,7 +149,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
           className={[
             'rounded-lg px-5 py-2 text-sm font-semibold text-white transition',
             dirty
-              ? 'bg-[var(--bk-accent)] hover:brightness-95'
+              ? 'bg-[var(--bk-success)] hover:bg-[var(--bk-success-hover)]'
               : 'cursor-not-allowed bg-[var(--bk-text-faint)] opacity-60',
           ].join(' ')}
         >
