@@ -6,6 +6,7 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import { useFlowStore } from '../../store/flowStore';
+import type { RFEdgeData } from '../irAdapter';
 import { Icon } from '../../ui/icons';
 import { useT } from '../../ui/i18n';
 
@@ -24,6 +25,7 @@ export function DeletableEdge({
   sourcePosition,
   targetPosition,
   label,
+  data,
   markerEnd,
   style,
 }: EdgeProps) {
@@ -31,6 +33,9 @@ export function DeletableEdge({
   const removeEdge = useFlowStore((s) => s.removeEdge);
   const t = useT();
   const hasLabel = typeof label === 'string' && label.length > 0;
+  // Node condition/script: nhãn giá trị nhánh luôn hiện; các node khác chỉ hiện khi hover.
+  const alwaysLabel = (data as RFEdgeData | undefined)?.alwaysLabel === true;
+  const labelVisible = alwaysLabel || hovered;
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -55,10 +60,12 @@ export function DeletableEdge({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       />
-      {/* Nhãn điều kiện căn GIỮA dây (mọi loại node — cố định hay tự do đều như nhau);
-          nút xoá tách hẳn sang phải (position absolute, cách 1 khoảng cố định) nên không
-          đè lên nhãn và không làm lệch tâm nhãn. Cả nhãn lẫn nút xoá chỉ hiện khi hover
-          (dùng opacity nên vẫn giữ chỗ -> không lệch tâm, vùng bắt hover không đổi). */}
+      {/* Nhãn điều kiện căn GIỮA dây; nút xoá tách hẳn sang phải (position absolute) nên
+          không đè lên nhãn và không làm lệch tâm nhãn.
+          - Node condition/script (nhánh tự do): nhãn GIÁ TRỊ luôn hiện.
+          - Các node khác: nhãn chỉ hiện khi hover (dùng opacity nên vẫn giữ chỗ ->
+            không lệch tâm, vùng bắt hover không đổi).
+          Nút xoá luôn chỉ hiện khi hover. */}
       <EdgeLabelRenderer>
         <div
           className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
@@ -67,7 +74,7 @@ export function DeletableEdge({
           onMouseLeave={() => setHovered(false)}
         >
           {hasLabel && (
-            <span className="edge-label" style={{ opacity: hovered ? 1 : 0 }}>
+            <span className="edge-label" style={{ opacity: labelVisible ? 1 : 0 }}>
               {label}
             </span>
           )}

@@ -21,6 +21,9 @@ export interface RFNodeData {
 // Dữ liệu gắn vào mỗi React Flow edge.
 export interface RFEdgeData {
   condition?: string;
+  // Node nguồn có nhánh TỰ DO (condition/script) -> nhãn giá trị luôn hiện;
+  // các node khác nhãn chỉ hiện khi hover (xem DeletableEdge).
+  alwaysLabel?: boolean;
   [key: string]: unknown;
 }
 
@@ -84,6 +87,8 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
       label: (isFixed || handles.length > 1 ? matched : undefined) ?? conditionOutputLabel(e.condition ?? e.label),
       data: {
         condition: e.condition,
+        // Node condition/script: nhãn giá trị nhánh luôn hiện; node khác chỉ hiện khi hover.
+        alwaysLabel: srcNode ? BRANCH_SCHEMA[srcNode.type].mode === 'editable' : false,
       } satisfies RFEdgeData,
     };
   });
