@@ -159,6 +159,11 @@ body {
 }
 .react-flow__controls-button svg {
   fill: currentColor;
+  /* Đồng nhất kích thước icon cho MỌI nút (kể cả undo/redo tự thêm). */
+  width: 14px;
+  height: 14px;
+  max-width: 14px;
+  max-height: 14px;
 }
 .react-flow__minimap {
   border-radius: 12px;
@@ -964,7 +969,10 @@ body {
   gap: 7px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: var(--bk-surface);
+  /* Nền ~70% (nhìn xuyên qua nhẹ) + blur để chữ vẫn đọc rõ trên canvas. */
+  background: color-mix(in srgb, var(--bk-surface) 70%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   border: 1px solid var(--bk-border);
   box-shadow: var(--bk-shadow);
   /* Chỉ để xem — không chặn tương tác canvas phía dưới. */

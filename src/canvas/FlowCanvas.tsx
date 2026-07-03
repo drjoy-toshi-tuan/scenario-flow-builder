@@ -246,10 +246,10 @@ export function FlowCanvas() {
       <Controls>
         {/* Undo / Redo cùng thanh với zoom/fit/lock. */}
         <ControlButton onClick={() => undo()} disabled={!canUndo} title={t('undo')} aria-label={t('undo')}>
-          <Icon icon="material-symbols-light:undo-rounded" width={18} height={18} />
+          <Icon icon="fa7-solid:undo-alt" />
         </ControlButton>
         <ControlButton onClick={() => redo()} disabled={!canRedo} title={t('redo')} aria-label={t('redo')}>
-          <Icon icon="material-symbols-light:redo-rounded" width={18} height={18} />
+          <Icon icon="fa7-solid:redo-alt" />
         </ControlButton>
       </Controls>
       <MiniMap pannable zoomable />
