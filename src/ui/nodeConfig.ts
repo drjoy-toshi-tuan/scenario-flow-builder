@@ -22,7 +22,7 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   llm: { icon: 'mingcute:ai-fill', typeLabel: 'LLM', color: '#d946ef' },
   faq: { icon: 'lucide:messages-square', typeLabel: 'FAQ', color: '#6366f1' },
   transfer: { icon: 'lucide:phone-forwarded', typeLabel: 'Transfer', color: '#06b6d4' },
-  flag: { icon: 'mingcute:flag-4-fill', typeLabel: 'Flag', color: '#f5841b' },
+  flag: { icon: 'mingcute:flag-4-fill', typeLabel: 'Flag', color: '#de5f1b' },
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
 };
 
