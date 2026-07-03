@@ -57,7 +57,8 @@ export function DeletableEdge({
       />
       {/* Nhãn điều kiện căn GIỮA dây (mọi loại node — cố định hay tự do đều như nhau);
           nút xoá tách hẳn sang phải (position absolute, cách 1 khoảng cố định) nên không
-          đè lên nhãn và không làm lệch tâm nhãn. Nhãn luôn hiện, nút xoá hiện khi hover. */}
+          đè lên nhãn và không làm lệch tâm nhãn. Cả nhãn lẫn nút xoá chỉ hiện khi hover
+          (dùng opacity nên vẫn giữ chỗ -> không lệch tâm, vùng bắt hover không đổi). */}
       <EdgeLabelRenderer>
         <div
           className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
@@ -65,7 +66,11 @@ export function DeletableEdge({
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          {hasLabel && <span className="edge-label">{label}</span>}
+          {hasLabel && (
+            <span className="edge-label" style={{ opacity: hovered ? 1 : 0 }}>
+              {label}
+            </span>
+          )}
           <button
             type="button"
             title={t('deleteEdgeTitle')}

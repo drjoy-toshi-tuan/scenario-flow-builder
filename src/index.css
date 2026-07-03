@@ -829,6 +829,8 @@ body {
   color: var(--bk-text-muted);
   white-space: nowrap;
   font-weight: 500;
+  /* Nhãn chỉ hiện khi hover vào dây (opacity điều khiển trong DeletableEdge). */
+  transition: opacity 0.15s ease;
 }
 .edge-trash {
   display: inline-flex;
