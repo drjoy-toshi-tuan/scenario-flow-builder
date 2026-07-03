@@ -33,6 +33,7 @@ export function DeletableEdge({
   const t = useT();
   // Nhãn nhánh cố định (FAILED/NEXT): chỉ hiện khi hover, đặt ngay dưới chấm output.
   const sourceLabel = typeof data?.sourceLabel === 'string' ? data.sourceLabel : undefined;
+  const hasLabel = typeof label === 'string' && label.length > 0;
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -57,12 +58,12 @@ export function DeletableEdge({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       />
-      {/* Nhãn nhánh cố định: hiện khi hover, ngay dưới chấm output (cách 1 đoạn nhỏ). */}
+      {/* Nhãn nhánh cố định: hiện khi hover, sát ngay dưới chấm output. */}
       {sourceLabel && hovered && (
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan edge-src-label"
-            style={{ transform: `translate(-50%, 0) translate(${sourceX}px, ${sourceY + 14}px)` }}
+            style={{ transform: `translate(-50%, 0) translate(${sourceX}px, ${sourceY + 9}px)` }}
           >
             {sourceLabel}
           </div>
@@ -70,14 +71,16 @@ export function DeletableEdge({
       )}
       <EdgeLabelRenderer>
         <div
-          className="nodrag nopan edge-toolbar"
+          className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
           }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          {typeof label === 'string' && label && <span className="edge-label">{label}</span>}
+          {/* Nhãn điều kiện (node nhánh tự do): căn GIỮA dây; nút xoá tách riêng bên phải
+              (position absolute) nên không làm lệch tâm nhãn. */}
+          {hasLabel && <span className="edge-label">{label}</span>}
           <button
             type="button"
             title={t('deleteEdgeTitle')}

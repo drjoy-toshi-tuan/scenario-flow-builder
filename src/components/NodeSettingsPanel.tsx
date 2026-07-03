@@ -14,6 +14,7 @@ import { Icon } from '../ui/icons';
 import { useT, type TKey } from '../ui/i18n';
 import { CodeEditor } from './CodeEditor';
 import { RegexBranchInput } from './RegexBranchInput';
+import { AutoGrowTextarea } from './AutoGrowTextarea';
 
 // Key giải thích ý nghĩa loại node trong từ điển i18n (exStart, exAnnounce, …).
 function explainKey(type: NodeType): TKey {
@@ -50,7 +51,7 @@ export function NodeSettingsPanel() {
   return (
     <aside
       className={[
-        'absolute right-0 top-0 z-10 flex h-full w-[560px] max-w-[85vw] flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)] shadow-[var(--bk-shadow)]',
+        'absolute right-0 top-0 z-10 flex h-full w-[600px] max-w-[90vw] flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)] shadow-[var(--bk-shadow)]',
         'transition-transform duration-300 ease-out will-change-transform',
         open ? 'translate-x-0' : 'translate-x-full pointer-events-none',
       ].join(' ')}
@@ -108,7 +109,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
           </div>
           <button
             type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] text-[var(--bk-text-muted)] shadow-sm transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
             onClick={onClose}
             aria-label={t('close')}
           >
@@ -286,6 +287,14 @@ function FieldControl({ field, data }: { field: PropertyField; data: Record<stri
             value={value}
             onChange={(e) => set(e.target.value.replace(/[\r\n]+/g, ' '))}
           />
+        </label>
+      );
+    case 'autoText':
+      return (
+        <label className="block">
+          {label}
+          {/* Announce: 1 dòng, tự wrap + cao lên khi dài (xem AutoGrowTextarea). */}
+          <AutoGrowTextarea className={`${inputClass} bk-autogrow`} value={value} onChange={set} />
         </label>
       );
     case 'number':

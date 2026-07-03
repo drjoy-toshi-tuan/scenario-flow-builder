@@ -69,10 +69,7 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
   const edges: Edge[] = ir.edges.map((e) => {
     const handles = handlesByNode.get(e.source) ?? [];
     // Nhãn của handle mà dây xuất phát (FAILED/NEXT hoặc giá trị nhánh).
-    const handleLabel =
-      handles.length > 1
-        ? handles.find((h) => h.id === (e.sourceHandle ?? 'default'))?.label
-        : undefined;
+    const matched = handles.find((h) => h.id === (e.sourceHandle ?? 'default'))?.label;
     const srcNode = nodeById.get(e.source);
     const isFixed = srcNode ? BRANCH_SCHEMA[srcNode.type].mode === 'fixed' : false;
 
@@ -82,12 +79,15 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
       target: e.target,
       sourceHandle: e.sourceHandle ?? undefined,
       type: 'deletable',
-      // Node nhánh CỐ ĐỊNH: nhãn chỉ hiện khi hover (đặt cạnh chấm output) -> để trống ở giữa.
+      // Node nhánh CỐ ĐỊNH: nhãn chỉ hiện khi hover (cạnh chấm output) -> để trống ở giữa;
+      //   kể cả node chỉ có 1 nhánh NEXT (start/announce/transfer) cũng có nhãn.
       // Node nhánh TỰ DO: giữ nhãn giá trị nhánh hiển thị giữa dây như trước.
-      label: isFixed ? undefined : handleLabel ?? conditionOutputLabel(e.condition ?? e.label),
+      label: isFixed
+        ? undefined
+        : (handles.length > 1 ? matched : undefined) ?? conditionOutputLabel(e.condition ?? e.label),
       data: {
         condition: e.condition,
-        ...(isFixed && handleLabel ? { sourceLabel: handleLabel } : {}),
+        ...(isFixed && matched ? { sourceLabel: matched } : {}),
       } satisfies RFEdgeData,
     };
   });

@@ -335,7 +335,7 @@ body {
   gap: 10px;
 }
 .bk-branch-cond {
-  flex: 1 1 46%;
+  flex: 1.35 1 0;
   min-width: 0;
 }
 .bk-branch-arrow {
@@ -343,7 +343,7 @@ body {
   color: var(--bk-text-faint);
 }
 .bk-branch-target {
-  flex: 1 1 54%;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -386,15 +386,17 @@ body {
   text-overflow: ellipsis;
 }
 .bk-branch-none {
-  font-size: 12px;
-  font-style: italic;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
   color: var(--bk-text-faint);
 }
-/* Nút xoá nhánh: thùng rác đỏ, không viền. */
+/* Nút xoá nhánh: thùng rác đỏ, không viền. Tách khỏi cột node đích 1 khoảng. */
 .bk-branch-del {
   flex: 0 0 auto;
   width: 32px;
   height: 32px;
+  margin-left: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -419,6 +421,17 @@ body {
 .bk-branch-del-spacer {
   flex: 0 0 auto;
   width: 32px;
+  margin-left: 4px;
+}
+/* Announce: ô 1 dòng tự cao lên (AutoGrowTextarea) — không cho kéo tay, ẩn thanh cuộn. */
+.bk-autogrow {
+  display: block;
+  min-height: 38px;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Modal cảnh báo thay đổi chưa lưu — phủ mờ trong panel. */
@@ -727,6 +740,14 @@ body {
      (~1000), nên nút xoá phải cao hơn nữa mới không bị dây vẽ đè lên icon.
      z-index này chỉ tác dụng TRONG viewport canvas nên không che panel/minimap. */
   z-index: 10000;
+}
+/* Khi có nhãn điều kiện: nhãn căn GIỮA dây (container = độ rộng nhãn, đã translate -50%);
+   nút xoá đẩy ra ngoài (absolute) nên không kéo lệch tâm nhãn. */
+.edge-toolbar--labeled .edge-trash {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 50%;
+  transform: translateY(-50%);
 }
 .edge-label {
   background: var(--bk-surface);

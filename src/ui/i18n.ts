@@ -68,7 +68,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     noPropertyNote: 'Node này không có tham số.',
     showField: 'Hiện',
     hideField: 'Ẩn',
-    branchTargetNone: 'chưa nối',
+    branchTargetNone: 'CHƯA NỐI',
     branchElse: 'Nhánh mặc định (else) — tự khớp phần còn lại, không sửa được.',
     // Nút lưu/huỷ + cảnh báo thay đổi chưa lưu
     btnSave: 'LƯU',

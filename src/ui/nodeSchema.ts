@@ -11,6 +11,7 @@ import type { TKey } from './i18n';
 // Kiểu ô nhập cho 1 tham số.
 export type FieldKind =
   | 'text' // 1 dòng, không cho xuống dòng
+  | 'autoText' // 1 dòng logic (không Enter) nhưng tự wrap + tăng chiều cao khi dài
   | 'number' // chỉ nhập số
   | 'textarea' // nhiều dòng
   | 'collapsibleTextarea' // textarea ẩn/hiện (nội dung dài)
@@ -102,9 +103,9 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'acceptanceTime', labelKey: 'fAcceptanceTime', kind: 'yesno', options: YESNO_OPTIONS, default: 'yes' },
     { key: 'contextSetting', labelKey: 'fContextSetting', kind: 'collapsibleTextarea', rows: 6 },
   ],
-  announce: [{ key: 'text', labelKey: 'fAnnounce', kind: 'textarea', rows: 3 }],
+  announce: [{ key: 'text', labelKey: 'fAnnounce', kind: 'autoText' }],
   input: [
-    { key: 'announce', labelKey: 'fAnnounce', kind: 'text' },
+    { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
     { key: 'inputType', labelKey: 'fInputType', kind: 'select', options: INPUT_TYPE_OPTIONS, default: 'STT' },
     {
       key: 'voiceType',
@@ -133,12 +134,12 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
     { key: 'prompt', labelKey: 'fPrompt', kind: 'textarea', rows: 6 },
   ],
-  faq: [{ key: 'announce', labelKey: 'fAnnounce', kind: 'text' }],
+  faq: [{ key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' }],
   transfer: [
     { key: 'transferNumber', labelKey: 'fTransferNumber', kind: 'text' },
     { key: 'transferType', labelKey: 'fTransferType', kind: 'select', options: TRANSFER_TYPE_OPTIONS, default: 'ATTENDED' },
-    { key: 'announce', labelKey: 'fAnnounce', kind: 'text' },
-    { key: 'failedAnnounce', labelKey: 'fFailedAnnounce', kind: 'text' },
+    { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
+    { key: 'failedAnnounce', labelKey: 'fFailedAnnounce', kind: 'autoText' },
   ],
   hangup: [],
 };
