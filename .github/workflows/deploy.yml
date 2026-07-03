@@ -44,7 +44,19 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url }}
     steps:
-      - id: deployment
+      # GitHub Pages đôi khi trả "Deployment failed, try again later." (lỗi tạm thời
+      # phía backend, không phải lỗi build). Tự thử lại tối đa 2 lần để không phải
+      # re-run thủ công mỗi lần merge.
+      - id: deploy1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Chờ trước khi thử lại
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 25
+
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
         uses: actions/deploy-pages@v4
