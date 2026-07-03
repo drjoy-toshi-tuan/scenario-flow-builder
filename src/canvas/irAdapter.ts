@@ -21,8 +21,6 @@ export interface RFNodeData {
 // Dữ liệu gắn vào mỗi React Flow edge.
 export interface RFEdgeData {
   condition?: string;
-  // Nhãn nhánh (FAILED/NEXT…) của node nhánh CỐ ĐỊNH: hiện khi hover, cạnh chấm output.
-  sourceLabel?: string;
   [key: string]: unknown;
 }
 
@@ -79,15 +77,13 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
       target: e.target,
       sourceHandle: e.sourceHandle ?? undefined,
       type: 'deletable',
-      // Node nhánh CỐ ĐỊNH: nhãn chỉ hiện khi hover (cạnh chấm output) -> để trống ở giữa;
-      //   kể cả node chỉ có 1 nhánh NEXT (start/announce/transfer) cũng có nhãn.
-      // Node nhánh TỰ DO: giữ nhãn giá trị nhánh hiển thị giữa dây như trước.
-      label: isFixed
-        ? undefined
-        : (handles.length > 1 ? matched : undefined) ?? conditionOutputLabel(e.condition ?? e.label),
+      // Nhãn nhánh căn GIỮA dây, hành vi giống nhau cho MỌI loại node:
+      //   - Node nhánh CỐ ĐỊNH (FAILED/NEXT…): nhãn = tên nhánh cố định (kể cả node 1 nhánh).
+      //   - Node nhánh TỰ DO (condition/script): nhãn = giá trị nhánh.
+      // Nút xoá hiện khi hover; nhãn + nút đều bám tâm dây (xem DeletableEdge).
+      label: (isFixed || handles.length > 1 ? matched : undefined) ?? conditionOutputLabel(e.condition ?? e.label),
       data: {
         condition: e.condition,
-        ...(isFixed && matched ? { sourceLabel: matched } : {}),
       } satisfies RFEdgeData,
     };
   });

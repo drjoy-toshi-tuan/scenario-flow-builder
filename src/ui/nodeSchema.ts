@@ -129,7 +129,7 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       showIf: saveContextOn,
     },
   ],
-  script: [{ key: 'script', labelKey: 'fScript', kind: 'code', rows: 12 }],
+  script: [{ key: 'script', labelKey: 'fScript', kind: 'code', rows: 18 }],
   llm: [
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
     { key: 'prompt', labelKey: 'fPrompt', kind: 'textarea', rows: 6 },

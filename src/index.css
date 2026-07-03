@@ -462,39 +462,91 @@ body {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Code editor (node Script) — textarea trong suốt chồng lên <pre> highlight.
-   Cùng font/size/padding để 2 lớp trùng khít; textarea nổi trên nhận thao tác.
+   Code editor (node Script) — kiểu VS Code: cột số dòng (gutter) + đường thụt lề
+   (indent guides) + textarea trong suốt chồng lên lớp highlight. Cùng font/size/
+   padding để mọi lớp trùng khít; textarea nổi trên nhận thao tác. Kéo cạnh dưới
+   (resize) để nới cao editor. Font/line-height thống nhất để em/ch tính đúng.
    ────────────────────────────────────────────────────────────────────────── */
 .bk-code {
   position: relative;
+  display: flex;
   margin-top: 4px;
   border-radius: 8px;
   border: 1px solid var(--bk-border);
   background: var(--bk-surface-2);
   overflow: hidden;
+  resize: vertical; /* kéo cạnh dưới cho cao/thấp tuỳ ý */
+  min-height: calc(8 * 1.5em + 20px);
+  font-family: 'SFMono-Regular', ui-monospace, 'Menlo', 'Consolas', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+/* Cột số dòng bên trái — cuộn dọc đồng bộ với code (transform). */
+.bk-code-gutter {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-right: 1px solid var(--bk-border);
+  background: color-mix(in srgb, var(--bk-border) 22%, transparent);
+  user-select: none;
+}
+.bk-code-gutter-inner {
+  padding: 10px 8px 10px 10px;
+  will-change: transform;
+  text-align: right;
+}
+.bk-code-lnum {
+  height: 1.5em;
+  line-height: 1.5;
+  color: var(--bk-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.bk-code-main {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+/* Lớp chứa highlight + đường thụt lề — dịch chuyển theo cuộn của textarea. */
+.bk-code-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 100%;
+  pointer-events: none;
+  will-change: transform;
+}
+.bk-code-guides {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.bk-code-guide {
+  position: absolute;
+  width: 0;
+  height: 1.5em;
+  border-left: 1px solid color-mix(in srgb, var(--bk-text-faint) 45%, transparent);
 }
 .bk-code-pre,
 .bk-code-ta {
   margin: 0;
   padding: 10px 12px;
-  font-family: 'SFMono-Regular', ui-monospace, 'Menlo', 'Consolas', monospace;
-  font-size: 12.5px;
+  font-family: inherit;
+  font-size: inherit;
   line-height: 1.5;
   tab-size: 2;
   white-space: pre;
-  overflow: auto;
   border: 0;
-  width: 100%;
-  height: 100%;
 }
 .bk-code-pre {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
   color: var(--bk-text);
 }
 .bk-code-ta {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
   background: transparent;
   color: transparent;
   caret-color: var(--bk-text);
@@ -503,6 +555,26 @@ body {
 }
 .bk-code-ta::selection {
   background: color-mix(in srgb, var(--bk-accent) 30%, transparent);
+}
+/* Báo lỗi cú pháp trực tiếp dưới editor (cập nhật khi gõ). */
+.bk-code-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #dc2626 40%, var(--bk-border));
+  background: color-mix(in srgb, #dc2626 10%, var(--bk-surface));
+  color: #dc2626;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.dark .bk-code-error {
+  color: #f87171;
+  border-color: color-mix(in srgb, #f87171 40%, var(--bk-border));
+  background: color-mix(in srgb, #dc2626 18%, var(--bk-surface));
 }
 /* Bảng màu token — dịu, đọc rõ trên cả 2 theme. */
 .bk-code-pre code {
@@ -757,28 +829,6 @@ body {
   color: var(--bk-text-muted);
   white-space: nowrap;
   font-weight: 500;
-}
-/* Cụm nhãn+xoá của dây node nhánh cố định: 1 hàng flex cạnh chấm output.
-   Nhãn và nút xoá luôn nằm cạnh nhau (gap), không bao giờ chồng lên nhau. */
-.edge-src-toolbar {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  z-index: 10000;
-  transition: opacity 0.15s ease;
-}
-/* Nhãn nhánh cố định (FAILED/NEXT) — pill nhỏ cạnh chấm output. */
-.edge-src-label {
-  background: var(--bk-surface);
-  padding: 1px 7px;
-  border-radius: 6px;
-  border: 1px solid var(--bk-border);
-  color: var(--bk-text-muted);
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 600;
-  box-shadow: var(--bk-shadow);
 }
 .edge-trash {
   display: inline-flex;

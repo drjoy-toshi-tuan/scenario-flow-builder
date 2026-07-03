@@ -1,11 +1,15 @@
-import { useRef, type UIEvent } from 'react';
+import { useMemo, useRef, type UIEvent } from 'react';
+import { Icon } from '../ui/icons';
+import { lintScript } from '../ui/scriptLint';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Editor code có tô sáng cú pháp — KHÔNG thêm thư viện (tech stack khoá cứng).
-// Kỹ thuật: <textarea> trong suốt đặt CHỒNG lên <pre> đã highlight; cuộn đồng bộ.
+// Kỹ thuật: <textarea> trong suốt đặt CHỒNG lên lớp highlight; cuộn đồng bộ bằng
+// transform. Bổ sung kiểu VS Code: cột số dòng (gutter), đường dẫn thụt lề
+// (indent guides) nối các khối {}, và báo lỗi cú pháp trực tiếp dưới editor.
 // Bộ tô sáng là scanner JS tự viết (đủ cho script Brekeke ES2021+): xử lý chú thích,
 // chuỗi, template literal, regex literal, số, từ khoá, literal, biến $global, tên hàm,
-// truy cập thuộc tính (.prop) và dấu câu — hạn chế "khoảng trắng không màu".
+// hàm/đối tượng dựng sẵn (JSON/Math/logger…), truy cập thuộc tính (.prop) và dấu câu.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const KEYWORDS = new Set([
@@ -16,6 +20,16 @@ const KEYWORDS = new Set([
   'debugger', 'get', 'set', 'static',
 ]);
 const LITERALS = new Set(['true', 'false', 'null', 'undefined', 'NaN', 'Infinity']);
+// Hàm/đối tượng dựng sẵn + host phổ biến trong script Brekeke -> tô như $global,
+// tránh để trắng như biến thường (JSON, Math, logger, console…).
+const BUILTINS = new Set([
+  'JSON', 'Math', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp',
+  'Map', 'Set', 'Promise', 'Symbol', 'Error', 'parseInt', 'parseFloat', 'isNaN', 'isFinite',
+  'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',
+  'console', 'logger',
+]);
+
+const TAB_SIZE = 2;
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -141,6 +155,7 @@ function highlight(code: string): string {
       else if (LITERALS.has(word)) cls = 'tok-literal';
       else if (word[0] === '$') cls = isCall ? 'tok-function' : 'tok-global';
       else if (afterDot) cls = isCall ? 'tok-method' : 'tok-property';
+      else if (BUILTINS.has(word)) cls = isCall ? 'tok-function' : 'tok-global';
       else if (isCall) cls = 'tok-function';
       else cls = 'tok-identifier';
 
@@ -163,38 +178,129 @@ function highlight(code: string): string {
   return out + (code.endsWith('\n') || code === '' ? ' ' : '');
 }
 
+interface IndentGuide {
+  row: number; // dòng (0-based)
+  col: number; // cột bắt đầu vẽ đường (số ký tự)
+}
+
+// Tính đường dẫn thụt lề cho từng dòng: mỗi cấp thụt lề -> 1 đường dọc, nối liền
+// qua các dòng trống trong cùng khối (giống VS Code).
+function computeGuides(lines: string[]): { guides: IndentGuide[] } {
+  const info = lines.map((l) => {
+    let cols = 0;
+    for (const ch of l) {
+      if (ch === ' ') cols += 1;
+      else if (ch === '\t') cols += TAB_SIZE;
+      else break;
+    }
+    return { blank: l.trim() === '', cols };
+  });
+
+  // Dòng trống: kế thừa mức thụt lề nhỏ hơn giữa dòng liền trước & liền sau (không rỗng)
+  // để đường guide chạy xuyên qua khoảng trống trong khối.
+  const cols = info.map((x) => x.cols);
+  for (let i = 0; i < info.length; i++) {
+    if (!info[i].blank) continue;
+    let p = i - 1;
+    while (p >= 0 && info[p].blank) p--;
+    let nx = i + 1;
+    while (nx < info.length && info[nx].blank) nx++;
+    const pv = p >= 0 ? cols[p] : 0;
+    const nv = nx < info.length ? info[nx].cols : 0;
+    cols[i] = Math.min(pv, nv);
+  }
+
+  // Đơn vị thụt lề = mức thụt lề dương nhỏ nhất trong file (2 hay 4 space đều đúng).
+  let unit = Infinity;
+  for (const x of info) if (!x.blank && x.cols > 0) unit = Math.min(unit, x.cols);
+  if (!Number.isFinite(unit) || unit < 1) unit = TAB_SIZE;
+
+  const guides: IndentGuide[] = [];
+  for (let row = 0; row < cols.length; row++) {
+    for (let col = unit; col < cols[row]; col += unit) {
+      guides.push({ row, col });
+    }
+  }
+  return { guides };
+}
+
 interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   rows?: number;
 }
 
-export function CodeEditor({ value, onChange, rows = 12 }: CodeEditorProps) {
-  const preRef = useRef<HTMLPreElement>(null);
+export function CodeEditor({ value, onChange, rows = 18 }: CodeEditorProps) {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
 
-  // Đồng bộ cuộn: textarea (trên) cuộn -> <pre> highlight (dưới) cuộn theo.
+  const lines = useMemo(() => value.split('\n'), [value]);
+  const { guides } = useMemo(() => computeGuides(lines), [lines]);
+  const html = useMemo(() => highlight(value), [value]);
+  const error = useMemo(() => lintScript(value), [value]);
+
+  // Đồng bộ cuộn: textarea (trên) cuộn -> lớp highlight + gutter dịch theo (transform).
   const onScroll = (e: UIEvent<HTMLTextAreaElement>) => {
-    const pre = preRef.current;
-    if (!pre) return;
-    pre.scrollTop = e.currentTarget.scrollTop;
-    pre.scrollLeft = e.currentTarget.scrollLeft;
+    const { scrollTop, scrollLeft } = e.currentTarget;
+    if (layerRef.current) {
+      layerRef.current.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
+    }
+    if (gutterRef.current) {
+      gutterRef.current.style.transform = `translateY(${-scrollTop}px)`;
+    }
   };
 
   return (
-    <div className="bk-code" style={{ height: `${rows * 1.5 + 1.25}em` }}>
-      <pre ref={preRef} className="bk-code-pre" aria-hidden="true">
-        <code dangerouslySetInnerHTML={{ __html: highlight(value) }} />
-      </pre>
-      <textarea
-        className="bk-code-ta"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onScroll={onScroll}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoCorrect="off"
-        wrap="off"
-      />
+    <div className="bk-code-wrap">
+      <div className="bk-code" style={{ height: `calc(${rows} * 1.5em + 20px)` }}>
+        <div className="bk-code-gutter" aria-hidden="true">
+          <div className="bk-code-gutter-inner" ref={gutterRef}>
+            {lines.map((_, i) => (
+              <div key={i} className="bk-code-lnum">
+                {i + 1}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bk-code-main">
+          <div className="bk-code-layer" ref={layerRef} aria-hidden="true">
+            <div className="bk-code-guides">
+              {guides.map((g, idx) => (
+                <span
+                  key={idx}
+                  className="bk-code-guide"
+                  style={{
+                    top: `calc(10px + ${g.row * 1.5}em)`,
+                    left: `calc(12px + ${g.col}ch)`,
+                  }}
+                />
+              ))}
+            </div>
+            <pre className="bk-code-pre">
+              <code dangerouslySetInnerHTML={{ __html: html }} />
+            </pre>
+          </div>
+          <textarea
+            className="bk-code-ta"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onScroll={onScroll}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            wrap="off"
+          />
+        </div>
+      </div>
+      {error && (
+        <div className="bk-code-error" role="alert">
+          <Icon icon="lucide:circle-alert" width={14} height={14} className="flex-none" />
+          <span>
+            {error.line != null ? `Dòng ${error.line}: ` : ''}
+            {error.message}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

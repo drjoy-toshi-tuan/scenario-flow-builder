@@ -26,13 +26,10 @@ export function DeletableEdge({
   label,
   markerEnd,
   style,
-  data,
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const removeEdge = useFlowStore((s) => s.removeEdge);
   const t = useT();
-  // Nhãn nhánh cố định (FAILED/NEXT): chỉ hiện khi hover, đặt ngay dưới chấm output.
-  const sourceLabel = typeof data?.sourceLabel === 'string' ? data.sourceLabel : undefined;
   const hasLabel = typeof label === 'string' && label.length > 0;
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -58,64 +55,32 @@ export function DeletableEdge({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       />
-      {sourceLabel ? (
-        // ── Dây node nhánh CỐ ĐỊNH ──────────────────────────────────────────────
-        // Nhãn (NEXT/FAILED) + nút xoá nằm CHUNG 1 cụm flex cạnh chấm output -> luôn
-        // tách nhau, KHÔNG BAO GIỜ chồng lên nhau dù dây ngắn tới đâu. Hiện khi hover.
-        <EdgeLabelRenderer>
-          <div
-            className="nodrag nopan edge-src-toolbar"
-            style={{
-              transform: `translate(-50%, 0) translate(${sourceX}px, ${sourceY + 9}px)`,
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? 'all' : 'none',
+      {/* Nhãn điều kiện căn GIỮA dây (mọi loại node — cố định hay tự do đều như nhau);
+          nút xoá tách hẳn sang phải (position absolute, cách 1 khoảng cố định) nên không
+          đè lên nhãn và không làm lệch tâm nhãn. Nhãn luôn hiện, nút xoá hiện khi hover. */}
+      <EdgeLabelRenderer>
+        <div
+          className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
+          {hasLabel && <span className="edge-label">{label}</span>}
+          <button
+            type="button"
+            title={t('deleteEdgeTitle')}
+            aria-label={t('deleteEdgeTitle')}
+            className="edge-trash"
+            style={{ opacity: hovered ? 1 : 0 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              removeEdge(id);
             }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
           >
-            <span className="edge-src-label">{sourceLabel}</span>
-            <button
-              type="button"
-              title={t('deleteEdgeTitle')}
-              aria-label={t('deleteEdgeTitle')}
-              className="edge-trash"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeEdge(id);
-              }}
-            >
-              <Icon icon="lucide:trash-2" />
-            </button>
-          </div>
-        </EdgeLabelRenderer>
-      ) : (
-        // ── Dây node nhánh TỰ DO / thường ───────────────────────────────────────
-        // Nhãn điều kiện căn GIỮA dây; nút xoá tách hẳn sang phải (position absolute,
-        // cách 1 khoảng cố định) nên không đè lên nhãn và không làm lệch tâm nhãn.
-        <EdgeLabelRenderer>
-          <div
-            className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
-            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-          >
-            {hasLabel && <span className="edge-label">{label}</span>}
-            <button
-              type="button"
-              title={t('deleteEdgeTitle')}
-              aria-label={t('deleteEdgeTitle')}
-              className="edge-trash"
-              style={{ opacity: hovered ? 1 : 0 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                removeEdge(id);
-              }}
-            >
-              <Icon icon="lucide:trash-2" />
-            </button>
-          </div>
-        </EdgeLabelRenderer>
-      )}
+            <Icon icon="lucide:trash-2" />
+          </button>
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 }

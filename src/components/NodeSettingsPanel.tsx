@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import type { FlowNode, NodeType } from '../ir/types';
 import { NODE_CONFIG } from '../ui/nodeConfig';
@@ -12,6 +12,7 @@ import {
 } from '../ui/nodeSchema';
 import { Icon } from '../ui/icons';
 import { useT, type TKey } from '../ui/i18n';
+import { lintScript, type ScriptError } from '../ui/scriptLint';
 import { CodeEditor } from './CodeEditor';
 import { RegexBranchInput } from './RegexBranchInput';
 import { AutoGrowTextarea } from './AutoGrowTextarea';
@@ -87,6 +88,30 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
     if ((tab === 'property' && !hasProperty) || (tab === 'branch' && !hasBranch)) setTab('general');
   }, [tab, hasProperty, hasBranch]);
 
+  // Kiểm tra cú pháp các ô code (script) trong draft -> chặn LƯU khi có lỗi.
+  const scriptError = useMemo<ScriptError | null>(() => {
+    if (!draft) return null;
+    for (const f of PROPERTY_FIELDS[node.type]) {
+      if (f.kind !== 'code') continue;
+      const v = draft.data[f.key];
+      if (typeof v === 'string') {
+        const err = lintScript(v);
+        if (err) return err;
+      }
+    }
+    return null;
+  }, [draft, node.type]);
+
+  const [showSyntaxWarn, setShowSyntaxWarn] = useState(false);
+  const handleSave = () => {
+    if (scriptError) {
+      setTab('property'); // đưa về tab có ô script để người dùng thấy lỗi
+      setShowSyntaxWarn(true);
+      return;
+    }
+    commitDraft();
+  };
+
   return (
     <div className="bk-panel-content flex h-full flex-col">
       <header className="bk-panel-header border-b border-[var(--bk-border)]">
@@ -152,7 +177,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
         </button>
         <button
           type="button"
-          onClick={commitDraft}
+          onClick={handleSave}
           disabled={!dirty}
           className={[
             'rounded-lg px-5 py-2 text-sm font-semibold text-white transition',
@@ -164,6 +189,39 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
           {t('btnSave')}
         </button>
       </footer>
+
+      {/* Modal cảnh báo khi bấm LƯU lúc script còn lỗi cú pháp. */}
+      {showSyntaxWarn && scriptError && (
+        <div className="bk-modal-overlay" role="dialog" aria-modal="true">
+          <div className="bk-modal">
+            <div className="mb-1 text-sm font-bold text-[var(--bk-text)]">{t('syntaxErrorTitle')}</div>
+            <p className="mb-2 text-sm leading-relaxed text-[var(--bk-text-muted)]">{t('syntaxErrorMessage')}</p>
+            <pre className="mb-4 overflow-x-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-xs text-[#dc2626]">
+              {scriptError.line != null ? `Dòng ${scriptError.line}: ` : ''}
+              {scriptError.message}
+            </pre>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSyntaxWarn(false)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('syntaxErrorFix')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSyntaxWarn(false);
+                  commitDraft();
+                }}
+                className="rounded-lg bg-[#dc2626] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+              >
+                {t('syntaxErrorSaveAnyway')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal cảnh báo khi rời panel lúc còn thay đổi chưa lưu. */}
       {pendingSelect && (
@@ -457,7 +515,8 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
           {(schema.fixed ?? []).map((b) => (
             <div key={b.id} className="bk-branch-row">
               <div className="bk-branch-cond">
-                <span className="bk-branch-fixed">{b.label ?? b.id}</span>
+                {/* Neo regex ^…$ cho khớp cách hiển thị của nhánh tự do (^FAILED$, ^NEXT$). */}
+                <span className="bk-branch-fixed">{`^${b.label ?? b.id}$`}</span>
               </div>
               <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
               <div className="bk-branch-target">
