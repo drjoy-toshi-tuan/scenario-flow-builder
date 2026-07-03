@@ -10,20 +10,22 @@ permissions:
   pages: write
   id-token: write
 
-# Chỉ chạy 1 deploy tại 1 thời điểm.
+# Chỉ 1 deploy tại 1 thời điểm. KHÔNG huỷ deploy đang chạy — để production deploy
+# hoàn tất; các run mới xếp hàng chạy lần lượt. Tránh lỗi
+# "Canceling since a higher priority waiting request for pages exists".
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
