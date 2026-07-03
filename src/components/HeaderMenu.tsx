@@ -101,19 +101,16 @@ export function HeaderMenu() {
               title={theme === 'dark' ? t('themeDark') : t('themeLight')}
             />
           </div>
-          <div className="bk-menu-row">
-            <span className="bk-menu-row-label">{t('autoLayout')}</span>
-            <button
-              type="button"
-              className="bk-menu-action"
-              onClick={handleAutoLayout}
-              disabled={busy || !ir}
-              title={t('autoLayout')}
-            >
-              <Icon icon="lucide:layout-dashboard" width={15} height={15} />
-              <span>{busy ? t('autoLayoutBusy') : t('run')}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="bk-menu-item"
+            onClick={handleAutoLayout}
+            disabled={busy || !ir}
+          >
+            <Icon icon="lucide:layout-dashboard" width={16} height={16} className="text-[var(--bk-accent)]" />
+            <span>{busy ? t('autoLayoutBusy') : t('autoLayout')}</span>
+          </button>
 
           {/* ── Cài đặt flow ── */}
           <MenuSection title={t('secFlow')} />
@@ -129,19 +126,16 @@ export function HeaderMenu() {
             <Icon icon="lucide:layout-dashboard" width={16} height={16} className="text-[var(--bk-accent)]" />
             <span>{t('ivrProperty')}</span>
           </button>
-          <div className="bk-menu-row">
-            <span className="bk-menu-row-label">{t('exportYaml')}</span>
-            <button
-              type="button"
-              className="bk-menu-action bk-menu-action--accent"
-              onClick={handleExport}
-              disabled={!ir}
-              title={t('exportYaml')}
-            >
-              <Icon icon="lucide:download" width={15} height={15} />
-              <span>{t('run')}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="bk-menu-item"
+            onClick={handleExport}
+            disabled={!ir}
+          >
+            <Icon icon="lucide:download" width={16} height={16} className="text-[var(--bk-accent)]" />
+            <span>{t('exportYaml')}</span>
+          </button>
 
           {/* ── Tài khoản / Đăng xuất ── */}
           <div className="bk-menu-sep" />

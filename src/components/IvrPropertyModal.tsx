@@ -25,8 +25,9 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
   const ir = useFlowStore((s) => s.ir);
   const ivr = useFlowStore((s) => s.ivr);
   const setIvr = useFlowStore((s) => s.setIvr);
+  const ivrCreatedAt = useFlowStore((s) => s.ivrCreatedAt);
 
-  const text = useMemo(() => buildIvrProperty(ir, ivr), [ir, ivr]);
+  const text = useMemo(() => buildIvrProperty(ir, ivr, ivrCreatedAt), [ir, ivr, ivrCreatedAt]);
 
   const envOptions: OptionDef[] = [
     { value: 'demo', labelKey: 'ivrEnvDemo', icon: 'fluent-mdl2:test-beaker-solid', color: '#16a34a' },
@@ -86,25 +87,27 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
             </label>
           </div>
 
-          {/* 3 lựa chọn: 環境 / TTS / STT */}
-          <OptionGroup
-            label={t('ivrEnvironment')}
-            options={envOptions}
-            value={ivr.environment}
-            onChange={(v) => setIvr({ environment: v as IvrSettings['environment'] })}
-          />
-          <OptionGroup
-            label={t('ivrTts')}
-            options={ttsOptions}
-            value={ivr.ttsEngine}
-            onChange={(v) => setIvr({ ttsEngine: v as IvrSettings['ttsEngine'] })}
-          />
-          <OptionGroup
-            label={t('ivrStt')}
-            options={sttOptions}
-            value={ivr.sttEngine}
-            onChange={(v) => setIvr({ sttEngine: v as IvrSettings['sttEngine'] })}
-          />
+          {/* 3 cột: 環境 / TTS / STT — ngăn cách bằng line mảnh, option xếp dọc. */}
+          <div className="bk-ivr-configs">
+            <ConfigColumn
+              label={t('ivrEnvironment')}
+              options={envOptions}
+              value={ivr.environment}
+              onChange={(v) => setIvr({ environment: v as IvrSettings['environment'] })}
+            />
+            <ConfigColumn
+              label={t('ivrTts')}
+              options={ttsOptions}
+              value={ivr.ttsEngine}
+              onChange={(v) => setIvr({ ttsEngine: v as IvrSettings['ttsEngine'] })}
+            />
+            <ConfigColumn
+              label={t('ivrStt')}
+              options={sttOptions}
+              value={ivr.sttEngine}
+              onChange={(v) => setIvr({ sttEngine: v as IvrSettings['sttEngine'] })}
+            />
+          </div>
 
           {/* IVR Property — read-only, liên động các setting trên + announce trong flow. */}
           <div className="block">
@@ -117,7 +120,8 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function OptionGroup({
+// 1 cột cấu hình: nhãn trên cùng + các option xếp DỌC (compact).
+function ConfigColumn({
   label,
   options,
   value,
@@ -130,25 +134,23 @@ function OptionGroup({
 }) {
   const t = useT();
   return (
-    <div className="block">
-      <span className="text-xs font-medium text-[var(--bk-text-muted)]">{label}</span>
-      <div className="mt-1 flex gap-2">
-        {options.map((o) => {
-          const on = value === o.value;
-          return (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => onChange(o.value)}
-              className={`bk-ivr-opt ${on ? 'bk-ivr-opt--on' : ''}`}
-              style={{ '--optc': o.color } as CSSProperties}
-            >
-              <Icon icon={o.icon} width={18} height={18} />
-              <span>{t(o.labelKey)}</span>
-            </button>
-          );
-        })}
-      </div>
+    <div className="bk-ivr-col">
+      <span className="bk-ivr-col-label">{label}</span>
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`bk-ivr-opt ${on ? 'bk-ivr-opt--on' : ''}`}
+            style={{ '--optc': o.color } as CSSProperties}
+          >
+            <Icon icon={o.icon} width={16} height={16} />
+            <span>{t(o.labelKey)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

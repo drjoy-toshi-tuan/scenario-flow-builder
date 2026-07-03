@@ -700,37 +700,6 @@ body {
   font-weight: 500;
   color: var(--bk-text);
 }
-.bk-menu-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--bk-border);
-  background: var(--bk-surface);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--bk-text-muted);
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
-}
-.bk-menu-action:hover:not(:disabled) {
-  border-color: var(--bk-accent);
-  color: var(--bk-accent);
-}
-.bk-menu-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.bk-menu-action--accent {
-  background: var(--bk-accent);
-  border-color: var(--bk-accent);
-  color: #fff;
-}
-.bk-menu-action--accent:hover:not(:disabled) {
-  color: #fff;
-  opacity: 0.9;
-}
 .bk-menu-item {
   display: flex;
   align-items: center;
@@ -747,8 +716,12 @@ body {
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.bk-menu-item:hover {
+.bk-menu-item:hover:not(:disabled) {
   background: var(--bk-surface-2);
+}
+.bk-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .bk-menu-sep {
   height: 1px;
@@ -812,18 +785,45 @@ body {
   padding: 16px;
   overflow-y: auto;
 }
-/* Nhóm lựa chọn (環境 / TTS / STT): các nút icon + nhãn chia đều. */
+/* 3 cột cấu hình (環境 / TTS / STT) — ngăn cách bằng line mảnh xám nhạt. */
+.bk-ivr-configs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+}
+.bk-ivr-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px;
+}
+.bk-ivr-col:first-child {
+  padding-left: 0;
+}
+.bk-ivr-col:last-child {
+  padding-right: 0;
+}
+/* Line ngăn cách siêu mảnh, xám nhạt. */
+.bk-ivr-col + .bk-ivr-col {
+  border-left: 1px solid color-mix(in srgb, var(--bk-border) 65%, transparent);
+}
+.bk-ivr-col-label {
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bk-text-muted);
+}
+/* Nút lựa chọn (compact): icon + nhãn, xếp dọc trong cột. */
 .bk-ivr-opt {
-  flex: 1 1 0;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 9px 12px;
-  border-radius: 10px;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 9px;
+  border-radius: 8px;
   border: 1px solid var(--bk-border);
   background: var(--bk-surface-2);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--bk-text-muted);
   cursor: pointer;

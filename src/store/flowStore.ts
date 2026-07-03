@@ -5,7 +5,7 @@ import { toYaml } from '../ir/toYaml';
 import { layout } from '../ir/layout';
 import { NODE_CONFIG } from '../ui/nodeConfig';
 import { defaultDataFor, readBranches, BRANCH_SCHEMA, CATCH_ALL_ID, type DataBranch } from '../ui/nodeSchema';
-import { DEFAULT_IVR_SETTINGS, type IvrSettings } from '../ir/ivrProperty';
+import { DEFAULT_IVR_SETTINGS, formatDateTime, type IvrSettings } from '../ir/ivrProperty';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Zustand store: giữ FlowIR (source of truth) + các action cập nhật IR.
@@ -38,6 +38,8 @@ interface FlowState {
   // modal "Cài đặt IVR Property". Giữ độc lập với ir để không bị reset khi nạp lại YAML.
   ivr: IvrSettings;
   setIvr: (patch: Partial<IvrSettings>) => void;
+  // Thời điểm import YAML (yyyy-MM-dd HH:mm) -> điền vào 作成日時 của IVR Property.
+  ivrCreatedAt: string;
 
   // Nạp YAML -> IR -> auto-layout, rồi set vào store.
   loadYaml: (text: string) => Promise<void>;
@@ -111,6 +113,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 
     ivr: { ...DEFAULT_IVR_SETTINGS },
     setIvr: (patch) => set({ ivr: { ...get().ivr, ...patch } }),
+    ivrCreatedAt: formatDateTime(new Date()),
 
     loadYaml: async (text) => {
       const ir = fromYaml(text);
@@ -121,7 +124,15 @@ export const useFlowStore = create<FlowState>((set, get) => {
         !ivr.facilityName && laidOut.meta.facility
           ? { ...ivr, facilityName: laidOut.meta.facility }
           : ivr;
-      set({ ir: laidOut, selectedNodeId: null, draft: null, pendingSelect: null, ivr: nextIvr });
+      set({
+        ir: laidOut,
+        selectedNodeId: null,
+        draft: null,
+        pendingSelect: null,
+        ivr: nextIvr,
+        // Mốc 作成日時 = thời điểm import file YAML này.
+        ivrCreatedAt: formatDateTime(new Date()),
+      });
     },
 
     autoLayout: async () => {

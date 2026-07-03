@@ -29,6 +29,15 @@ export const DEFAULT_IVR_SETTINGS: IvrSettings = {
   sttEngine: 'amivoice',
 };
 
+// 作成日時 hiển thị theo định dạng yyyy-MM-dd HH:mm (giờ địa phương).
+export function formatDateTime(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
 // Tên dùng làm key prompt = tên node (label); fallback về id nếu label rỗng.
 function nodeName(node: FlowNode): string {
   const label = typeof node.label === 'string' ? node.label.trim() : '';
@@ -153,7 +162,8 @@ function announceLines(ir: FlowIR, token: string): string[] {
   return lines;
 }
 
-export function buildIvrProperty(ir: FlowIR | null, settings: IvrSettings): string {
+// createdAt: thời điểm import file YAML (định dạng yyyy-MM-dd HH:mm) — điền vào 作成日時.
+export function buildIvrProperty(ir: FlowIR | null, settings: IvrSettings, createdAt = ''): string {
   const envLabel = settings.environment === 'demo' ? 'デモ' : '本番';
   const token = settings.ttsEngine === 'aitalk' ? 'tts_ai' : 'tts_g';
   const lines = ir ? announceLines(ir, token) : [];
@@ -164,7 +174,7 @@ export function buildIvrProperty(ir: FlowIR | null, settings: IvrSettings): stri
     '# ===== IVRプロパティ =====',
     `# 施設名: ${settings.facilityName}`,
     `# 環境: ${envLabel}`,
-    '# 作成日: NOW()',
+    `# 作成日時: ${createdAt}`,
     '',
     '# ==================',
     '#Office ID',

@@ -18,9 +18,9 @@ function getInitialLang(): Lang {
 // Từ điển — VI và JA phải cùng bộ key.
 const DICT: Record<Lang, Record<string, string>> = {
   vi: {
-    autoLayout: 'Tự sắp xếp',
+    autoLayout: 'Auto Layout',
     autoLayoutBusy: 'Đang sắp xếp…',
-    exportYaml: 'Xuất YAML',
+    exportYaml: 'YAML Export',
     logout: 'Đăng xuất',
     themeLight: 'Chế độ sáng',
     themeDark: 'Chế độ tối',
@@ -31,7 +31,6 @@ const DICT: Record<Lang, Record<string, string>> = {
     mLanguage: 'Ngôn ngữ',
     mTheme: 'Giao diện',
     ivrProperty: 'Cài đặt IVR Property',
-    run: 'Chạy',
     // Modal IVR Property
     ivrFacility: 'Tên bệnh viện',
     ivrOfficeId: 'Office ID',
@@ -136,9 +135,9 @@ const DICT: Record<Lang, Record<string, string>> = {
       'Kiểm tra domain ở client-side chỉ là cổng UX cho nội bộ test UI, không phải bảo mật thật. Xem cảnh báo trong README.',
   },
   ja: {
-    autoLayout: '自動レイアウト',
+    autoLayout: 'Auto Layout',
     autoLayoutBusy: '配置中…',
-    exportYaml: 'YAML出力',
+    exportYaml: 'YAML Export',
     logout: 'ログアウト',
     themeLight: 'ライトモード',
     themeDark: 'ダークモード',
@@ -149,7 +148,6 @@ const DICT: Record<Lang, Record<string, string>> = {
     mLanguage: '言語',
     mTheme: 'テーマ',
     ivrProperty: 'IVRプロパティ設定',
-    run: '実行',
     // Modal IVR Property
     ivrFacility: '施設名',
     ivrOfficeId: 'Office ID',
