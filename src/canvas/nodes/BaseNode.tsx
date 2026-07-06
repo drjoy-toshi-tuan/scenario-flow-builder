@@ -172,7 +172,10 @@ function formatFieldValue(
   t: (key: TKey) => string,
 ): string {
   const raw = data[field.key];
-  const value = typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : '';
+  // Chưa lưu vào data -> lấy giá trị mặc định (giống ô nhập trong panel), tránh hiện "—"
+  // dù field vốn có default (vd Voice Type, Retry Count).
+  const value =
+    typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : field.default ?? '';
   if ((field.kind === 'select' || field.kind === 'yesno') && value) {
     const opt = field.options?.find((o) => o.value === value);
     if (opt) return opt.labelKey ? t(opt.labelKey) : opt.label ?? value;

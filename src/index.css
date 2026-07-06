@@ -340,7 +340,8 @@ body {
   gap: 10px;
 }
 .bk-branch-cond {
-  flex: 1.35 1 0;
+  /* Ô điều kiện nuốt phần trống -> tag node đích + nút xoá dồn sát nhau bên phải. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 .bk-branch-arrow {
@@ -348,10 +349,12 @@ body {
   color: var(--bk-text-faint);
 }
 .bk-branch-target {
-  flex: 1 1 0;
+  /* Co vừa nội dung (tag), không giãn -> nằm sát nút xoá. */
+  flex: 0 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
 }
 /* Nhãn nhánh cố định (FAILED/NEXT) — trông như ô read-only, canh cao bằng input. */
 .bk-branch-fixed {

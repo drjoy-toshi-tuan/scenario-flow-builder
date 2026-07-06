@@ -66,6 +66,7 @@ const INPUT_TYPE_OPTIONS: FieldOption[] = [
 ];
 
 const VOICE_TYPE_OPTIONS: FieldOption[] = [
+  { value: 'TEXT', label: 'TEXT' },
   { value: 'KANA_NAME', labelKey: 'vtKanaName' },
   { value: 'NUMBER', labelKey: 'vtNumber' },
   { value: 'PHONE_NUMBER', labelKey: 'vtPhone' },
@@ -151,7 +152,6 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'transferNumber', labelKey: 'fTransferNumber', kind: 'text' },
     { key: 'transferType', labelKey: 'fTransferType', kind: 'select', options: TRANSFER_TYPE_OPTIONS, default: 'ATTENDED' },
     { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
-    { key: 'failedAnnounce', labelKey: 'fFailedAnnounce', kind: 'autoText' },
   ],
   // Flag (フラグ): 2 tham số chỉ nhận số — Status Flag & SMS Flag.
   flag: [
@@ -175,7 +175,8 @@ export const BRANCH_SCHEMA: Record<NodeType, BranchSchema> = {
   script: { mode: 'editable' },
   llm: { mode: 'fixed', fixed: FAILED_NEXT },
   faq: { mode: 'fixed', fixed: FAILED_NEXT },
-  transfer: { mode: 'fixed', fixed: [{ id: 'default', label: 'NEXT' }] },
+  // Transfer: nhánh FAILED (nối máy thất bại) nằm trên nhánh NEXT.
+  transfer: { mode: 'fixed', fixed: FAILED_NEXT },
   // Flag: chỉ có nhánh NEXT.
   flag: { mode: 'fixed', fixed: [{ id: 'default', label: 'NEXT' }] },
   hangup: { mode: 'none' },

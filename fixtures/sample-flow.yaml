@@ -351,7 +351,6 @@ flow:
       transferNumber: "0120-000-000"
       transferType: ATTENDED
       announce: "担当者におつなぎします。少々お待ちください。"
-      failedAnnounce: "只今担当者にお繋ぎできません。後ほど改めておかけ直しください。"
       next: hangup
 
     - id: flag_inquiry
