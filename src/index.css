@@ -1032,14 +1032,15 @@ body {
   font-style: italic;
 }
 
-/* Tooltip nổi (HoverTip): hiện full text khi ô văn bản bị cắt "…". Render ra <body>. */
+/* Tooltip nổi (HoverTip): hiện full text khi ô văn bản bị cắt "…". Render ra <body>.
+   Nền giảm opacity + blur nhẹ -> nhìn xuyên qua đôi chút mà chữ vẫn đọc rõ. */
 .bk-hovertip {
   position: fixed;
   z-index: 1000;
   max-width: 360px;
   padding: 6px 10px;
   border-radius: 8px;
-  background: var(--bk-text);
+  background: color-mix(in srgb, var(--bk-text) 80%, transparent);
   color: var(--bk-surface);
   font-size: 12px;
   font-weight: 500;
@@ -1047,6 +1048,8 @@ body {
   white-space: normal;
   word-break: break-word;
   box-shadow: var(--bk-shadow);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   pointer-events: none;
 }
 

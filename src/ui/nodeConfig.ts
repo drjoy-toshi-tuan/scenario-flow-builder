@@ -19,7 +19,7 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   input: { icon: 'mingcute:voice-fill', typeLabel: 'Input', color: '#0ea5e9' },
   condition: { icon: 'lucide:git-fork', typeLabel: 'Condition', color: '#f59e0b' },
   script: { icon: 'tabler:file-code-filled', typeLabel: 'Logic', color: '#22c55e' },
-  llm: { icon: 'mingcute:ai-fill', typeLabel: 'LLM', color: '#d946ef' },
+  llm: { icon: 'ri:openai-fill', typeLabel: 'OpenAI', color: '#d946ef' },
   faq: { icon: 'lucide:messages-square', typeLabel: 'FAQ', color: '#6366f1' },
   transfer: { icon: 'lucide:phone-forwarded', typeLabel: 'Transfer', color: '#06b6d4' },
   flag: { icon: 'mingcute:flag-4-fill', typeLabel: 'Flag', color: '#de5f1b' },
