@@ -1040,7 +1040,7 @@ body {
   max-width: 360px;
   padding: 6px 10px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--bk-text) 80%, transparent);
+  background: color-mix(in srgb, var(--bk-text) 70%, transparent);
   color: var(--bk-surface);
   font-size: 12px;
   font-weight: 500;
