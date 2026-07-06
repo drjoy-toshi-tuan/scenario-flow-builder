@@ -45,7 +45,8 @@ export type BranchMode =
 
 export interface BranchDescriptor {
   id: string; // trùng với sourceHandle của edge
-  label?: string;
+  name?: string; // tên nhánh cố định (NEXT/FAILED) — cột VALUE, hiển thị ^name$
+  label?: string; // nhãn hiển thị (次へ/失敗) — cột LABEL + nhãn trên dây
 }
 
 export interface BranchSchema {
@@ -178,17 +179,18 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
   hangup: [],
 };
 
-// Nhãn mặc định cho nhánh cố định (hiển thị trên dây + tab Branch).
-//   - NEXT (handle 'default', khớp `next` trong YAML) -> 次へ
-//   - FAILED (handle 'failed')                        -> 失敗
+// Nhánh cố định: VALUE (name, hiển thị ^name$) giữ nguyên NEXT/FAILED;
+// LABEL mặc định là 次へ (NEXT) / 失敗 (FAILED) — cũng là nhãn hiện trên dây.
+//   - NEXT  = handle 'default' (khớp `next` trong YAML)
+//   - FAILED = handle 'failed'
 export const NEXT_BRANCH_LABEL = '次へ';
 export const FAILED_BRANCH_LABEL = '失敗';
 
-const NEXT_ONLY: BranchDescriptor[] = [{ id: 'default', label: NEXT_BRANCH_LABEL }];
+const NEXT_ONLY: BranchDescriptor[] = [{ id: 'default', name: 'NEXT', label: NEXT_BRANCH_LABEL }];
 // FAILED + NEXT dùng chung cho input/llm/faq/transfer.
 const FAILED_NEXT: BranchDescriptor[] = [
-  { id: 'failed', label: FAILED_BRANCH_LABEL },
-  { id: 'default', label: NEXT_BRANCH_LABEL },
+  { id: 'failed', name: 'FAILED', label: FAILED_BRANCH_LABEL },
+  { id: 'default', name: 'NEXT', label: NEXT_BRANCH_LABEL },
 ];
 
 export const BRANCH_SCHEMA: Record<NodeType, BranchSchema> = {

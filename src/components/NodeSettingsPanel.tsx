@@ -508,25 +508,42 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
   }
 
   if (schema.mode === 'fixed') {
-    // Nhánh cố định (FAILED / NEXT …): chỉ xem nhãn + đích jump (cùng UI như node tự do).
+    // Nhánh cố định (FAILED / NEXT …): cùng bố cục VALUE · LABEL · NODE như nhánh tự do,
+    // chỉ khác là không sửa/không thêm/không xoá được (hiển thị read-only).
     return (
       <div className="space-y-3">
         <p className="text-xs text-[var(--bk-text-faint)]">{t('branchFixedNote')}</p>
         <div className="space-y-2.5">
-          {(schema.fixed ?? []).map((b) => (
-            <div key={b.id} className="bk-branch-row">
-              <div className="bk-branch-cond">
-                {/* Nhánh cố định là nhãn ngữ nghĩa (次へ / 失敗) — hiện thẳng, không bọc regex. */}
-                <span className="bk-branch-fixed" title={b.label ?? b.id}>
-                  {b.label ?? b.id}
-                </span>
+          <div className="bk-branch-row bk-branch-head">
+            <div className="bk-branch-cond">{t('branchColValue')}</div>
+            <div className="bk-branch-label-col">{t('branchColLabel')}</div>
+            <span className="bk-branch-arrow-spacer" aria-hidden />
+            <div className="bk-branch-target">{t('branchColNode')}</div>
+          </div>
+          {(schema.fixed ?? []).map((b) => {
+            const value = `^${b.name ?? b.id}$`;
+            const label = b.label ?? '';
+            return (
+              <div key={b.id} className="bk-branch-row">
+                <div className="bk-branch-cond">
+                  {/* VALUE: tên nhánh cố định neo ^…$ (giữ nguyên, không sửa). */}
+                  <span className="bk-branch-fixed" title={value}>
+                    {value}
+                  </span>
+                </div>
+                <div className="bk-branch-label-col">
+                  {/* LABEL: nhãn hiển thị (次へ / 失敗), read-only. */}
+                  <span className="bk-branch-fixed" title={label}>
+                    {label}
+                  </span>
+                </div>
+                <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
+                <div className="bk-branch-target">
+                  <BranchTarget info={targetInfo(b.id)} />
+                </div>
               </div>
-              <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
-              <div className="bk-branch-target">
-                <BranchTarget info={targetInfo(b.id)} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
