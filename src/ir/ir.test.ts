@@ -147,6 +147,40 @@ describe('nhánh (branch) model mới', () => {
     expect(out.branches![2]).toEqual({ default: 'fallback' });
   });
 
+  it('label nhánh round-trip qua YAML (đọc label + xuất lại label)', () => {
+    const withLabel = `
+flow:
+  name: "f"
+  start: c
+  nodes:
+    - id: c
+      type: condition
+      branches:
+        - when: "^はい$"
+          to: a
+          label: "はい"
+        - default: b
+    - id: a
+      type: hangup
+    - id: b
+      type: hangup
+`;
+    const ir = fromYaml(withLabel);
+    const c = ir.nodes.find((n) => n.id === 'c')!;
+    // fromYaml lưu label vào data.branches.
+    expect(readBranches(c.data)).toEqual([
+      { id: 'b0', value: '^はい$', label: 'はい' },
+      { id: 'default', value: '' },
+    ]);
+    // toYaml xuất lại label; nhánh không có label thì không kèm field label.
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; branches?: Array<{ label?: string }> }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'c')!;
+    expect(out.branches![0].label).toBe('はい');
+    expect(out.branches![1].label).toBeUndefined();
+  });
+
   it('defaultDataFor: seed tham số mặc định + 1 nhánh cho node editable', () => {
     const input = defaultDataFor('input');
     expect(input.inputType).toBe('STT');

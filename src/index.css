@@ -332,7 +332,8 @@ body {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Hàng nhánh (Branch tab): [điều kiện] · icon flow-dot · [tag node đích] · [xoá].
+   Hàng nhánh (Branch tab): [giá trị] · [label] · icon flow-dot · [tag node đích] · [xoá].
+   Trên cùng có hàng tiêu đề cột: VALUE · LABEL · NODE.
    ────────────────────────────────────────────────────────────────────────── */
 .bk-branch-row {
   display: flex;
@@ -340,8 +341,11 @@ body {
   gap: 10px;
 }
 .bk-branch-cond {
-  /* Ô điều kiện nuốt phần trống -> tag node đích + nút xoá dồn sát nhau bên phải. */
-  flex: 1 1 auto;
+  flex: 1.2 1 0;
+  min-width: 0;
+}
+.bk-branch-label-col {
+  flex: 1 1 0;
   min-width: 0;
 }
 .bk-branch-arrow {
@@ -349,12 +353,30 @@ body {
   color: var(--bk-text-faint);
 }
 .bk-branch-target {
-  /* Co vừa nội dung (tag), không giãn -> nằm sát nút xoá. */
-  flex: 0 1 auto;
+  /* Tag node đích căn phải -> nằm sát nút xoá. */
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+}
+/* Hàng tiêu đề cột (VALUE / LABEL / NODE) — chữ nhỏ, mờ, IN HOA. */
+.bk-branch-head {
+  padding-bottom: 2px;
+}
+.bk-branch-head > * {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--bk-text-faint);
+}
+.bk-branch-head .bk-branch-target {
+  justify-content: flex-end;
+}
+/* Khoảng trống chiếm chỗ icon flow-dot ở hàng tiêu đề (canh cột thẳng với hàng nhánh). */
+.bk-branch-arrow-spacer {
+  flex: 0 0 18px;
 }
 /* Nhãn nhánh cố định (FAILED/NEXT) — trông như ô read-only, canh cao bằng input. */
 .bk-branch-fixed {

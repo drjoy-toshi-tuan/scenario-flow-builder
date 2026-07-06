@@ -86,6 +86,7 @@ interface FlowState {
   setDraftField: (key: string, value: unknown) => void;
   draftAddBranch: () => void;
   draftUpdateBranch: (branchId: string, value: string) => void;
+  draftSetBranchLabel: (branchId: string, label: string) => void;
   draftRemoveBranch: (branchId: string) => void;
   // Ghi bản nháp vào IR (nút LƯU) + dọn dây theo nhánh còn lại; đóng panel.
   commitDraft: () => void;
@@ -348,8 +349,16 @@ export const useFlowStore = create<FlowState>((set, get) => {
 
     draftUpdateBranch: (branchId, value) => {
       const { draft } = get();
-      if (!draft || branchId === CATCH_ALL_ID) return; // catch-all không sửa
+      if (!draft || branchId === CATCH_ALL_ID) return; // catch-all không sửa value
       const branches = readBranches(draft.data).map((b) => (b.id === branchId ? { ...b, value } : b));
+      set({ draft: { ...draft, data: { ...draft.data, branches } } });
+    },
+
+    // Đặt nhãn hiển thị cho 1 nhánh (áp dụng cho MỌI nhánh, kể cả catch-all).
+    draftSetBranchLabel: (branchId, label) => {
+      const { draft } = get();
+      if (!draft) return;
+      const branches = readBranches(draft.data).map((b) => (b.id === branchId ? { ...b, label } : b));
       set({ draft: { ...draft, data: { ...draft.data, branches } } });
     },
 
@@ -370,6 +379,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const branches = editable ? readBranches(draft.data) : [];
       const branchIds = new Set(branches.map((b) => b.id));
       const valueByHandle = new Map(branches.map((b) => [b.id, b.value]));
+      const labelByHandle = new Map(branches.map((b) => [b.id, (b.label ?? '').trim()]));
 
       set({
         ...snapshot(),
@@ -387,8 +397,11 @@ export const useFlowStore = create<FlowState>((set, get) => {
                 )
                 .map((e) => {
                   if (e.source !== selectedNodeId) return e;
-                  const val = valueByHandle.get(e.sourceHandle ?? 'default') ?? '';
-                  return { ...e, condition: val || undefined, label: val || undefined };
+                  const handle = e.sourceHandle ?? 'default';
+                  const val = valueByHandle.get(handle) ?? '';
+                  const lbl = labelByHandle.get(handle) ?? '';
+                  // Nhãn dây ưu tiên label người dùng đặt, fallback về value.
+                  return { ...e, condition: val || undefined, label: (lbl || val) || undefined };
                 })
             : ir.edges,
         },

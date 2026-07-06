@@ -88,6 +88,20 @@ const TRANSFER_TYPE_OPTIONS: FieldOption[] = [
   { value: 'BLIND', label: 'Blind Transfer' },
 ];
 
+// Module cho node Logic (nguyên Script). Chọn "Script" -> hiện ô soạn code;
+// 2 module còn lại (tạm thời chưa có tham số riêng) sẽ bổ sung property sau.
+const MODULE_OPTIONS: FieldOption[] = [
+  { value: 'Clinic Day Classifier', label: 'Clinic Day Classifier' },
+  { value: 'Context Match Router', label: 'Context Match Router' },
+  { value: 'Script', label: 'Script' },
+];
+
+// Logic: chỉ hiện ô soạn code khi Module = Script (mặc định khi chưa chọn).
+function moduleIsScript(data: Record<string, unknown>): boolean {
+  const v = data.module;
+  return typeof v === 'string' ? v === 'Script' : true;
+}
+
 // Input Type có STT (STT hoặc STT & DTMF) -> mới hiện Voice Type.
 function inputHasStt(data: Record<string, unknown>): boolean {
   const v = data.inputType;
@@ -140,7 +154,10 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       showIf: saveContextOn,
     },
   ],
-  script: [{ key: 'script', labelKey: 'fScript', kind: 'code', rows: 18 }],
+  script: [
+    { key: 'module', labelKey: 'fModule', kind: 'select', options: MODULE_OPTIONS, default: 'Script' },
+    { key: 'script', labelKey: 'fScript', kind: 'code', rows: 18, showIf: moduleIsScript },
+  ],
   llm: [
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
     // Retry Announce luôn nằm ngay dưới Retry Count.
@@ -186,6 +203,7 @@ export const BRANCH_SCHEMA: Record<NodeType, BranchSchema> = {
 export interface DataBranch {
   id: string;
   value: string; // biểu thức regex (không kèm ^ $ — chỉ thêm khi hiển thị)
+  label?: string; // nhãn hiển thị trên dây (thay cho value); rỗng -> dùng value
 }
 
 // Nhánh "catch-all" (else) của node có nhánh tự do: LUÔN có, không sửa/không xoá.
@@ -199,7 +217,12 @@ export function readBranches(data: Record<string, unknown>): DataBranch[] {
   if (Array.isArray(raw)) {
     list = raw
       .filter((b): b is DataBranch => !!b && typeof (b as DataBranch).id === 'string')
-      .map((b) => ({ id: b.id, value: typeof b.value === 'string' ? b.value : '' }));
+      .map((b) => {
+        const branch: DataBranch = { id: b.id, value: typeof b.value === 'string' ? b.value : '' };
+        // Chỉ giữ label khi có giá trị -> không rải label rỗng khắp IR/YAML.
+        if (typeof b.label === 'string' && b.label !== '') branch.label = b.label;
+        return branch;
+      });
   }
   if (list.length === 0) return [{ id: CATCH_ALL_ID, value: '' }];
   // Thiếu catch-all -> thêm vào đầu (giữ nguyên các nhánh sẵn có).
@@ -230,7 +253,8 @@ export function sourceHandlesFor(node: FlowNode): BranchDescriptor[] {
   const schema = BRANCH_SCHEMA[node.type];
   if (schema.mode === 'none') return [];
   if (schema.mode === 'fixed') return schema.fixed ?? [];
-  return readBranches(node.data).map((b) => ({ id: b.id, label: b.value || undefined }));
+  // Nhãn trên dây/handle: ưu tiên label do người dùng đặt, fallback về value.
+  return readBranches(node.data).map((b) => ({ id: b.id, label: b.label?.trim() || b.value || undefined }));
 }
 
 // Sinh dữ liệu mặc định khi thêm node mới (tham số + nhánh tự do nếu có).

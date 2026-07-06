@@ -15,6 +15,7 @@ interface OutBranch {
   when?: string;
   to?: string;
   default?: string;
+  label?: string;
 }
 
 interface OutNode {
@@ -29,14 +30,21 @@ function outgoing(edges: FlowEdge[], nodeId: string): FlowEdge[] {
   return edges.filter((e) => e.source === nodeId);
 }
 
-// Map handleId -> giá trị điều kiện, đọc từ node.data.branches (nhánh tự do).
-function readDataBranches(data: Record<string, unknown>): Map<string, string> {
-  const map = new Map<string, string>();
+// Map handleId -> { value điều kiện, label hiển thị }, đọc từ node.data.branches.
+interface BranchInfo {
+  value: string;
+  label?: string;
+}
+function readDataBranches(data: Record<string, unknown>): Map<string, BranchInfo> {
+  const map = new Map<string, BranchInfo>();
   const raw = data.branches;
   if (Array.isArray(raw)) {
     for (const b of raw) {
       if (b && typeof b.id === 'string') {
-        map.set(b.id, typeof b.value === 'string' ? b.value : '');
+        map.set(b.id, {
+          value: typeof b.value === 'string' ? b.value : '',
+          label: typeof b.label === 'string' && b.label.trim() ? b.label : undefined,
+        });
       }
     }
   }
@@ -69,8 +77,11 @@ export function toYaml(ir: FlowIR): string {
       const dataBranches = readDataBranches(node.data);
       const branches: OutBranch[] = edges.map((e) => {
         const handle = e.sourceHandle ?? 'default';
-        const value = dataBranches.get(handle) ?? e.condition ?? '';
-        return value ? { when: value, to: e.target } : { default: e.target };
+        const info = dataBranches.get(handle);
+        const value = info?.value ?? e.condition ?? '';
+        const out: OutBranch = value ? { when: value, to: e.target } : { default: e.target };
+        if (info?.label) out.label = info.label;
+        return out;
       });
       if (branches.length > 0) out.branches = branches;
     } else {

@@ -72,7 +72,8 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
     // Nhãn của handle mà dây xuất phát (FAILED/NEXT hoặc giá trị nhánh).
     const matched = handles.find((h) => h.id === (e.sourceHandle ?? 'default'))?.label;
     const srcNode = nodeById.get(e.source);
-    const isFixed = srcNode ? BRANCH_SCHEMA[srcNode.type].mode === 'fixed' : false;
+    const mode = srcNode ? BRANCH_SCHEMA[srcNode.type].mode : 'none';
+    const isFixed = mode === 'fixed';
 
     return {
       id: e.id,
@@ -82,9 +83,11 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
       type: 'deletable',
       // Nhãn nhánh căn GIỮA dây, hành vi giống nhau cho MỌI loại node:
       //   - Node nhánh CỐ ĐỊNH (FAILED/NEXT…): nhãn = tên nhánh cố định (kể cả node 1 nhánh).
-      //   - Node nhánh TỰ DO (condition/script): nhãn = giá trị nhánh.
+      //   - Node nhánh TỰ DO (condition/logic): nhãn = label nhánh (fallback giá trị nhánh).
       // Nút xoá hiện khi hover; nhãn + nút đều bám tâm dây (xem DeletableEdge).
-      label: (isFixed || handles.length > 1 ? matched : undefined) ?? conditionOutputLabel(e.condition ?? e.label),
+      label:
+        (isFixed || mode === 'editable' || handles.length > 1 ? matched : undefined) ??
+        conditionOutputLabel(e.condition ?? e.label),
       data: {
         condition: e.condition,
         // Node condition/script: nhãn giá trị nhánh luôn hiện; node khác chỉ hiện khi hover.

@@ -28,6 +28,7 @@ interface RawBranch {
   when?: string;
   to?: string;
   default?: string;
+  label?: string; // nhãn hiển thị trên dây (tuỳ chọn)
 }
 
 interface RawNode {
@@ -113,28 +114,29 @@ export function fromYaml(text: string): FlowIR {
     // branches -> mỗi nhánh là 1 edge; đồng thời dựng danh sách nhánh tự do (data.branches)
     // để các chấm nối ở đáy node hiển thị đúng số lượng kể cả khi chưa nối dây.
     if (Array.isArray(raw.branches)) {
-      const dataBranches: { id: string; value: string }[] = [];
+      const dataBranches: { id: string; value: string; label?: string }[] = [];
       raw.branches.forEach((branch, index) => {
+        const label = typeof branch.label === 'string' ? branch.label : undefined;
         if (branch.when && branch.to) {
           const handle = `b${index}`;
-          dataBranches.push({ id: handle, value: branch.when });
+          dataBranches.push({ id: handle, value: branch.when, label });
           edges.push({
             id: edgeId(raw.id, branch.to, handle),
             source: raw.id,
             target: branch.to,
             sourceHandle: handle,
             condition: branch.when,
-            label: branch.when,
+            label: label || branch.when,
           });
         } else if (branch.default) {
           // Nhánh mặc định (else) -> handle 'default', giá trị rỗng.
-          dataBranches.push({ id: 'default', value: '' });
+          dataBranches.push({ id: 'default', value: '', label });
           edges.push({
             id: edgeId(raw.id, branch.default, 'default'),
             source: raw.id,
             target: branch.default,
             sourceHandle: 'default',
-            label: 'default',
+            label: label || 'default',
           });
         }
       });
