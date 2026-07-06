@@ -1001,8 +1001,9 @@ body {
   -webkit-backdrop-filter: blur(3px);
   border: 1px solid var(--bk-border);
   box-shadow: var(--bk-shadow);
-  /* Chỉ để xem — không chặn tương tác canvas phía dưới. */
-  pointer-events: none;
+  /* Cho phép hover vào card (giữ preview mở + xem tooltip full text khi bị cắt "…").
+     Card chỉ hiện khi hover/chọn node nên không cản trở canvas lúc bình thường. */
+  pointer-events: auto;
   text-align: left;
 }
 .bk-node-preview-row {
@@ -1024,14 +1025,29 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Card preview để pointer-events:none (không chặn canvas); riêng dòng giá trị
-     bật lại pointer-events để hover xem tooltip (title) đầy đủ khi bị cắt "…". */
-  pointer-events: auto;
 }
 .bk-node-preview-empty {
   font-size: 12px;
   color: var(--bk-text-faint);
   font-style: italic;
+}
+
+/* Tooltip nổi (HoverTip): hiện full text khi ô văn bản bị cắt "…". Render ra <body>. */
+.bk-hovertip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 360px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bk-text);
+  color: var(--bk-surface);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: var(--bk-shadow);
+  pointer-events: none;
 }
 
 /* Handle (điểm nối dây) — chấm RỖNG chỉ có viền (border), nền theo surface.

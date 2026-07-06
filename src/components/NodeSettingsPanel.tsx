@@ -16,6 +16,7 @@ import { lintScript, type ScriptError } from '../ui/scriptLint';
 import { CodeEditor } from './CodeEditor';
 import { RegexBranchInput } from './RegexBranchInput';
 import { AutoGrowTextarea } from './AutoGrowTextarea';
+import { HoverTip } from './HoverTip';
 
 // Key giải thích ý nghĩa loại node trong từ điển i18n (exStart, exAnnounce, …).
 function explainKey(type: NodeType): TKey {
@@ -640,9 +641,10 @@ function BranchTarget({ info }: { info: TargetInfo | null }) {
   if (!info) {
     return <span className="bk-branch-none">{t('branchTargetNone')}</span>;
   }
+  // Tên node dài -> cắt "…"; hover xem đầy đủ (tooltip nổi).
   return (
-    <span className="bk-branch-tag" style={{ '--tagc': info.color } as CSSProperties} title={info.label}>
+    <HoverTip className="bk-branch-tag" style={{ '--tagc': info.color } as CSSProperties} content={info.label}>
       {info.label}
-    </span>
+    </HoverTip>
   );
 }

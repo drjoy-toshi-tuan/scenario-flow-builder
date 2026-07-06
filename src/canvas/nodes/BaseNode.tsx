@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import type { RFNodeData } from '../irAdapter';
 import type { NodeType } from '../../ir/types';
@@ -7,6 +7,7 @@ import { PROPERTY_FIELDS, type PropertyField } from '../../ui/nodeSchema';
 import { Icon } from '../../ui/icons';
 import { useFlowStore } from '../../store/flowStore';
 import { useT, type TKey } from '../../ui/i18n';
+import { HoverTip } from '../../components/HoverTip';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node card. Bố cục theo yêu cầu:
@@ -31,13 +32,26 @@ export function makeNode(nodeType: NodeType) {
     const isPanning = useFlowStore((s) => s.isPanning);
     const t = useT();
     const [hovered, setHovered] = useState(false);
+    // Giữ preview mở khi rê chuột từ node sang card preview (có khoảng hở 12px):
+    // mouseleave hẹn ẩn sau 180ms; mouseenter card huỷ hẹn -> hover được vào card.
+    const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const showPreview = () => {
+      if (hideTimer.current) {
+        clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+      setHovered(true);
+    };
+    const hidePreview = () => {
+      hideTimer.current = setTimeout(() => setHovered(false), 180);
+    };
 
     return (
       <div
         className={['bk-node', selected ? 'bk-node--selected' : ''].join(' ')}
         style={{ '--accent': cfg.color } as CSSProperties}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={showPreview}
+        onMouseLeave={hidePreview}
       >
         {/* Hover / chọn node -> xem nhanh các property đang set (bên phải node). */}
         <NodeToolbar
@@ -46,7 +60,9 @@ export function makeNode(nodeType: NodeType) {
           offset={12}
           align="start"
         >
-          <NodePreview type={nodeType} data={d.nodeData} />
+          <div onMouseEnter={showPreview} onMouseLeave={hidePreview}>
+            <NodePreview type={nodeType} data={d.nodeData} />
+          </div>
         </NodeToolbar>
 
         {/* Thanh công cụ nổi phía trên node khi được chọn (bấm vào node).
@@ -152,10 +168,10 @@ function NodePreview({ type, data }: { type: NodeType; data: Record<string, unkn
       {description && (
         <div className="bk-node-preview-row">
           <span className="bk-node-preview-key">{t('description')}</span>
-          {/* Giá trị dài bị cắt "…" -> hover xem đầy đủ qua title. */}
-          <span className="bk-node-preview-val" title={description}>
+          {/* Giá trị dài bị cắt "…" -> hover xem đầy đủ (tooltip nổi). */}
+          <HoverTip className="bk-node-preview-val" content={description}>
             {description}
-          </span>
+          </HoverTip>
         </div>
       )}
       {fields.map((f) => {
@@ -163,9 +179,9 @@ function NodePreview({ type, data }: { type: NodeType; data: Record<string, unkn
         return (
           <div key={f.key} className="bk-node-preview-row">
             <span className="bk-node-preview-key">{t(f.labelKey)}</span>
-            <span className="bk-node-preview-val" title={val || undefined}>
+            <HoverTip className="bk-node-preview-val" content={val}>
               {val || '—'}
-            </span>
+            </HoverTip>
           </div>
         );
       })}
