@@ -28,6 +28,12 @@ type FileRow = FlowFile & { meta: FlowMeta };
 // Bỏ đuôi .yaml/.yml khi hiển thị (danh sách chỉ hiện tên).
 const stripExt = (name: string) => name.replace(/\.ya?ml$/i, '');
 
+// Cache metadata theo blob sha (sha = hash nội dung, đổi khi file đổi). Nhờ vậy khi
+// quay lại màn danh sách / bấm Làm mới mà file không đổi -> KHÔNG tải lại nội dung;
+// chỉ file mới hoặc vừa sửa (sha khác) mới phải fetch. Sống ở cấp module để giữ qua
+// các lần mount (điều hướng canvas <-> quản lý file).
+const metaCache = new Map<string, FlowMeta>();
+
 // Nội dung flow trống khi "Tạo flow mới" — kèm metadata (施設名/シナリオ名/作成者/日時).
 function buildBlankFlow(o: { facility: string; name: string; author: string; createdAt: string }): string {
   const q = (s: string) => JSON.stringify(s ?? ''); // double-quoted scalar an toàn cho YAML
@@ -91,17 +97,27 @@ export function FileManagerScreen() {
     setListErrorKey(null);
     try {
       const list = await listFlows(token);
-      // Đọc metadata từng file (song song) để hiển thị theo cột.
+      // Đọc metadata từng file (song song), tận dụng cache theo sha để không tải lại
+      // file không đổi. Chỉ fetch những file chưa có trong cache (mới/vừa sửa).
       const rows = await Promise.all(
         list.map(async (f): Promise<FileRow> => {
+          const cached = metaCache.get(f.sha);
+          if (cached) return { ...f, meta: cached };
           try {
             const { content } = await getFlow(token, f.path);
-            return { ...f, meta: parseFlowMeta(content) };
+            const meta = parseFlowMeta(content);
+            metaCache.set(f.sha, meta);
+            return { ...f, meta };
           } catch {
             return { ...f, meta: {} };
           }
         }),
       );
+      // Dọn cache: chỉ giữ sha còn trong danh sách hiện tại (tránh phình vô hạn).
+      const alive = new Set(list.map((f) => f.sha));
+      for (const sha of metaCache.keys()) {
+        if (!alive.has(sha)) metaCache.delete(sha);
+      }
       setFiles(rows);
     } catch (e) {
       setListErrorKey(ghErrorKey(e));

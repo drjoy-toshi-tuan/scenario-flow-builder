@@ -26,7 +26,7 @@ export function GithubConnectPanel() {
     <div className="w-full max-w-lg rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-8 shadow-[var(--bk-shadow)]">
       <div className="mb-5 flex items-center gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--bk-accent-soft)] text-2xl text-[var(--bk-accent)]">
-          <Icon icon="lucide:github" />
+          <Icon icon="mdi:github" />
         </span>
         <div>
           <h2 className="text-lg font-bold text-[var(--bk-text)]">{t('fmConnectTitle')}</h2>

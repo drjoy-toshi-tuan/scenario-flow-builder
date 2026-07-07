@@ -85,7 +85,7 @@ export function FileManagerMenu() {
               <div className="bk-menu-sep" />
               <div className="bk-menu-row">
                 <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--bk-text-muted)]">
-                  <Icon icon="lucide:github" width={14} height={14} />
+                  <Icon icon="mdi:github" width={14} height={14} />
                   <span className="truncate" title={t('fmConnectedAs', { login })}>{login}</span>
                 </span>
                 <button
