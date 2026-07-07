@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useGithubToken } from '../github/token';
 import { ghErrorKey } from '../github/errors';
-import { flowsBrowseUrl } from '../github/config';
 import { useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 
@@ -78,7 +77,7 @@ export function GithubConnectPanel() {
         </button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-1.5">
+      <div className="mt-4">
         <a
           href={TOKEN_CREATE_URL}
           target="_blank"
@@ -87,15 +86,6 @@ export function GithubConnectPanel() {
         >
           <Icon icon="lucide:external-link" width={14} height={14} />
           {t('fmTokenHelp')}
-        </a>
-        <a
-          href={flowsBrowseUrl()}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs text-[var(--bk-text-faint)] hover:text-[var(--bk-accent)] hover:underline"
-        >
-          <Icon icon="lucide:external-link" width={14} height={14} />
-          {t('fmBrowseRepo')}
         </a>
       </div>
     </div>

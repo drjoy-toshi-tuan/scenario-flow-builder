@@ -48,6 +48,10 @@ interface FlowState {
   // Xuất IR hiện tại ra chuỗi YAML (round-trip).
   exportYaml: () => string;
 
+  // Cập nhật metadata flow (name/facility/author/createdAt/updatedAt) — dùng khi
+  // lưu về repo để đóng dấu 更新日時/作成者. Không ghi vào lịch sử Undo.
+  setMeta: (patch: Partial<FlowIR['meta']>) => void;
+
   // Cập nhật vị trí sau khi kéo-thả (commit vào IR).
   setNodePositions: (positions: Record<string, { x: number; y: number }>) => void;
 
@@ -177,6 +181,12 @@ export const useFlowStore = create<FlowState>((set, get) => {
     exportYaml: () => {
       const { ir } = get();
       return ir ? toYaml(ir) : '';
+    },
+
+    setMeta: (patch) => {
+      const { ir } = get();
+      if (!ir) return;
+      set({ ir: { ...ir, meta: { ...ir.meta, ...patch } } });
     },
 
     setNodePositions: (positions) => {

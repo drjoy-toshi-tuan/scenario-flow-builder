@@ -8,10 +8,11 @@ export interface FlowIR {
   version: string; // vd "1.0"
   meta: {
     id: string;
-    name: string;
-    facility?: string; // 施設名 nếu có
-    createdAt: string;
-    updatedAt: string;
+    name: string; // シナリオ名 (tên kịch bản)
+    facility?: string; // 施設名 (tên bệnh viện) nếu có
+    author?: string; // 作成者 (người tạo) nếu có
+    createdAt: string; // 作成日時 — định dạng yyyy-MM-dd HH:mm
+    updatedAt: string; // 更新日時 — định dạng yyyy-MM-dd HH:mm
   };
   nodes: FlowNode[];
   edges: FlowEdge[];

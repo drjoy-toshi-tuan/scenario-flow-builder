@@ -188,6 +188,18 @@ const DICT: Record<Lang, Record<string, string>> = {
     ghErrOther: 'Có lỗi khi gọi GitHub. Thử lại.',
     fmUploadInvalid: 'File YAML không hợp lệ hoặc không đọc được.',
     fmNameRequired: 'Vui lòng nhập tên file.',
+    // Cột bảng danh sách file
+    colFacility: 'Tên bệnh viện',
+    colScenario: 'Tên kịch bản',
+    colCreatedAt: 'Ngày tạo',
+    colUpdatedAt: 'Cập nhật cuối',
+    colAuthor: 'Người tạo',
+    colActions: 'Thao tác',
+    // Form tạo flow mới
+    fmFacilityPlaceholder: 'Nhập tên bệnh viện…',
+    fmScenarioPlaceholder: 'Nhập tên kịch bản…',
+    fmFacilityRequired: 'Vui lòng nhập tên bệnh viện.',
+    fmScenarioRequired: 'Vui lòng nhập tên kịch bản.',
     loginDemoNotice:
       'Chưa cấu hình VITE_GOOGLE_CLIENT_ID. Bạn đang xem bản demo UI — đăng nhập Google bị tắt.',
     loginDemoButton: 'Vào chế độ demo (bỏ qua đăng nhập)',
@@ -365,6 +377,18 @@ const DICT: Record<Lang, Record<string, string>> = {
     ghErrOther: 'GitHub呼び出しでエラーが発生しました。もう一度お試しください。',
     fmUploadInvalid: 'YAMLファイルが無効か読み取れませんでした。',
     fmNameRequired: 'ファイル名を入力してください。',
+    // Cột bảng danh sách file
+    colFacility: '施設名',
+    colScenario: 'シナリオ名',
+    colCreatedAt: '作成日時',
+    colUpdatedAt: '更新日時',
+    colAuthor: '作成者',
+    colActions: '操作',
+    // Form tạo flow mới
+    fmFacilityPlaceholder: '施設名を入力…',
+    fmScenarioPlaceholder: 'シナリオ名を入力…',
+    fmFacilityRequired: '施設名を入力してください。',
+    fmScenarioRequired: 'シナリオ名を入力してください。',
     loginDemoNotice:
       'VITE_GOOGLE_CLIENT_ID が未設定です。UIデモを表示中 — Googleログインは無効です。',
     loginDemoButton: 'デモモードで開く（ログインをスキップ）',

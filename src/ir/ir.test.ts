@@ -4,6 +4,7 @@ import { toYaml } from './toYaml';
 import { parse } from 'yaml';
 import { SYNTHETIC_START_ID } from './types';
 import { defaultDataFor, sourceHandlesFor, readBranches, catchAllDisplay } from '../ui/nodeSchema';
+import { parseFlowMeta } from './flowMeta';
 
 const SAMPLE = `
 flow:
@@ -204,5 +205,54 @@ flow:
         { id: 'b1', value: '2' },
       ]),
     ).toBe('^(?!(?:1|2)$).*$');
+  });
+});
+
+describe('metadata flow (施設名/シナリオ名/作成者/日時)', () => {
+  const WITH_META = `
+flow:
+  name: "予約フロー"
+  facility: "テスト病院"
+  author: "Tuan"
+  createdAt: "2026-07-01 09:30"
+  updatedAt: "2026-07-02 14:00"
+  start: greet
+  nodes:
+    - id: greet
+      type: announce
+      text: "hi"
+`;
+
+  it('fromYaml đọc facility/author/createdAt/updatedAt vào meta', () => {
+    const ir = fromYaml(WITH_META);
+    expect(ir.meta.facility).toBe('テスト病院');
+    expect(ir.meta.author).toBe('Tuan');
+    expect(ir.meta.createdAt).toBe('2026-07-01 09:30');
+    expect(ir.meta.updatedAt).toBe('2026-07-02 14:00');
+  });
+
+  it('toYaml ghi lại metadata (round-trip)', () => {
+    const parsed = parse(toYaml(fromYaml(WITH_META))) as {
+      flow: { facility?: string; author?: string; createdAt?: string; updatedAt?: string };
+    };
+    expect(parsed.flow.facility).toBe('テスト病院');
+    expect(parsed.flow.author).toBe('Tuan');
+    expect(parsed.flow.createdAt).toBe('2026-07-01 09:30');
+    expect(parsed.flow.updatedAt).toBe('2026-07-02 14:00');
+  });
+
+  it('parseFlowMeta trả metadata; field vắng -> undefined', () => {
+    const meta = parseFlowMeta(WITH_META);
+    expect(meta).toEqual({
+      facility: 'テスト病院',
+      name: '予約フロー',
+      author: 'Tuan',
+      createdAt: '2026-07-01 09:30',
+      updatedAt: '2026-07-02 14:00',
+    });
+    const bare = parseFlowMeta('flow:\n  name: "x"\n  nodes: []\n');
+    expect(bare.createdAt).toBeUndefined();
+    expect(bare.author).toBeUndefined();
+    expect(bare.name).toBe('x');
   });
 });

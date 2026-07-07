@@ -174,18 +174,31 @@ export async function deleteFlow(token: string, path: string, sha: string, messa
 }
 
 // Chuẩn hoá tên file người dùng nhập/upload thành tên hợp lệ, luôn có đuôi .yaml/.yml.
-// Chống path traversal (bỏ '/', '\\'), bỏ ký tự lạ, không mở đầu bằng '.'/'-'.
+// Giữ chữ/số MỌI ngôn ngữ (kể cả tiếng Nhật) + . _ - ; loại bỏ ký tự nguy hiểm cho
+// path (dấu phân tách, ký tự điều khiển…). Chống path traversal, không mở đầu bằng '.'/'-'.
 export function sanitizeFileName(raw: string): string {
   let name = raw.trim().replace(/\s+/g, '-');
-  // Chỉ giữ chữ/số/._- ; loại bỏ mọi ký tự khác (kể cả dấu phân tách path).
-  name = name.replace(/[^A-Za-z0-9._-]/g, '');
-  name = name.replace(/^[.-]+/, ''); // không mở đầu bằng . hoặc -
+  // Chỉ giữ ký tự chữ (\p{L}) / số (\p{N}) của mọi bảng chữ, và . _ - ; bỏ phần còn lại.
+  name = name.replace(/[^\p{L}\p{N}._-]/gu, '');
+  name = name.replace(/^[.-]+/u, ''); // không mở đầu bằng . hoặc -
 
   // Giữ .yml nếu người dùng đã dùng, còn lại mặc định .yaml.
   const ext = /\.yml$/i.test(name) ? '.yml' : '.yaml';
-  let base = name.replace(/\.ya?ml$/i, '').replace(/\.+$/, '').replace(/^[.-]+/, '');
+  let base = name.replace(/\.ya?ml$/i, '').replace(/\.+$/, '').replace(/^[.-]+/u, '');
   if (!base) base = 'flow';
   return `${base}${ext}`;
+}
+
+// Tạo tên file duy nhất trong tập tên đã có (thêm -2, -3… trước đuôi) — dùng khi
+// tạo flow mới để không ghi đè file trùng tên.
+export function uniqueFileName(desired: string, taken: Set<string>): string {
+  if (!taken.has(desired)) return desired;
+  const m = desired.match(/^(.*?)(\.ya?ml)$/i);
+  const base = m ? m[1] : desired;
+  const ext = m ? m[2] : '.yaml';
+  let i = 2;
+  while (taken.has(`${base}-${i}${ext}`)) i++;
+  return `${base}-${i}${ext}`;
 }
 
 export { isYaml };

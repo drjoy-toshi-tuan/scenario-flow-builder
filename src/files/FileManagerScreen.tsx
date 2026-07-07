@@ -2,29 +2,42 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useGithubToken } from '../github/token';
 import { GithubConnectPanel } from './GithubConnectPanel';
+import { FileManagerMenu } from './FileManagerMenu';
 import {
   listFlows,
   getFlow,
   putFlow,
   deleteFlow,
   sanitizeFileName,
+  uniqueFileName,
   type FlowFile,
 } from '../github/api';
 import { ghErrorKey } from '../github/errors';
-import { FLOWS_DIR, flowsBrowseUrl } from '../github/config';
+import { FLOWS_DIR } from '../github/config';
 import { fromYaml } from '../ir/fromYaml';
+import { parseFlowMeta, type FlowMeta } from '../ir/flowMeta';
+import { formatDateTime } from '../ir/ivrProperty';
 import { useFlowStore } from '../store/flowStore';
 import { useFileStore } from '../store/fileStore';
-import { useLang, useT, type TKey } from '../ui/i18n';
-import { useTheme } from '../ui/theme';
+import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
-import { SlideToggle } from '../components/SlideToggle';
 
-// Nội dung flow trống khi "Tạo flow mới".
-function buildBlankFlow(name: string): string {
+// File kèm metadata đọc từ header YAML (để hiển thị theo cột).
+type FileRow = FlowFile & { meta: FlowMeta };
+
+// Bỏ đuôi .yaml/.yml khi hiển thị (danh sách chỉ hiện tên).
+const stripExt = (name: string) => name.replace(/\.ya?ml$/i, '');
+
+// Nội dung flow trống khi "Tạo flow mới" — kèm metadata (施設名/シナリオ名/作成者/日時).
+function buildBlankFlow(o: { facility: string; name: string; author: string; createdAt: string }): string {
+  const q = (s: string) => JSON.stringify(s ?? ''); // double-quoted scalar an toàn cho YAML
   return [
     'flow:',
-    `  name: "${name}"`,
+    `  name: ${q(o.name)}`,
+    `  facility: ${q(o.facility)}`,
+    `  author: ${q(o.author)}`,
+    `  createdAt: ${q(o.createdAt)}`,
+    `  updatedAt: ${q(o.createdAt)}`,
     '  start: welcome',
     '  nodes:',
     '    - id: welcome',
@@ -40,24 +53,21 @@ function buildBlankFlow(name: string): string {
 // Kiểm tra YAML có phải flow đọc được không (không ném lỗi khi vào canvas).
 function isValidFlowYaml(text: string): boolean {
   try {
-    const ir = fromYaml(text);
-    return Array.isArray(ir.nodes);
+    return Array.isArray(fromYaml(text).nodes);
   } catch {
     return false;
   }
 }
 
 export function FileManagerScreen() {
-  const { user, signOut } = useAuth();
-  const { token, login, disconnect } = useGithubToken();
-  const { lang, setLang } = useLang();
-  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
+  const { token } = useGithubToken();
   const t = useT();
 
   const loadYaml = useFlowStore((s) => s.loadYaml);
   const openFile = useFileStore((s) => s.openFile);
 
-  const [files, setFiles] = useState<FlowFile[]>([]);
+  const [files, setFiles] = useState<FileRow[]>([]);
   const [loading, setLoading] = useState(false);
   // Giữ KEY i18n (không phải chuỗi đã dịch) để refresh không phụ thuộc hàm t()
   // — t() đổi identity mỗi render, nếu đưa vào deps sẽ gây vòng lặp fetch vô hạn.
@@ -67,8 +77,10 @@ export function FileManagerScreen() {
 
   // Modal tạo mới / xoá / xác nhận ghi đè khi upload.
   const [showNew, setShowNew] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<FlowFile | null>(null);
+  const [newFacility, setNewFacility] = useState('');
+  const [newScenario, setNewScenario] = useState('');
+  const [createErrorKey, setCreateErrorKey] = useState<TKey | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FileRow | null>(null);
   const [overwrite, setOverwrite] = useState<{ name: string; content: string; sha: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +90,19 @@ export function FileManagerScreen() {
     setLoading(true);
     setListErrorKey(null);
     try {
-      setFiles(await listFlows(token));
+      const list = await listFlows(token);
+      // Đọc metadata từng file (song song) để hiển thị theo cột.
+      const rows = await Promise.all(
+        list.map(async (f): Promise<FileRow> => {
+          try {
+            const { content } = await getFlow(token, f.path);
+            return { ...f, meta: parseFlowMeta(content) };
+          } catch {
+            return { ...f, meta: {} };
+          }
+        }),
+      );
+      setFiles(rows);
     } catch (e) {
       setListErrorKey(ghErrorKey(e));
     } finally {
@@ -126,12 +150,9 @@ export function FileManagerScreen() {
     }
   };
 
-  const handleUploadPick = () => fileInputRef.current?.click();
-
   const handleUploadFile = async (fileList: FileList | null) => {
     const file = fileList?.[0];
-    // Cho phép chọn lại cùng file lần sau.
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = ''; // cho phép chọn lại cùng file
     if (!file) return;
     setActionError(null);
     let content: string;
@@ -148,8 +169,7 @@ export function FileManagerScreen() {
     const name = sanitizeFileName(file.name);
     const existing = files.find((f) => f.name === name);
     if (existing) {
-      // Đã có -> hỏi xác nhận ghi đè (cần sha).
-      setOverwrite({ name, content, sha: existing.sha });
+      setOverwrite({ name, content, sha: existing.sha }); // hỏi xác nhận ghi đè
       return;
     }
     await commitAndOpen(name, content, t('commitUpload', { name }));
@@ -162,19 +182,31 @@ export function FileManagerScreen() {
     await commitAndOpen(name, content, t('commitUpload', { name }), sha);
   };
 
+  const openNewModal = () => {
+    setCreateErrorKey(null);
+    setNewFacility('');
+    setNewScenario('');
+    setShowNew(true);
+  };
+
   const handleCreate = async () => {
-    const trimmed = newName.trim();
-    if (!trimmed) {
-      setActionError(t('fmNameRequired'));
+    const facility = newFacility.trim();
+    const scenario = newScenario.trim();
+    if (!facility) {
+      setCreateErrorKey('fmFacilityRequired');
       return;
     }
-    const name = sanitizeFileName(trimmed);
-    const base = name.replace(/\.ya?ml$/i, '');
+    if (!scenario) {
+      setCreateErrorKey('fmScenarioRequired');
+      return;
+    }
+    // Tên file suy từ シナリオ名; đảm bảo duy nhất để không ghi đè file trùng tên.
+    const name = uniqueFileName(sanitizeFileName(scenario), new Set(files.map((f) => f.name)));
     setShowNew(false);
-    setNewName('');
-    const existing = files.find((f) => f.name === name);
-    const content = buildBlankFlow(base);
-    await commitAndOpen(name, content, t('commitCreate', { name }), existing?.sha);
+    const now = formatDateTime(new Date());
+    const author = user?.name ?? user?.email ?? '';
+    const content = buildBlankFlow({ facility, name: scenario, author, createdAt: now });
+    await commitAndOpen(name, content, t('commitCreate', { name }));
   };
 
   const handleDelete = async () => {
@@ -193,9 +225,12 @@ export function FileManagerScreen() {
     }
   };
 
+  const cell = 'px-4 py-3 text-sm text-[var(--bk-text)]';
+  const th = 'px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]';
+
   return (
     <div className="relative flex h-full flex-col bg-[var(--bk-bg)]">
-      {/* ── Top bar ── */}
+      {/* ── Top bar: tiêu đề + nút menu (giống canvas) ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--bk-accent-soft)] text-lg text-[var(--bk-accent)]">
@@ -208,38 +243,7 @@ export function FileManagerScreen() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <SlideToggle
-            value={lang}
-            options={[
-              { key: 'vi', icon: 'twemoji:flag-vietnam' },
-              { key: 'ja', icon: 'twemoji:flag-japan' },
-            ]}
-            onChange={(k) => setLang(k as 'vi' | 'ja')}
-            ariaLabel="Language"
-          />
-          <SlideToggle
-            value={theme}
-            options={[
-              { key: 'light', icon: 'lucide:sun' },
-              { key: 'dark', icon: 'lucide:moon' },
-            ]}
-            onChange={(k) => setTheme(k as 'light' | 'dark')}
-            ariaLabel="Theme"
-          />
-          <div className="mx-1 h-6 w-px bg-[var(--bk-border)]" />
-          {user?.picture && <img src={user.picture} alt="" className="h-7 w-7 rounded-full" />}
-          <span
-            className="hidden max-w-[140px] truncate text-xs text-[var(--bk-text-muted)] sm:block"
-            title={user?.email}
-          >
-            {user?.name}
-          </span>
-          <button type="button" onClick={signOut} className="bk-menu-logout" title={t('logout')}>
-            <Icon icon="lucide:log-out" width={14} height={14} />
-            <span>{t('logout')}</span>
-          </button>
-        </div>
+        <FileManagerMenu />
       </header>
 
       {/* ── Nội dung ── */}
@@ -248,7 +252,7 @@ export function FileManagerScreen() {
           <GithubConnectPanel />
         </div>
       ) : (
-        <main className="mx-auto w-full max-w-3xl flex-1 overflow-auto p-6">
+        <main className="mx-auto w-full max-w-5xl flex-1 overflow-auto p-6">
           <div className="mb-4">
             <h1 className="text-lg font-bold text-[var(--bk-text)]">{t('fmTitle')}</h1>
             <p className="text-sm text-[var(--bk-text-muted)]">{t('fmSubtitle')}</p>
@@ -258,7 +262,7 @@ export function FileManagerScreen() {
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleUploadPick}
+              onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               className="flex items-center gap-1.5 rounded-lg bg-[var(--bk-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
@@ -267,11 +271,7 @@ export function FileManagerScreen() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setActionError(null);
-                setNewName('');
-                setShowNew(true);
-              }}
+              onClick={openNewModal}
               disabled={busy}
               className="flex items-center gap-1.5 rounded-lg border border-[var(--bk-border)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-text)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)] disabled:opacity-60"
             >
@@ -287,29 +287,6 @@ export function FileManagerScreen() {
               <Icon icon="lucide:refresh-cw" width={16} height={16} className={loading ? 'animate-spin' : ''} />
               {t('fmRefresh')}
             </button>
-            <div className="ml-auto flex items-center gap-3">
-              <a
-                href={flowsBrowseUrl()}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-[var(--bk-text-faint)] hover:text-[var(--bk-accent)] hover:underline"
-              >
-                <Icon icon="lucide:external-link" width={14} height={14} />
-                {t('fmBrowseRepo')}
-              </a>
-              <span className="inline-flex items-center gap-1.5 text-xs text-[var(--bk-text-faint)]" title={t('fmConnectedAs', { login: login ?? '' })}>
-                <Icon icon="lucide:github" width={14} height={14} />
-                {login}
-                <button
-                  type="button"
-                  onClick={disconnect}
-                  className="ml-1 text-[var(--bk-text-faint)] hover:text-rose-500"
-                  title={t('fmDisconnect')}
-                >
-                  <Icon icon="lucide:x" width={13} height={13} />
-                </button>
-              </span>
-            </div>
           </div>
 
           <input
@@ -327,8 +304,8 @@ export function FileManagerScreen() {
             </div>
           )}
 
-          {/* Danh sách file */}
-          <div className="overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
+          {/* Bảng danh sách file */}
+          <div className="overflow-x-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
             {loading ? (
               <div className="flex items-center justify-center gap-2 p-8 text-sm text-[var(--bk-text-muted)]">
                 <Icon icon="lucide:loader-circle" className="animate-spin" />
@@ -340,45 +317,68 @@ export function FileManagerScreen() {
                 <span className="text-sm">{t('fmEmpty')}</span>
               </div>
             ) : (
-              <ul className="divide-y divide-[var(--bk-border)]">
-                {files.map((file) => (
-                  <li
-                    key={file.path}
-                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--bk-surface-2)]"
-                  >
-                    <Icon icon="lucide:file-text" width={18} height={18} className="shrink-0 text-[var(--bk-accent)]" />
-                    <button
-                      type="button"
-                      onClick={() => void handleOpen(file)}
-                      disabled={busy}
-                      className="min-w-0 flex-1 text-left disabled:opacity-60"
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--bk-border)]">
+                    <th className={th}>{t('colFacility')}</th>
+                    <th className={th}>{t('colScenario')}</th>
+                    <th className={th}>{t('colCreatedAt')}</th>
+                    <th className={th}>{t('colUpdatedAt')}</th>
+                    <th className={th}>{t('colAuthor')}</th>
+                    <th className={`${th} text-right`}>{t('colActions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {files.map((file) => (
+                    <tr
+                      key={file.path}
+                      className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
                     >
-                      <div className="truncate text-sm font-medium text-[var(--bk-text)]">{file.name}</div>
-                      <div className="text-[11px] text-[var(--bk-text-faint)]">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleOpen(file)}
-                      disabled={busy}
-                      className="flex items-center gap-1.5 rounded-lg border border-[var(--bk-border)] px-3 py-1.5 text-xs font-semibold text-[var(--bk-text)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)] disabled:opacity-60"
-                    >
-                      <Icon icon="lucide:folder-open" width={14} height={14} />
-                      {t('fmOpen')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(file)}
-                      disabled={busy}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--bk-border)] text-[var(--bk-text-faint)] transition hover:border-rose-400 hover:text-rose-500 disabled:opacity-60"
-                      title={t('fmDeleteTitle')}
-                    >
-                      <Icon icon="lucide:trash-2" width={14} height={14} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <td className={`${cell} text-[var(--bk-text-muted)]`}>{file.meta.facility ?? '—'}</td>
+                      <td className={cell}>
+                        <button
+                          type="button"
+                          onClick={() => void handleOpen(file)}
+                          disabled={busy}
+                          className="flex items-center gap-2 text-left font-medium text-[var(--bk-text)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
+                        >
+                          <Icon icon="lucide:file-text" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
+                          <span className="truncate">{file.meta.name ?? stripExt(file.name)}</span>
+                        </button>
+                      </td>
+                      <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>
+                        {file.meta.createdAt ?? '—'}
+                      </td>
+                      <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>
+                        {file.meta.updatedAt ?? '—'}
+                      </td>
+                      <td className={`${cell} text-[var(--bk-text-muted)]`}>{file.meta.author ?? '—'}</td>
+                      <td className={cell}>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => void handleOpen(file)}
+                            disabled={busy}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-accent)] transition hover:bg-[var(--bk-accent-soft)] disabled:opacity-60"
+                            title={t('fmOpen')}
+                          >
+                            <Icon icon="fluent:open-16-filled" width={18} height={18} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(file)}
+                            disabled={busy}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,#dc2626_12%,transparent)] hover:text-rose-500 disabled:opacity-60"
+                            title={t('fmDeleteTitle')}
+                          >
+                            <Icon icon="lucide:trash-2" width={16} height={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </main>
@@ -391,7 +391,7 @@ export function FileManagerScreen() {
         </div>
       )}
 
-      {/* Modal: tạo flow mới */}
+      {/* Modal: tạo flow mới (施設名 + シナリオ名) */}
       {showNew && (
         <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true" onClick={() => setShowNew(false)}>
           <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
@@ -401,16 +401,35 @@ export function FileManagerScreen() {
               </span>
               {t('fmNew')}
             </div>
+
+            <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+              {t('colFacility')}
+            </label>
             <input
               autoFocus
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              value={newFacility}
+              onChange={(e) => setNewFacility(e.target.value)}
+              placeholder={t('fmFacilityPlaceholder')}
+              className="mb-3 w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
+            />
+
+            <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+              {t('colScenario')}
+            </label>
+            <input
+              value={newScenario}
+              onChange={(e) => setNewScenario(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void handleCreate();
               }}
-              placeholder={t('fmNamePrompt')}
+              placeholder={t('fmScenarioPlaceholder')}
               className="mb-4 w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
             />
+
+            {createErrorKey && (
+              <div className="mb-3 text-xs text-rose-500">{t(createErrorKey)}</div>
+            )}
+
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -442,7 +461,7 @@ export function FileManagerScreen() {
               {t('fmUploadReplaceTitle')}
             </div>
             <p className="mb-4 text-sm leading-relaxed text-[var(--bk-text-muted)]">
-              {t('fmUploadReplace', { name: overwrite.name })}
+              {t('fmUploadReplace', { name: stripExt(overwrite.name) })}
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -475,7 +494,7 @@ export function FileManagerScreen() {
               {t('fmDeleteTitle')}
             </div>
             <p className="mb-4 text-sm leading-relaxed text-[var(--bk-text-muted)]">
-              {t('fmDeleteConfirm', { name: deleteTarget.name })}
+              {t('fmDeleteConfirm', { name: deleteTarget.meta.name ?? stripExt(deleteTarget.name) })}
             </p>
             <div className="flex justify-end gap-2">
               <button
