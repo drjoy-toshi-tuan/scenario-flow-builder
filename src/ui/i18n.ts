@@ -138,6 +138,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginGoogleError: 'Đăng nhập Google thất bại. Thử lại.',
     loginNonceError: 'Phiên đăng nhập không hợp lệ (nonce sai). Thử lại.',
     loginExpiredError: 'Phiên đăng nhập đã hết hạn. Đăng nhập lại.',
+    loginNotConfigured:
+      'Chưa cấu hình đăng nhập Google (thiếu Client ID). Vui lòng liên hệ quản trị viên.',
     // ── Quản lý file YAML (GitHub) ──
     fmTitle: 'Quản lý file YAML',
     fmSubtitle: 'Chọn file có sẵn hoặc tải lên file mới để mở trên canvas.',
@@ -313,6 +315,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginGoogleError: 'Googleログインに失敗しました。もう一度お試しください。',
     loginNonceError: 'ログインセッションが無効です（nonce不一致）。もう一度お試しください。',
     loginExpiredError: 'ログインセッションの有効期限が切れました。再度ログインしてください。',
+    loginNotConfigured:
+      'Googleログインが未設定です（Client IDがありません）。管理者にお問い合わせください。',
     // ── YAMLファイル管理（GitHub） ──
     fmTitle: 'YAMLファイル管理',
     fmSubtitle: '既存のファイルを選ぶか、新しいファイルをアップロードしてキャンバスで開きます。',

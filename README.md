@@ -36,8 +36,9 @@ npm run dev        # mở http://localhost:5173
 Sau khi đăng nhập, chọn/tải file từ màn **Quản lý file YAML** (xem [§Quản lý file YAML](#-quản-lý-file-yaml-github))
 để mở trên canvas. File mẫu có sẵn trong [`flows/`](flows/).
 
-> **Chế độ demo:** nếu chưa set `VITE_GOOGLE_CLIENT_ID`, màn login có nút
-> **“Vào chế độ demo (bỏ qua đăng nhập)”** để xem UI ngay mà không cần Google.
+> **Chế độ demo (chỉ khi chạy `npm run dev`):** nếu chưa set `VITE_GOOGLE_CLIENT_ID`, màn login
+> có nút **“Vào chế độ demo (bỏ qua đăng nhập)”** để xem UI ngay. **Bản build/deploy TẮT demo**
+> → luôn bắt đăng nhập Google (muốn bật demo trên bản build phải đặt `VITE_ALLOW_DEMO=true`).
 > (Vẫn cần GitHub token để đọc/ghi file YAML.)
 
 Các lệnh khác:

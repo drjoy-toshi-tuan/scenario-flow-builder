@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from './useAuth';
-import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID } from './config';
+import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID, ALLOW_DEMO } from './config';
 import { verifyIdToken, reasonToMessageKey } from './verifyIdToken';
 import { createNonce, clearNonce, peekNonce } from './nonce';
 import { Icon } from '../ui/icons';
@@ -98,7 +98,7 @@ export function LoginScreen() {
               onError={() => setError(t('loginGoogleError'))}
             />
           </div>
-        ) : (
+        ) : ALLOW_DEMO ? (
           <div className="space-y-3">
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               {t('loginDemoNotice')}
@@ -112,6 +112,12 @@ export function LoginScreen() {
             >
               {t('loginDemoButton')}
             </button>
+          </div>
+        ) : (
+          // Không có Client ID và demo bị tắt (bản production) -> chặn, buộc cấu hình.
+          <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <Icon icon="lucide:triangle-alert" className="mt-0.5 shrink-0" />
+            <span>{t('loginNotConfigured')}</span>
           </div>
         )}
 
