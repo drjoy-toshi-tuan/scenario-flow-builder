@@ -80,9 +80,12 @@ Claude Code không làm được các bước này — bạn (Tuan) cần tự l
 ## Deploy GitHub Pages
 
 1. **Bật Pages:** repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. **Thêm secret:** repo → **Settings → Secrets and variables → Actions → New repository secret**
+2. **Thêm Client ID:** repo → **Settings → Secrets and variables → Actions**
+   - Vào tab **Secrets** (hoặc **Variables** đều được — workflow đọc cả hai) → **New**
    - Name: `VITE_GOOGLE_CLIENT_ID`
    - Value: Client ID ở trên.
+   - ⚠️ Sau khi thêm phải **chạy lại deploy** (push `main` hoặc **Actions → Deploy → Run workflow**)
+     thì bản build mới có Client ID. Nếu thiếu, màn login sẽ báo *"Chưa cấu hình đăng nhập Google"*.
 3. **Push `main`** → workflow `.github/workflows/deploy.yml` build & deploy.
 4. URL: `https://drjoy-toshi-tuan.github.io/brekeke-flow-builder/`
 

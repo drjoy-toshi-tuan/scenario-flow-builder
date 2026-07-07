@@ -32,8 +32,9 @@ jobs:
 
       - run: npm run build
         env:
-          # Client ID (không phải secret) — set trong Settings > Secrets and variables > Actions.
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          # Client ID (không phải secret) — set ở Settings > Secrets and variables > Actions.
+          # Chấp nhận cả tab "Secrets" LẪN tab "Variables" để tránh cấu hình nhầm chỗ.
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || vars.VITE_GOOGLE_CLIENT_ID }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
