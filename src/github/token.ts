@@ -4,9 +4,12 @@ import { verifyToken } from './api';
 // ─────────────────────────────────────────────────────────────────────────────
 // Lưu GitHub fine-grained token để ghi file YAML vào repo.
 //
-// Bảo mật: token CHỈ lưu trong sessionStorage (mất khi đóng tab) — không dùng
-// localStorage để giảm rủi ro token nằm lại lâu trên máy dùng chung. Token vẫn là
-// bí mật của người dùng; hãy cấp quyền tối thiểu (Contents: Read/Write đúng repo).
+// Token lưu ở localStorage → NHỚ qua các phiên: thêm 1 lần, lần sau tự dùng cho
+// tới khi token hết hạn (theo ngày đặt lúc tạo trên GitHub) hoặc người dùng bấm
+// "Ngắt kết nối". Đánh đổi: token nằm trên máy lâu hơn — KHÔNG nên dùng trên máy
+// công cộng/dùng chung (khi đó hãy nhớ "Ngắt kết nối" trước khi rời máy).
+// Token vẫn là bí mật của người dùng; hãy cấp quyền tối thiểu (Contents: Read/Write
+// đúng repo). (Đăng nhập Google vẫn theo sessionStorage — xem auth/AuthProvider.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TOKEN_KEY = 'brekeke-flow-builder.github.token';
@@ -14,7 +17,7 @@ const LOGIN_KEY = 'brekeke-flow-builder.github.login';
 
 function load(key: string): string | null {
   try {
-    return sessionStorage.getItem(key);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
@@ -47,10 +50,10 @@ export const useGithubToken = create<GithubTokenState>((set) => ({
     try {
       const { login } = await verifyToken(token);
       try {
-        sessionStorage.setItem(TOKEN_KEY, token);
-        sessionStorage.setItem(LOGIN_KEY, login);
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(LOGIN_KEY, login);
       } catch {
-        // sessionStorage không khả dụng — vẫn giữ trong bộ nhớ phiên này.
+        // localStorage không khả dụng — vẫn giữ trong bộ nhớ phiên này.
       }
       set({ token, login, connecting: false, error: null });
       return true;
@@ -65,8 +68,8 @@ export const useGithubToken = create<GithubTokenState>((set) => ({
 
   disconnect: () => {
     try {
-      sessionStorage.removeItem(TOKEN_KEY);
-      sessionStorage.removeItem(LOGIN_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(LOGIN_KEY);
     } catch {
       // ignore
     }

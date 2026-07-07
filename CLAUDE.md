@@ -44,7 +44,8 @@ flows/       # kho file YAML trên repo (mở/upload/tạo/lưu qua GitHub Conte
   `auth/verifyIdToken.ts` siết claim (iss/aud/exp/nonce/hd/email_verified/sub) — defense-in-depth,
   KHÔNG verify chữ ký. Chặn bypass mạnh nhất = đặt OAuth consent screen **Internal** (xem README §Bảo mật).
 - Ghi file YAML vào repo qua **GitHub Contents API** bằng fine-grained token của người dùng
-  (quyền Contents: Read/Write), lưu **sessionStorage** — không đưa vào bundle. `github/` thuần fetch.
+  (quyền Contents: Read/Write), lưu **localStorage** (nhớ qua phiên, tới khi hết hạn/ngắt kết nối)
+  — không đưa vào bundle. Đăng nhập Google vẫn **sessionStorage**. `github/` thuần fetch.
 
 ## IR Schema (SOURCE OF TRUTH)
 

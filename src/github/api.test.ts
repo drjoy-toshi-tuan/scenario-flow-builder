@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { utf8ToBase64, base64ToUtf8, sanitizeFileName, isYaml } from './api';
+import { utf8ToBase64, base64ToUtf8, sanitizeFileName, uniqueFileName, isYaml } from './api';
 
 describe('base64 utf-8 round-trip', () => {
   it('giữ nguyên ký tự nhiều byte (tiếng Nhật/Việt)', () => {
@@ -37,6 +37,22 @@ describe('sanitizeFileName', () => {
   it('trả tên mặc định khi rỗng', () => {
     expect(sanitizeFileName('   ')).toBe('flow.yaml');
     expect(sanitizeFileName('@@@')).toBe('flow.yaml');
+  });
+
+  it('giữ tên tiếng Nhật (mọi bảng chữ)', () => {
+    expect(sanitizeFileName('新規予約フロー')).toBe('新規予約フロー.yaml');
+    expect(sanitizeFileName('施設 予約')).toBe('施設-予約.yaml');
+  });
+});
+
+describe('uniqueFileName', () => {
+  it('giữ nguyên nếu chưa tồn tại', () => {
+    expect(uniqueFileName('a.yaml', new Set())).toBe('a.yaml');
+  });
+  it('thêm hậu tố -2, -3 khi trùng', () => {
+    expect(uniqueFileName('a.yaml', new Set(['a.yaml']))).toBe('a-2.yaml');
+    expect(uniqueFileName('a.yaml', new Set(['a.yaml', 'a-2.yaml']))).toBe('a-3.yaml');
+    expect(uniqueFileName('予約.yaml', new Set(['予約.yaml']))).toBe('予約-2.yaml');
   });
 });
 

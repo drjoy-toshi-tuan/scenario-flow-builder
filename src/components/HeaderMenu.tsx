@@ -4,6 +4,7 @@ import { useFileStore } from '../store/fileStore';
 import { useGithubToken } from '../github/token';
 import { putFlow } from '../github/api';
 import { ghErrorKey } from '../github/errors';
+import { formatDateTime } from '../ir/ivrProperty';
 import { useAuth } from '../auth/useAuth';
 import { useTheme } from '../ui/theme';
 import { useLang, useT, type TKey } from '../ui/i18n';
@@ -29,6 +30,7 @@ export function HeaderMenu() {
   const ir = useFlowStore((s) => s.ir);
   const autoLayout = useFlowStore((s) => s.autoLayout);
   const exportYaml = useFlowStore((s) => s.exportYaml);
+  const setMeta = useFlowStore((s) => s.setMeta);
   const currentFile = useFileStore((s) => s.current);
   const closeFile = useFileStore((s) => s.closeFile);
   const setSha = useFileStore((s) => s.setSha);
@@ -57,6 +59,13 @@ export function HeaderMenu() {
     setSaving(true);
     setSaveState(null);
     try {
+      // Đóng dấu 更新日時 (và 作成者/作成日時 nếu file cũ chưa có) trước khi export.
+      const now = formatDateTime(new Date());
+      setMeta({
+        updatedAt: now,
+        ...(ir?.meta.createdAt ? {} : { createdAt: now }),
+        ...(ir?.meta.author ? {} : { author: user?.name ?? user?.email ?? '' }),
+      });
       const yaml = exportYaml();
       const res = await putFlow(
         token,
@@ -148,20 +157,6 @@ export function HeaderMenu() {
 
           {/* ── Cài đặt flow ── */}
           <MenuSection title={t('secFlow')} />
-          {currentFile && (
-            <button
-              type="button"
-              role="menuitem"
-              className="bk-menu-item"
-              onClick={() => {
-                closeFile();
-                setOpen(false);
-              }}
-            >
-              <Icon icon="lucide:arrow-left" width={16} height={16} className="text-[var(--bk-accent)]" />
-              <span>{t('fmBackToFiles')}</span>
-            </button>
-          )}
           <button
             type="button"
             role="menuitem"
@@ -219,6 +214,20 @@ export function HeaderMenu() {
 
           {/* ── Tài khoản / Đăng xuất ── */}
           <div className="bk-menu-sep" />
+          {currentFile && (
+            <button
+              type="button"
+              role="menuitem"
+              className="bk-menu-item"
+              onClick={() => {
+                closeFile();
+                setOpen(false);
+              }}
+            >
+              <Icon icon="line-md:list-3-filled" width={16} height={16} className="text-[var(--bk-accent)]" />
+              <span>{t('fmBackToManager')}</span>
+            </button>
+          )}
           <div className="bk-menu-account">
             {user?.picture && <img src={user.picture} alt="" className="h-7 w-7 rounded-full" />}
             <span className="min-w-0 flex-1 truncate text-xs text-[var(--bk-text-muted)]" title={user?.email}>

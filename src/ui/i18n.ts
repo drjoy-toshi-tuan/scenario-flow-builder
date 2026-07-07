@@ -138,6 +138,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginGoogleError: 'Đăng nhập Google thất bại. Thử lại.',
     loginNonceError: 'Phiên đăng nhập không hợp lệ (nonce sai). Thử lại.',
     loginExpiredError: 'Phiên đăng nhập đã hết hạn. Đăng nhập lại.',
+    loginNotConfigured:
+      'Chưa cấu hình đăng nhập Google (thiếu Client ID). Vui lòng liên hệ quản trị viên.',
     // ── Quản lý file YAML (GitHub) ──
     fmTitle: 'Quản lý file YAML',
     fmSubtitle: 'Chọn file có sẵn hoặc tải lên file mới để mở trên canvas.',
@@ -161,6 +163,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmBrowseRepo: 'Xem trên GitHub',
     fmFolderNote: 'Thư mục: {dir}',
     fmBackToFiles: 'Danh sách file',
+    fmBackToManager: 'Về màn quản lý file',
     fmSaveToRepo: 'Lưu về repo',
     fmSaving: 'Đang lưu…',
     fmSaved: 'Đã lưu về repo',
@@ -185,6 +188,18 @@ const DICT: Record<Lang, Record<string, string>> = {
     ghErrOther: 'Có lỗi khi gọi GitHub. Thử lại.',
     fmUploadInvalid: 'File YAML không hợp lệ hoặc không đọc được.',
     fmNameRequired: 'Vui lòng nhập tên file.',
+    // Cột bảng danh sách file
+    colFacility: 'Tên bệnh viện',
+    colScenario: 'Tên kịch bản',
+    colCreatedAt: 'Ngày tạo',
+    colUpdatedAt: 'Cập nhật cuối',
+    colAuthor: 'Người tạo',
+    colActions: 'Thao tác',
+    // Form tạo flow mới
+    fmFacilityPlaceholder: 'Nhập tên bệnh viện…',
+    fmScenarioPlaceholder: 'Nhập tên kịch bản…',
+    fmFacilityRequired: 'Vui lòng nhập tên bệnh viện.',
+    fmScenarioRequired: 'Vui lòng nhập tên kịch bản.',
     loginDemoNotice:
       'Chưa cấu hình VITE_GOOGLE_CLIENT_ID. Bạn đang xem bản demo UI — đăng nhập Google bị tắt.',
     loginDemoButton: 'Vào chế độ demo (bỏ qua đăng nhập)',
@@ -312,6 +327,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginGoogleError: 'Googleログインに失敗しました。もう一度お試しください。',
     loginNonceError: 'ログインセッションが無効です（nonce不一致）。もう一度お試しください。',
     loginExpiredError: 'ログインセッションの有効期限が切れました。再度ログインしてください。',
+    loginNotConfigured:
+      'Googleログインが未設定です（Client IDがありません）。管理者にお問い合わせください。',
     // ── YAMLファイル管理（GitHub） ──
     fmTitle: 'YAMLファイル管理',
     fmSubtitle: '既存のファイルを選ぶか、新しいファイルをアップロードしてキャンバスで開きます。',
@@ -335,6 +352,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmBrowseRepo: 'GitHubで開く',
     fmFolderNote: 'フォルダ: {dir}',
     fmBackToFiles: 'ファイル一覧',
+    fmBackToManager: 'ファイル管理へ戻る',
     fmSaveToRepo: 'リポジトリに保存',
     fmSaving: '保存中…',
     fmSaved: 'リポジトリに保存しました',
@@ -359,6 +377,18 @@ const DICT: Record<Lang, Record<string, string>> = {
     ghErrOther: 'GitHub呼び出しでエラーが発生しました。もう一度お試しください。',
     fmUploadInvalid: 'YAMLファイルが無効か読み取れませんでした。',
     fmNameRequired: 'ファイル名を入力してください。',
+    // Cột bảng danh sách file
+    colFacility: '施設名',
+    colScenario: 'シナリオ名',
+    colCreatedAt: '作成日時',
+    colUpdatedAt: '更新日時',
+    colAuthor: '作成者',
+    colActions: '操作',
+    // Form tạo flow mới
+    fmFacilityPlaceholder: '施設名を入力…',
+    fmScenarioPlaceholder: 'シナリオ名を入力…',
+    fmFacilityRequired: '施設名を入力してください。',
+    fmScenarioRequired: 'シナリオ名を入力してください。',
     loginDemoNotice:
       'VITE_GOOGLE_CLIENT_ID が未設定です。UIデモを表示中 — Googleログインは無効です。',
     loginDemoButton: 'デモモードで開く（ログインをスキップ）',

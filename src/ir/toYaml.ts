@@ -97,6 +97,9 @@ export function toYaml(ir: FlowIR): string {
     flow: {
       name: ir.meta.name,
       ...(ir.meta.facility ? { facility: ir.meta.facility } : {}),
+      ...(ir.meta.author ? { author: ir.meta.author } : {}),
+      ...(ir.meta.createdAt ? { createdAt: ir.meta.createdAt } : {}),
+      ...(ir.meta.updatedAt ? { updatedAt: ir.meta.updatedAt } : {}),
       ...(start ? { start } : {}),
       nodes: outNodes,
     },

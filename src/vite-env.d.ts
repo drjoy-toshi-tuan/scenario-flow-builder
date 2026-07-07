@@ -30,6 +30,8 @@ declare module 'elkjs/lib/elk.bundled.js' {
 
 interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string;
+  // 'true' để bật chế độ demo (bỏ qua đăng nhập) trên bản build. Mặc định tắt.
+  readonly VITE_ALLOW_DEMO?: string;
   // Kho GitHub chứa file YAML (tuỳ chọn — mặc định trỏ repo hiện tại).
   readonly VITE_GITHUB_OWNER?: string;
   readonly VITE_GITHUB_REPO?: string;

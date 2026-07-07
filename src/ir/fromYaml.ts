@@ -44,6 +44,9 @@ interface RawFlowFile {
     name?: string;
     start?: string;
     facility?: string;
+    author?: string;
+    createdAt?: string;
+    updatedAt?: string;
     nodes?: RawNode[];
   };
 }
@@ -146,15 +149,17 @@ export function fromYaml(text: string): FlowIR {
     }
   }
 
-  const now = new Date().toISOString();
+  // Giữ nguyên 作成日時/更新日時/作成者 nếu file đã có; nếu chưa thì để trống
+  // (không tự bịa thời điểm import — tránh ghi đè khi lưu lại).
   return {
     version: '1.0',
     meta: {
       id: slugify(flow.name ?? 'flow'),
       name: flow.name ?? 'Untitled flow',
       facility: flow.facility,
-      createdAt: now,
-      updatedAt: now,
+      author: flow.author,
+      createdAt: flow.createdAt ?? '',
+      updatedAt: flow.updatedAt ?? '',
     },
     nodes,
     edges,

@@ -36,8 +36,9 @@ npm run dev        # mở http://localhost:5173
 Sau khi đăng nhập, chọn/tải file từ màn **Quản lý file YAML** (xem [§Quản lý file YAML](#-quản-lý-file-yaml-github))
 để mở trên canvas. File mẫu có sẵn trong [`flows/`](flows/).
 
-> **Chế độ demo:** nếu chưa set `VITE_GOOGLE_CLIENT_ID`, màn login có nút
-> **“Vào chế độ demo (bỏ qua đăng nhập)”** để xem UI ngay mà không cần Google.
+> **Chế độ demo (chỉ khi chạy `npm run dev`):** nếu chưa set `VITE_GOOGLE_CLIENT_ID`, màn login
+> có nút **“Vào chế độ demo (bỏ qua đăng nhập)”** để xem UI ngay. **Bản build/deploy TẮT demo**
+> → luôn bắt đăng nhập Google (muốn bật demo trên bản build phải đặt `VITE_ALLOW_DEMO=true`).
 > (Vẫn cần GitHub token để đọc/ghi file YAML.)
 
 Các lệnh khác:
@@ -148,8 +149,10 @@ duyệt gọi thẳng **GitHub Contents API** bằng **fine-grained personal acc
 3. **Repository permissions → Contents: Read and write**.
 4. Dán token vào màn "Kết nối GitHub".
 
-> 🔐 Token **chỉ lưu trong `sessionStorage`** (mất khi đóng tab), không đưa vào bundle, không
-> commit. Hãy cấp **quyền tối thiểu** (đúng 1 repo, chỉ Contents). Có thể "Ngắt kết nối" bất cứ lúc nào.
+> 🔐 Token lưu ở **`localStorage`** → **nhớ qua các phiên** (thêm 1 lần, lần sau tự dùng cho tới
+> khi token hết hạn hoặc bạn **"Ngắt kết nối"**). Không đưa vào bundle, không commit. Hãy cấp
+> **quyền tối thiểu** (đúng 1 repo, chỉ Contents) và **"Ngắt kết nối"** trước khi rời máy dùng chung.
+> (Đăng nhập Google vẫn theo `sessionStorage` — đóng tab/tắt trình duyệt là đăng nhập lại.)
 
 Cấu hình repo/nhánh/thư mục qua biến `VITE_GITHUB_OWNER` / `VITE_GITHUB_REPO` /
 `VITE_FLOWS_BRANCH` / `VITE_FLOWS_DIR` (xem `.env.example`).
