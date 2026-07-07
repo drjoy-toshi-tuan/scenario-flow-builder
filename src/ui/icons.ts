@@ -16,6 +16,7 @@ import {
   notoSubset,
   fa7SolidSubset,
   riSubset,
+  lineMdSubset,
 } from './iconData';
 
 addCollection(lucideSubset);
@@ -31,6 +32,7 @@ addCollection(hugeiconsSubset);
 addCollection(notoSubset);
 addCollection(fa7SolidSubset);
 addCollection(riSubset);
+addCollection(lineMdSubset);
 
 // Re-export để cả app import 1 chỗ (đảm bảo addCollection đã chạy trước khi render).
 export { Icon };

@@ -235,13 +235,9 @@ export function FileManagerScreen() {
           >
             {user?.name}
           </span>
-          <button
-            type="button"
-            onClick={signOut}
-            className="flex items-center gap-1.5 rounded-lg border border-[var(--bk-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
-            title={t('logout')}
-          >
+          <button type="button" onClick={signOut} className="bk-menu-logout" title={t('logout')}>
             <Icon icon="lucide:log-out" width={14} height={14} />
+            <span>{t('logout')}</span>
           </button>
         </div>
       </header>

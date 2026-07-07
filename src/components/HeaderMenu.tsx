@@ -148,20 +148,6 @@ export function HeaderMenu() {
 
           {/* ── Cài đặt flow ── */}
           <MenuSection title={t('secFlow')} />
-          {currentFile && (
-            <button
-              type="button"
-              role="menuitem"
-              className="bk-menu-item"
-              onClick={() => {
-                closeFile();
-                setOpen(false);
-              }}
-            >
-              <Icon icon="lucide:arrow-left" width={16} height={16} className="text-[var(--bk-accent)]" />
-              <span>{t('fmBackToFiles')}</span>
-            </button>
-          )}
           <button
             type="button"
             role="menuitem"
@@ -219,6 +205,20 @@ export function HeaderMenu() {
 
           {/* ── Tài khoản / Đăng xuất ── */}
           <div className="bk-menu-sep" />
+          {currentFile && (
+            <button
+              type="button"
+              role="menuitem"
+              className="bk-menu-item"
+              onClick={() => {
+                closeFile();
+                setOpen(false);
+              }}
+            >
+              <Icon icon="line-md:list-3-filled" width={16} height={16} className="text-[var(--bk-accent)]" />
+              <span>{t('fmBackToManager')}</span>
+            </button>
+          )}
           <div className="bk-menu-account">
             {user?.picture && <img src={user.picture} alt="" className="h-7 w-7 rounded-full" />}
             <span className="min-w-0 flex-1 truncate text-xs text-[var(--bk-text-muted)]" title={user?.email}>
