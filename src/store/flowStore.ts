@@ -48,6 +48,10 @@ interface FlowState {
   switchFlow: (id: string) => Promise<void>;
   // Tạo sub flow mới (seed node Start) rồi chuyển sang nó.
   createSubflow: (name: string) => Promise<void>;
+  // Đổi tên sub flow — các node Jump đang trỏ tên cũ được cập nhật theo tên mới.
+  renameSubflow: (id: string, name: string) => void;
+  // Xoá sub flow — đang đứng trong nó thì đưa về main flow.
+  deleteSubflow: (id: string) => void;
 
   // Panel nổi vùng canvas ('Thêm node' / 'Main-Sub Flow') — mở panel này tự đóng panel kia.
   canvasPanel: 'addNode' | 'flows' | null;
@@ -249,6 +253,92 @@ export const useFlowStore = create<FlowState>((set, get) => {
         future: [],
         canvasPanel: null,
       });
+    },
+
+    renameSubflow: (id, name) => {
+      const doc = assembleDoc();
+      if (!doc) return;
+      const { activeFlowId } = get();
+      const sub = (doc.subflows ?? []).find((s) => s.id === id);
+      const trimmed = name.trim();
+      if (!sub || !trimmed || trimmed === sub.name) return;
+      // Tên duy nhất giữa các sub flow còn lại.
+      const taken = new Set((doc.subflows ?? []).filter((s) => s.id !== id).map((s) => s.name));
+      let finalName = trimmed;
+      let n = 2;
+      while (taken.has(finalName)) finalName = `${trimmed} ${n++}`;
+
+      // Node Jump trỏ theo TÊN -> đổi tên phải cập nhật mọi graph (main + các sub).
+      const oldName = sub.name;
+      const retargetJumps = (nodes: FlowNode[]) =>
+        nodes.map((node) =>
+          node.type === 'jump' && node.data.subflow === oldName
+            ? { ...node, data: { ...node.data, subflow: finalName } }
+            : node,
+        );
+      const newDoc: FlowIR = {
+        ...doc,
+        meta: { ...doc.meta, updatedAt: new Date().toISOString() },
+        nodes: retargetJumps(doc.nodes),
+        subflows: (doc.subflows ?? []).map((s) => ({
+          ...s,
+          ...(s.id === id ? { name: finalName } : {}),
+          nodes: retargetJumps(s.nodes),
+        })),
+      };
+
+      // Tách lại theo flow đang mở (doc là tài liệu đầy đủ). Reset Undo: snapshot
+      // không bao mainStash nên không hoàn tác xuyên cấu trúc doc được.
+      const base = {
+        selectedNodeId: null,
+        draft: null,
+        pendingSelect: null,
+        past: [] as FlowIR[],
+        future: [] as FlowIR[],
+      };
+      if (activeFlowId === 'main') {
+        set({ ...base, ir: newDoc, mainStash: null });
+      } else {
+        const target = (newDoc.subflows ?? []).find((s) => s.id === activeFlowId);
+        if (!target) return;
+        set({
+          ...base,
+          ir: { ...newDoc, nodes: target.nodes, edges: target.edges },
+          mainStash: { nodes: newDoc.nodes, edges: newDoc.edges },
+        });
+      }
+    },
+
+    deleteSubflow: (id) => {
+      const doc = assembleDoc();
+      if (!doc) return;
+      const { activeFlowId } = get();
+      if (!(doc.subflows ?? []).some((s) => s.id === id)) return;
+      const newDoc: FlowIR = {
+        ...doc,
+        meta: { ...doc.meta, updatedAt: new Date().toISOString() },
+        subflows: (doc.subflows ?? []).filter((s) => s.id !== id),
+      };
+      const base = {
+        selectedNodeId: null,
+        draft: null,
+        pendingSelect: null,
+        pendingDelete: null,
+        past: [] as FlowIR[],
+        future: [] as FlowIR[],
+      };
+      if (activeFlowId === 'main' || activeFlowId === id) {
+        // Xoá flow đang mở -> quay về main flow.
+        set({ ...base, ir: newDoc, mainStash: null, activeFlowId: 'main' });
+      } else {
+        const target = (newDoc.subflows ?? []).find((s) => s.id === activeFlowId);
+        if (!target) return;
+        set({
+          ...base,
+          ir: { ...newDoc, nodes: target.nodes, edges: target.edges },
+          mainStash: { nodes: newDoc.nodes, edges: newDoc.edges },
+        });
+      }
     },
 
     createSubflow: async (name) => {

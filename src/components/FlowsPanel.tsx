@@ -52,10 +52,17 @@ export function FlowsPanel() {
   // Ô nhập tên khi bấm nút tạo sub flow (inline trong panel).
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  // Đổi tên sub flow: id đang sửa + giá trị đang gõ (inline, giống ô tạo mới).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  // Sub flow chờ xác nhận xoá (mở modal).
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
     if (!open) {
       setCreating(false);
       setNewName('');
+      setEditingId(null);
+      setEditName('');
     }
   }, [open]);
 
@@ -69,10 +76,20 @@ export function FlowsPanel() {
     [],
   );
 
+  const renameSubflow = useFlowStore((s) => s.renameSubflow);
+  const deleteSubflow = useFlowStore((s) => s.deleteSubflow);
+
   const handleCreate = async () => {
     const name = newName.trim();
     if (!name) return;
     await createSubflow(name); // tự chuyển sang sub flow mới + đóng panel (store)
+  };
+
+  const handleRename = () => {
+    if (!editingId || !editName.trim()) return;
+    renameSubflow(editingId, editName);
+    setEditingId(null);
+    setEditName('');
   };
 
   return (
@@ -121,15 +138,57 @@ export function FlowsPanel() {
           {subflows.length === 0 && !creating && (
             <div className="px-2.5 pb-1 text-xs text-[var(--bk-text-faint)]">{t('subFlowEmpty')}</div>
           )}
-          {subflows.map((s) => (
-            <FlowItem
-              key={s.id}
-              icon="tabler:square-rounded-letter-s-filled"
-              name={s.name}
-              active={activeFlowId === s.id}
-              onClick={() => void switchFlow(s.id)}
-            />
-          ))}
+          {subflows.map((s) =>
+            editingId === s.id ? (
+              // Đang đổi tên: input inline + nút xác nhận (giống ô tạo mới).
+              <div key={s.id} className="flex items-center gap-1.5 px-1 py-0.5">
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRename();
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
+                  placeholder={t('subflowNamePlaceholder')}
+                  className="w-full min-w-0 flex-1 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-2.5 py-1.5 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={handleRename}
+                  disabled={!editName.trim()}
+                  className={[
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200',
+                    editName.trim()
+                      ? 'text-[#22c55e] hover:-translate-y-0.5 hover:brightness-110 hover:drop-shadow-md active:translate-y-0 active:scale-95'
+                      : 'cursor-not-allowed text-[var(--bk-text-faint)] opacity-60',
+                  ].join(' ')}
+                  title={t('renameSubflow')}
+                  aria-label={t('renameSubflow')}
+                >
+                  <Icon
+                    key={editName.trim() ? 'on' : 'off'}
+                    icon="line-md:square-filled-to-confirm-square-filled-transition"
+                    width={26}
+                    height={26}
+                  />
+                </button>
+              </div>
+            ) : (
+              <FlowItem
+                key={s.id}
+                icon="tabler:square-rounded-letter-s-filled"
+                name={s.name}
+                active={activeFlowId === s.id}
+                onClick={() => void switchFlow(s.id)}
+                onRename={() => {
+                  setEditingId(s.id);
+                  setEditName(s.name);
+                }}
+                onDelete={() => setDeleteTarget({ id: s.id, name: s.name })}
+              />
+            ),
+          )}
 
           {/* Tạo sub flow: bấm + -> hiện ô nhập tên, Enter để tạo. */}
           {creating ? (
@@ -194,39 +253,117 @@ export function FlowsPanel() {
       )}
 
       {ivrOpen && <IvrPropertyModal onClose={() => setIvrOpen(false)} />}
+
+      {/* Modal xác nhận xoá sub flow (node bên trong sẽ mất, Jump trỏ tới sẽ mất đích). */}
+      {deleteTarget && (
+        <div
+          className="bk-modal-overlay bk-modal-overlay--fixed"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[color-mix(in_srgb,#dc2626_14%,transparent)] text-[#dc2626]">
+                <Icon icon="lucide:trash-2" width={15} height={15} />
+              </span>
+              {t('deleteSubflowTitle')}
+            </div>
+            <p className="mb-4 text-sm leading-relaxed text-[var(--bk-text-muted)]">
+              {t('deleteSubflowConfirm', { name: deleteTarget.name })}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('btnCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteSubflow(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+                className="rounded-lg bg-[#dc2626] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+              >
+                {t('delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // 1 dòng flow trong panel: icon + tên; flow đang mở tô nền accent.
+// Sub flow (có onRename/onDelete): hover hiện nút đổi tên / xoá bên phải.
 function FlowItem({
   icon,
   name,
   active,
   onClick,
+  onRename,
+  onDelete,
 }: {
   icon: string;
   name: string;
   active: boolean;
   onClick: () => void;
+  onRename?: () => void;
+  onDelete?: () => void;
 }) {
+  const t = useT();
   return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
+    <div
       className={[
-        'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition',
-        active
-          ? 'bg-[var(--bk-accent-soft)] font-semibold text-[var(--bk-accent)]'
-          : 'text-[var(--bk-text)] hover:bg-[var(--bk-surface-2)]',
+        'group flex w-full items-center gap-1 rounded-xl transition',
+        active ? 'bg-[var(--bk-accent-soft)]' : 'hover:bg-[var(--bk-surface-2)]',
       ].join(' ')}
     >
-      <Icon icon={icon} width={16} height={16} className={active ? '' : 'text-[var(--bk-text-faint)]'} />
-      <span className="min-w-0 flex-1 truncate text-sm" title={name}>
-        {name}
-      </span>
-      {active && <Icon icon="lucide:circle-check" width={14} height={14} />}
-    </button>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={onClick}
+        className={[
+          'flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left',
+          active ? 'font-semibold text-[var(--bk-accent)]' : 'text-[var(--bk-text)]',
+        ].join(' ')}
+      >
+        <Icon icon={icon} width={16} height={16} className={active ? '' : 'text-[var(--bk-text-faint)]'} />
+        <span className="min-w-0 flex-1 truncate text-sm" title={name}>
+          {name}
+        </span>
+        {active && <Icon icon="lucide:circle-check" width={14} height={14} className="shrink-0" />}
+      </button>
+      {(onRename || onDelete) && (
+        <div className="flex shrink-0 items-center gap-0.5 pr-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          {onRename && (
+            <button
+              type="button"
+              onClick={onRename}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-accent-soft)] hover:text-[var(--bk-accent)]"
+              title={t('renameSubflow')}
+              aria-label={t('renameSubflow')}
+            >
+              <Icon icon="lucide:pencil" width={14} height={14} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,#dc2626_12%,transparent)] hover:text-rose-500"
+              title={t('deleteSubflowTitle')}
+              aria-label={t('deleteSubflowTitle')}
+            >
+              <Icon icon="lucide:trash-2" width={14} height={14} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -131,6 +131,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     subFlowSection: 'Sub Flow',
     subFlowEmpty: 'Chưa có sub flow nào.',
     createSubflow: 'Tạo Sub Flow',
+    renameSubflow: 'Đổi tên Sub Flow',
+    deleteSubflowTitle: 'Xoá Sub Flow',
+    deleteSubflowConfirm:
+      'Xoá sub flow "{name}"? Toàn bộ node bên trong sẽ mất; node Jump đang trỏ tới nó sẽ mất đích.',
     subflowNamePlaceholder: 'Tên sub flow',
     subFlowBadge: 'Sub Flow',
     mainFlowBadge: 'Main Flow',
@@ -371,6 +375,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     subFlowSection: 'サブフロー',
     subFlowEmpty: 'サブフローはまだありません。',
     createSubflow: 'サブフロー作成',
+    renameSubflow: 'サブフロー名を変更',
+    deleteSubflowTitle: 'サブフロー削除',
+    deleteSubflowConfirm:
+      'サブフロー「{name}」を削除しますか？中のノードはすべて失われ、参照している Jump ノードは宛先を失います。',
     subflowNamePlaceholder: 'サブフロー名',
     subFlowBadge: 'サブフロー',
     mainFlowBadge: 'メインフロー',
