@@ -4,15 +4,13 @@ import { ghErrorKey } from '../github/errors';
 import { useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 
-// URL tạo fine-grained personal access token trên GitHub.
-const TOKEN_CREATE_URL = 'https://github.com/settings/personal-access-tokens/new';
 // URL tạo classic token với scope `repo` sẵn — classic token cho phép chọn
 // "No expiration" nên nhập 1 lần là dùng mãi mãi (tới khi tự thu hồi).
 const CLASSIC_TOKEN_CREATE_URL =
   'https://github.com/settings/tokens/new?scopes=repo&description=Brekeke%20Flow%20Builder';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Panel nhập GitHub token (fine-grained hoặc classic) để đọc/ghi file YAML vào repo.
+// Panel nhập GitHub classic token để đọc/ghi file YAML vào repo.
 // Hiện khi chưa kết nối. Token lưu localStorage → nhớ qua các phiên (xem github/token.ts).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -75,22 +73,13 @@ export function GithubConnectPanel() {
           {connecting ? (
             <Icon icon="lucide:loader-circle" className="animate-spin" />
           ) : (
-            <Icon icon="lucide:plug" width={16} height={16} />
+            <Icon icon="line-md:login" width={18} height={18} />
           )}
           <span>{connecting ? t('fmConnecting') : t('fmConnectBtn')}</span>
         </button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
-        <a
-          href={TOKEN_CREATE_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--bk-accent)] hover:underline"
-        >
-          <Icon icon="lucide:external-link" width={14} height={14} />
-          {t('fmTokenHelp')}
-        </a>
+      <div className="mt-4">
         <a
           href={CLASSIC_TOKEN_CREATE_URL}
           target="_blank"
@@ -102,10 +91,16 @@ export function GithubConnectPanel() {
         </a>
       </div>
 
-      <p className="mt-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-[var(--bk-text-faint)]">
-        <Icon icon="lucide:info" width={13} height={13} className="mt-0.5 shrink-0" />
-        <span>{t('fmTokenPersistNote')}</span>
-      </p>
+      <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-[var(--bk-text-faint)]">
+        <p className="flex items-start gap-1.5">
+          <Icon icon="lucide:info" width={13} height={13} className="mt-0.5 shrink-0" />
+          <span>{t('fmTokenPersistNote')}</span>
+        </p>
+        <p className="flex items-start gap-1.5">
+          <Icon icon="lucide:info" width={13} height={13} className="mt-0.5 shrink-0" />
+          <span>{t('fmTokenPersistNote2')}</span>
+        </p>
+      </div>
     </div>
   );
 }

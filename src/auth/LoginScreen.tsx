@@ -25,7 +25,13 @@ export function LoginScreen() {
   const nonce = useMemo(() => createNonce(), []);
 
   return (
-    <div className="relative flex h-full items-center justify-center bg-[var(--bk-bg)] p-6">
+    <div className="relative flex h-full items-center justify-center overflow-hidden bg-[var(--bk-bg)] p-6">
+      {/* Vầng sáng accent mờ phía sau — tạo chiều sâu, cảm giác cao cấp */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--bk-accent)] opacity-[0.08] blur-[100px]"
+      />
+
       {/* Toggle ngôn ngữ & theme ngay trên màn login */}
       <div className="absolute right-5 top-5 flex items-center gap-2">
         <SlideToggle
@@ -40,21 +46,28 @@ export function LoginScreen() {
         <SlideToggle
           value={theme}
           options={[
-            { key: 'light', icon: 'lucide:sun' },
-            { key: 'dark', icon: 'lucide:moon' },
+            { key: 'light', icon: 'line-md:sunny-loop' },
+            { key: 'dark', icon: 'line-md:moon-alt-loop' },
           ]}
           onChange={(k) => setTheme(k as 'light' | 'dark')}
           ariaLabel="Theme"
         />
       </div>
 
-      <div className="w-full max-w-md rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-8 shadow-[var(--bk-shadow)]">
+      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-8 shadow-[var(--bk-shadow)]">
+        {/* Dải accent mảnh trên đỉnh thẻ */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-[var(--bk-accent)] to-transparent opacity-70"
+        />
         <div className="mb-6 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--bk-accent-soft)] text-3xl text-[var(--bk-accent)]">
-            <Icon icon="lucide:phone" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bk-accent)] text-white shadow-lg ring-4 ring-[var(--bk-accent-soft)]">
+            <Icon icon="line-md:account" width={34} height={34} />
           </div>
-          <h1 className="mt-3 text-xl font-bold text-[var(--bk-text)]">AI電話 Flow Builder</h1>
-          <p className="mt-1 text-sm text-[var(--bk-text-muted)]">
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--bk-text)]">
+            Brekeke Flow Builder
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-[var(--bk-text-muted)]">
             {t('loginSubtitle', { domain: ALLOWED_DOMAIN })}
           </p>
         </div>
@@ -120,10 +133,6 @@ export function LoginScreen() {
             <span>{t('loginNotConfigured')}</span>
           </div>
         )}
-
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-[var(--bk-text-faint)]">
-          {t('loginFooter')}
-        </p>
       </div>
     </div>
   );

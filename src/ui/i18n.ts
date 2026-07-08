@@ -132,7 +132,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     exTransfer: 'Chuyển cuộc gọi tới máy nhánh / người khác',
     exFlag: 'Đặt cờ trạng thái / SMS cho cuộc gọi',
     exHangup: 'Kết thúc và ngắt cuộc gọi',
-    loginSubtitle: 'Đăng nhập bằng tài khoản @{domain}',
+    loginSubtitle: 'Đăng nhập bằng tài khoản Google @{domain} để truy cập không gian làm việc của bạn.',
     loginReadError: 'Không đọc được thông tin đăng nhập.',
     loginDomainError: 'Chỉ tài khoản @{domain} mới truy cập được.',
     loginGoogleError: 'Đăng nhập Google thất bại. Thử lại.',
@@ -144,18 +144,16 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmTitle: 'Quản lý file YAML',
     fmSubtitle: 'Chọn file có sẵn hoặc tải lên file mới để mở trên canvas.',
     fmConnectTitle: 'Kết nối GitHub',
-    fmConnectDesc:
-      'Nhập token (fine-grained hoặc classic) có quyền ghi Contents trên repo này để đọc/ghi file YAML.',
-    fmTokenLabel: 'GitHub Token',
-    fmTokenPlaceholder: 'github_pat_… hoặc ghp_…',
+    fmConnectDesc: 'Nhập Classic Token có quyền ghi Contents trên Repo.',
+    fmTokenLabel: 'Classic Token',
+    fmTokenPlaceholder: 'ghp_…',
     fmConnectBtn: 'Kết nối',
     fmConnecting: 'Đang kết nối…',
     fmDisconnect: 'Ngắt kết nối',
     fmConnectedAs: 'Đã kết nối: {login}',
-    fmTokenHelp: 'Cách tạo token (Fine-grained, Contents: Read and write)',
-    fmTokenHelpClassic: 'Hoặc tạo classic token (scope: repo) — chọn “No expiration” để nhập 1 lần dùng mãi mãi',
-    fmTokenPersistNote:
-      'Token được nhớ trên trình duyệt này qua các phiên — chỉ phải nhập lại khi token hết hạn hoặc bạn bấm “Ngắt kết nối”. Đừng dùng trên máy chung.',
+    fmTokenHelpClassic: 'Tạo Classic Token',
+    fmTokenPersistNote: 'Token được lưu trên trình duyệt này qua các phiên',
+    fmTokenPersistNote2: 'Chỉ nhập lại token khi hết hạn hoặc chủ động “Ngắt kết nối”',
     fmOpen: 'Mở',
     fmUpload: 'Tải file lên',
     fmUploading: 'Đang tải lên…',
@@ -206,8 +204,6 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginDemoNotice:
       'Chưa cấu hình VITE_GOOGLE_CLIENT_ID. Bạn đang xem bản demo UI — đăng nhập Google bị tắt.',
     loginDemoButton: 'Vào chế độ demo (bỏ qua đăng nhập)',
-    loginFooter:
-      'Kiểm tra domain ở client-side chỉ là cổng UX cho nội bộ test UI, không phải bảo mật thật. Xem cảnh báo trong README.',
   },
   ja: {
     autoLayout: 'Auto Layout',
@@ -324,7 +320,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     exTransfer: '他の内線・担当者へ転送する',
     exFlag: 'ステータス／SMSフラグを設定する',
     exHangup: '通話を終了して切断する',
-    loginSubtitle: '@{domain} アカウントでログイン',
+    loginSubtitle: '@{domain} の Google アカウントでログインしてワークスペースにアクセスします。',
     loginReadError: 'ログイン情報を読み取れませんでした。',
     loginDomainError: '@{domain} のアカウントのみアクセスできます。',
     loginGoogleError: 'Googleログインに失敗しました。もう一度お試しください。',
@@ -336,18 +332,16 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmTitle: 'YAMLファイル管理',
     fmSubtitle: '既存のファイルを選ぶか、新しいファイルをアップロードしてキャンバスで開きます。',
     fmConnectTitle: 'GitHub接続',
-    fmConnectDesc:
-      'このリポジトリの Contents 書き込み権限を持つトークン（fine-grained または classic）を入力してください。',
-    fmTokenLabel: 'GitHub トークン',
-    fmTokenPlaceholder: 'github_pat_… または ghp_…',
+    fmConnectDesc: 'リポジトリの Contents 書き込み権限を持つ Classic Token を入力してください。',
+    fmTokenLabel: 'Classic Token',
+    fmTokenPlaceholder: 'ghp_…',
     fmConnectBtn: '接続',
     fmConnecting: '接続中…',
     fmDisconnect: '切断',
     fmConnectedAs: '接続済み: {login}',
-    fmTokenHelp: 'トークンの作成方法（Fine-grained, Contents: Read and write）',
-    fmTokenHelpClassic: 'または classic トークンを作成（scope: repo）—「No expiration」を選べば一度の入力で無期限に使えます',
-    fmTokenPersistNote:
-      'トークンはこのブラウザに保存され、セッションをまたいで記憶されます（期限切れまたは「切断」まで再入力は不要）。共有PCでは使用しないでください。',
+    fmTokenHelpClassic: 'Classic Token を作成',
+    fmTokenPersistNote: 'トークンはこのブラウザに保存され、セッションをまたいで保持されます',
+    fmTokenPersistNote2: '期限切れ、または手動で「切断」した場合のみ再入力が必要です',
     fmOpen: '開く',
     fmUpload: 'アップロード',
     fmUploading: 'アップロード中…',
@@ -398,8 +392,6 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginDemoNotice:
       'VITE_GOOGLE_CLIENT_ID が未設定です。UIデモを表示中 — Googleログインは無効です。',
     loginDemoButton: 'デモモードで開く（ログインをスキップ）',
-    loginFooter:
-      'クライアント側のドメイン確認は社内UIテスト用のUXゲートであり、実際のセキュリティではありません。READMEの注意を参照してください。',
   },
 };
 
