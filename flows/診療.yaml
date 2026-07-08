@@ -3,7 +3,7 @@ flow:
   facility: 運動器ケアしまだ病院
   author: トシTuan
   createdAt: 2026-07-08 10:03
-  updatedAt: 2026-07-08 10:22
+  updatedAt: 2026-07-08 10:24
   start: welcome
   nodes:
     - id: welcome
