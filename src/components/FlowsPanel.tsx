@@ -141,11 +141,19 @@ export function FlowsPanel() {
                 type="button"
                 onClick={() => void handleCreate()}
                 disabled={!newName.trim()}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#16a34a] text-white transition hover:opacity-90 disabled:opacity-50"
+                className={[
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200',
+                  newName.trim()
+                    ? // Sẵn sàng: accent-soft như các nút tile của app; hover mới đổ màu accent.
+                      'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)] hover:-translate-y-0.5 hover:bg-[var(--bk-accent)] hover:text-white hover:shadow-md active:translate-y-0 active:scale-95'
+                    : // Chưa nhập tên: trung tính, mờ — không gào màu khi chưa bấm được.
+                      'cursor-not-allowed bg-[var(--bk-surface-2)] text-[var(--bk-text-faint)] opacity-60',
+                ].join(' ')}
                 title={t('createSubflow')}
                 aria-label={t('createSubflow')}
               >
-                <Icon icon="lucide:check" width={16} height={16} />
+                {/* key theo trạng thái để animation vẽ nét của icon chạy lại khi nút "sáng" lên */}
+                <Icon key={newName.trim() ? 'on' : 'off'} icon="line-md:confirm" width={18} height={18} />
               </button>
             </div>
           ) : (
