@@ -81,6 +81,13 @@ export function LoginScreen() {
         {GOOGLE_CLIENT_ID ? (
           <div className="flex justify-center">
             <GoogleLogin
+              // Nút do Google render trong iframe — chỉ custom được trong khuôn khổ GIS:
+              // pill + theme/locale đồng bộ với app (không áp CSS riêng được).
+              shape="pill"
+              size="large"
+              width={280}
+              theme={theme === 'dark' ? 'filled_black' : 'outline'}
+              locale={lang === 'ja' ? 'ja' : 'vi'}
               // hint cho Google chỉ gợi ý tài khoản đúng Workspace; nonce chống replay.
               hosted_domain={ALLOWED_DOMAIN}
               nonce={nonce}
