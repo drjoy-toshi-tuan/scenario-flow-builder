@@ -142,19 +142,19 @@ export function FlowsPanel() {
                 onClick={() => void handleCreate()}
                 disabled={!newName.trim()}
                 className={[
+                  // Icon tự vẽ hình nút (square-filled + animation) nên KHÔNG cần nền;
+                  // chỉ thêm hiệu ứng hover: nhấc nhẹ + sáng lên, active scale.
                   'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200',
                   newName.trim()
-                    ? // Sẵn sàng: xanh lá sáng (màu "OK/xác nhận"), nền soft cùng tông;
-                      // hover mới đổ màu xanh đầy.
-                      'bg-[color-mix(in_srgb,#22c55e_16%,transparent)] text-[#22c55e] hover:-translate-y-0.5 hover:bg-[#22c55e] hover:text-white hover:shadow-md active:translate-y-0 active:scale-95'
+                    ? 'text-[#22c55e] hover:-translate-y-0.5 hover:brightness-110 hover:drop-shadow-md active:translate-y-0 active:scale-95'
                     : // Chưa nhập tên: trung tính, mờ — không gào màu khi chưa bấm được.
-                      'cursor-not-allowed bg-[var(--bk-surface-2)] text-[var(--bk-text-faint)] opacity-60',
+                      'cursor-not-allowed text-[var(--bk-text-faint)] opacity-60',
                 ].join(' ')}
                 title={t('createSubflow')}
                 aria-label={t('createSubflow')}
               >
                 {/* key theo trạng thái để animation vẽ nét của icon chạy lại khi nút "sáng" lên */}
-                <Icon key={newName.trim() ? 'on' : 'off'} icon="line-md:confirm" width={18} height={18} />
+                <Icon key={newName.trim() ? 'on' : 'off'} icon="line-md:confirm-square-filled" width={26} height={26} />
               </button>
             </div>
           ) : (
