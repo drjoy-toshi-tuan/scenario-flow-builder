@@ -128,13 +128,13 @@ export function HeaderMenu() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f97316] text-white shadow-[var(--bk-shadow)] transition hover:brightness-95"
+        className="group flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] text-[var(--bk-text)] shadow-[var(--bk-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)] hover:shadow-md active:translate-y-0 active:scale-95"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={t('menu')}
         title={t('menu')}
       >
-        <Icon icon="heroicons-solid:menu-alt-3" width={20} height={20} />
+        <Icon icon="line-md:close-to-menu-transition" width={22} height={22} />
       </button>
 
       {render && (
@@ -165,8 +165,8 @@ export function HeaderMenu() {
             <SlideToggle
               value={theme}
               options={[
-                { key: 'light', icon: 'lucide:sun' },
-                { key: 'dark', icon: 'lucide:moon' },
+                { key: 'light', icon: 'line-md:sunny-loop' },
+                { key: 'dark', icon: 'line-md:moon-alt-loop' },
               ]}
               onChange={(k) => setTheme(k as 'light' | 'dark')}
               ariaLabel="Theme"
@@ -195,7 +195,7 @@ export function HeaderMenu() {
               setOpen(false);
             }}
           >
-            <Icon icon="fluent:code-text-20-filled" width={16} height={16} className="text-[var(--bk-accent)]" />
+            <Icon icon="majesticons:code-block-line" width={16} height={16} className="text-[var(--bk-accent)]" />
             <span>{t('ivrProperty')}</span>
           </button>
           {currentFile && (

@@ -18,6 +18,7 @@ import {
   riSubset,
   lineMdSubset,
   mdiSubset,
+  majesticonsSubset,
 } from './iconData';
 
 addCollection(lucideSubset);
@@ -35,6 +36,7 @@ addCollection(fa7SolidSubset);
 addCollection(riSubset);
 addCollection(lineMdSubset);
 addCollection(mdiSubset);
+addCollection(majesticonsSubset);
 
 // Re-export để cả app import 1 chỗ (đảm bảo addCollection đã chạy trước khi render).
 export { Icon };
