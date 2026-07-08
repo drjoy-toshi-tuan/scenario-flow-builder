@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import { useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
@@ -61,6 +61,14 @@ export function FlowsPanel() {
 
   const subflows = ir?.subflows ?? [];
 
+  // Icon spinner (SMIL loop) phải GIỮ NGUYÊN element giữa các lần render: nếu để
+  // re-render, Iconify sinh lại các thẻ <animate> (id mới) bên trong <svg> cũ —
+  // begin="0" trỏ vào timeline đã chạy qua 0 nên animation chết hẳn sau lần click đầu.
+  const spinnerIcon = useMemo(
+    () => <Icon icon="svg-spinners:blocks-scale" width={22} height={22} />,
+    [],
+  );
+
   const handleCreate = async () => {
     const name = newName.trim();
     if (!name) return;
@@ -84,7 +92,7 @@ export function FlowsPanel() {
         aria-label={t('flowsTitle')}
         title={t('flowsTitle')}
       >
-        <Icon icon="svg-spinners:blocks-scale" width={22} height={22} />
+        {spinnerIcon}
       </button>
 
       {render && (

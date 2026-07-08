@@ -29,8 +29,8 @@ export function Toolbar() {
                 {t('subFlowBadge')}: {activeSub.name}
               </span>
             ) : (
-              // Đang ở main flow: badge xanh lá (nền soft cùng tông để chữ nổi rõ).
-              <span className="rounded-md bg-[color-mix(in_srgb,#16a34a_14%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#16a34a]">
+              // Đang ở main flow: badge xanh lá SÁNG ngả nhẹ về lam (emerald) — nền soft cùng tông.
+              <span className="rounded-md bg-[color-mix(in_srgb,#10b981_14%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#10b981]">
                 {t('mainFlowBadge')}
               </span>
             )}

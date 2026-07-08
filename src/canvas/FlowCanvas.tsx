@@ -129,12 +129,27 @@ export function FlowCanvas() {
     setNodePositions(positions);
   }, [nodes, setNodePositions]);
 
+  // 1 output chỉ nối 1 dây: bỏ dây cũ cùng source+handle khỏi state cục bộ trước khi
+  // thêm dây mới (IR store cũng thay tương tự — xem flowStore.addEdge).
+  const dropSameHandle = useCallback(
+    (eds: Edge[], source: string, sourceHandle?: string | null) =>
+      eds.filter(
+        (e) => !(e.source === source && (e.sourceHandle ?? 'default') === (sourceHandle ?? 'default')),
+      ),
+    [],
+  );
+
   // Nối dây -> thêm edge vào state cục bộ + commit vào IR.
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
       const id = `${connection.source}->${connection.target}#${Date.now()}`;
-      setEdges((eds) => rfAddEdge({ ...connection, id, type: 'deletable' }, eds));
+      setEdges((eds) =>
+        rfAddEdge(
+          { ...connection, id, type: 'deletable' },
+          dropSameHandle(eds, connection.source, connection.sourceHandle),
+        ),
+      );
       addEdge({
         id,
         source: connection.source,
@@ -142,7 +157,7 @@ export function FlowCanvas() {
         sourceHandle: connection.sourceHandle ?? undefined,
       });
     },
-    [setEdges, addEdge],
+    [setEdges, addEdge, dropSameHandle],
   );
 
   // Kết thúc kéo dây MÀ KHÔNG trúng handle: nếu thả trên vùng 1 module thì vẫn nối
@@ -176,10 +191,12 @@ export function FlowCanvas() {
       if (source === target) return;
 
       const id = `${source}->${target}#${Date.now()}`;
-      setEdges((eds) => rfAddEdge({ source, target, sourceHandle, id, type: 'deletable' }, eds));
+      setEdges((eds) =>
+        rfAddEdge({ source, target, sourceHandle, id, type: 'deletable' }, dropSameHandle(eds, source, sourceHandle)),
+      );
       addEdge({ id, source, target, sourceHandle });
     },
-    [setEdges, addEdge],
+    [setEdges, addEdge, dropSameHandle],
   );
 
   // Double-click node -> mở panel setting.
