@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import { useFileStore } from '../store/fileStore';
 import { useGithubToken } from '../github/token';
@@ -8,6 +8,7 @@ import { formatDateTime } from '../ir/ivrProperty';
 import { useAuth } from '../auth/useAuth';
 import { useTheme } from '../ui/theme';
 import { useLang, useT, type TKey } from '../ui/i18n';
+import { useToast } from '../ui/toast';
 import { Icon } from '../ui/icons';
 import { SlideToggle } from './SlideToggle';
 import { IvrPropertyModal } from './IvrPropertyModal';
@@ -23,8 +24,18 @@ export function HeaderMenu() {
   // Giữ menu mounted trong lúc chạy animation ĐÓNG.
   const [render, setRender] = useState(false);
   const [ivrOpen, setIvrOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (open) setRender(true);
+  }, [open]);
+  // Click ra ngoài panel -> tự đóng menu (không cần bấm lại nút menu).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
   const ir = useFlowStore((s) => s.ir);
@@ -39,10 +50,13 @@ export function HeaderMenu() {
   const { theme, setTheme } = useTheme();
   const { lang, setLang } = useLang();
   const t = useT();
+  const showToast = useToast((s) => s.show);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Trạng thái lưu về repo: null | 'saved' | key lỗi i18n.
-  const [saveState, setSaveState] = useState<string | null>(null);
+  // Thời điểm lưu về repo thành công gần nhất (yyyy-MM-dd HH:mm) — hiện cạnh dấu tích.
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  // Key lỗi i18n nếu lưu thất bại (null = không lỗi).
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleAutoLayout = async () => {
     setBusy(true);
@@ -57,7 +71,7 @@ export function HeaderMenu() {
   const handleSaveToRepo = async () => {
     if (!currentFile || !token || saving) return;
     setSaving(true);
-    setSaveState(null);
+    setSaveError(null);
     try {
       // Đóng dấu 更新日時 (và 作成者/作成日時 nếu file cũ chưa có) trước khi export.
       const now = formatDateTime(new Date());
@@ -75,13 +89,28 @@ export function HeaderMenu() {
         currentFile.sha ?? undefined,
       );
       setSha(res.sha);
-      setSaveState('saved');
+      setSavedAt(now);
+      showToast(t('fmSaved')); // thông báo nổi, tự biến mất
     } catch (e) {
-      setSaveState(ghErrorKey(e));
+      setSaveError(ghErrorKey(e));
     } finally {
       setSaving(false);
     }
   };
+
+  // Phím tắt Ctrl/Cmd + Shift + S = lưu về repo (dùng ref để luôn gọi handler mới nhất).
+  const saveRef = useRef(handleSaveToRepo);
+  saveRef.current = handleSaveToRepo;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyS') {
+        e.preventDefault();
+        void saveRef.current();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const handleExport = () => {
     const yaml = exportYaml();
@@ -95,11 +124,11 @@ export function HeaderMenu() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] text-[var(--bk-text)] shadow-[var(--bk-shadow)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f97316] text-white shadow-[var(--bk-shadow)] transition hover:brightness-95"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={t('menu')}
@@ -166,7 +195,7 @@ export function HeaderMenu() {
               setOpen(false);
             }}
           >
-            <Icon icon="lucide:layout-dashboard" width={16} height={16} className="text-[var(--bk-accent)]" />
+            <Icon icon="fluent:code-text-20-filled" width={16} height={16} className="text-[var(--bk-accent)]" />
             <span>{t('ivrProperty')}</span>
           </button>
           {currentFile && (
@@ -183,23 +212,20 @@ export function HeaderMenu() {
                 height={16}
                 className={`text-[var(--bk-accent)] ${saving ? 'animate-spin' : ''}`}
               />
-              <span>
-                {saving
-                  ? t('fmSaving')
-                  : saveState === 'saved'
-                    ? t('fmSaved')
-                    : t('fmSaveToRepo')}
-              </span>
-              {saveState && saveState !== 'saved' && (
+              <span>{saving ? t('fmSaving') : t('fmSaveToRepo')}</span>
+              {!saving && saveError && (
                 <Icon icon="lucide:triangle-alert" width={14} height={14} className="ml-auto text-rose-500" />
               )}
-              {saveState === 'saved' && (
-                <Icon icon="lucide:circle-check" width={14} height={14} className="ml-auto text-emerald-500" />
+              {!saving && !saveError && savedAt && (
+                <span className="ml-auto flex items-center gap-1 whitespace-nowrap text-[11px] text-emerald-500">
+                  <Icon icon="lucide:circle-check" width={14} height={14} />
+                  {savedAt}
+                </span>
               )}
             </button>
           )}
-          {saveState && saveState !== 'saved' && (
-            <div className="px-3 pb-1 text-[11px] text-rose-500">{t(saveState as TKey)}</div>
+          {saveError && (
+            <div className="px-3 pb-1 text-[11px] text-rose-500">{t(saveError as TKey)}</div>
           )}
           <button
             type="button"

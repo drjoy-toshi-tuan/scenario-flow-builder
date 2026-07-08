@@ -8,11 +8,13 @@ import { FlowCanvas } from './canvas/FlowCanvas';
 import { Toolbar } from './components/Toolbar';
 import { NodeSettingsPanel } from './components/NodeSettingsPanel';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { Toast } from './ui/Toast';
 
 export default function App() {
   return (
     <AuthProvider>
       <Gate />
+      <Toast />
     </AuthProvider>
   );
 }

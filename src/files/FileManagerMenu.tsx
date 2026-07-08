@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useGithubToken } from '../github/token';
 import { useTheme } from '../ui/theme';
@@ -16,8 +16,18 @@ import { SlideToggle } from '../components/SlideToggle';
 export function FileManagerMenu() {
   const [open, setOpen] = useState(false);
   const [render, setRender] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (open) setRender(true);
+  }, [open]);
+  // Click ra ngoài panel -> tự đóng menu (không cần bấm lại nút menu).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
   const { user, signOut } = useAuth();
@@ -27,11 +37,11 @@ export function FileManagerMenu() {
   const t = useT();
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] text-[var(--bk-text)] shadow-[var(--bk-shadow)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f97316] text-white shadow-[var(--bk-shadow)] transition hover:brightness-95"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={t('menu')}

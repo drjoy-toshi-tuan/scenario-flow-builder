@@ -715,6 +715,58 @@ body {
   transform-origin: top right;
 }
 
+/* Mọi icon trong panel menu: fade + pop khi panel mở (mỗi lần panel mount lại),
+   stagger nhẹ theo thứ tự từ trên xuống. */
+@keyframes bk-menu-icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Loại trừ icon đang quay (.animate-spin, vd loader lúc lưu) để không đè mất spin. */
+.bk-addmenu svg:not(.animate-spin) {
+  animation: bk-menu-icon-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
+}
+.bk-addmenu > *:nth-child(1) svg:not(.animate-spin) {
+  animation-delay: 0.02s;
+}
+.bk-addmenu > *:nth-child(2) svg:not(.animate-spin) {
+  animation-delay: 0.05s;
+}
+.bk-addmenu > *:nth-child(3) svg:not(.animate-spin) {
+  animation-delay: 0.08s;
+}
+.bk-addmenu > *:nth-child(4) svg:not(.animate-spin) {
+  animation-delay: 0.11s;
+}
+.bk-addmenu > *:nth-child(5) svg:not(.animate-spin) {
+  animation-delay: 0.14s;
+}
+.bk-addmenu > *:nth-child(6) svg:not(.animate-spin) {
+  animation-delay: 0.17s;
+}
+.bk-addmenu > *:nth-child(7) svg:not(.animate-spin) {
+  animation-delay: 0.2s;
+}
+.bk-addmenu > *:nth-child(8) svg:not(.animate-spin) {
+  animation-delay: 0.23s;
+}
+.bk-addmenu > *:nth-child(9) svg:not(.animate-spin) {
+  animation-delay: 0.26s;
+}
+.bk-addmenu > *:nth-child(n + 10) svg:not(.animate-spin) {
+  animation-delay: 0.29s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-addmenu svg:not(.animate-spin) {
+    animation: none;
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    Menu header (dọc): mục section + hàng "label · control" + item bấm được.
    ────────────────────────────────────────────────────────────────────────── */
@@ -781,6 +833,48 @@ body {
 }
 .bk-menu-logout:hover {
   background: #dc2626;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Toast: thông báo nổi, bán trong suốt, tự fade ra và KHÔNG chặn thao tác
+   (pointer-events: none). Dùng cho "Đã lưu về repo" (bấm nút / phím tắt).
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes bk-toast {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.96);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -6px) scale(0.98);
+  }
+}
+.bk-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bk-text) 80%, transparent);
+  color: var(--bk-bg);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--bk-shadow);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: bk-toast 1.8s ease forwards;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

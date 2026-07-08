@@ -62,6 +62,10 @@ async function ghFetch(token: string, path: string, init?: RequestInit): Promise
   try {
     res = await fetch(`${GITHUB_API_BASE}${path}`, {
       ...init,
+      // GitHub API trả `Cache-Control: private, max-age=60` cho request đọc — nếu để
+      // trình duyệt cache thì sau khi tạo/upload/xoá file, danh sách `flows/` sẽ còn
+      // hiện bản CŨ tới 60s. `no-store` buộc luôn lấy dữ liệu mới → file mới hiện ngay.
+      cache: 'no-store',
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,

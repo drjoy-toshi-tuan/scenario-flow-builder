@@ -289,7 +289,7 @@ export function FileManagerScreen() {
               type="button"
               onClick={openNewModal}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--bk-border)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-text)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)] disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-lg bg-[#16a34a] px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
               <Icon icon="lucide:file-plus" width={16} height={16} />
               {t('fmNew')}
@@ -298,10 +298,11 @@ export function FileManagerScreen() {
               type="button"
               onClick={() => void refresh()}
               disabled={loading || busy}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--bk-border)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)] disabled:opacity-60"
+              title={t('fmRefresh')}
+              aria-label={t('fmRefresh')}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--bk-text-muted)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
             >
-              <Icon icon="lucide:refresh-cw" width={16} height={16} className={loading ? 'animate-spin' : ''} />
-              {t('fmRefresh')}
+              <Icon icon="lucide:refresh-cw" width={18} height={18} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
 
