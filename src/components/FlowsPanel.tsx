@@ -84,7 +84,7 @@ export function FlowsPanel() {
         aria-label={t('flowsTitle')}
         title={t('flowsTitle')}
       >
-        <Icon icon="hugeicons:workflow-square-10" />
+        <Icon icon="svg-spinners:blocks-scale" width={22} height={22} />
       </button>
 
       {render && (
@@ -100,7 +100,7 @@ export function FlowsPanel() {
             {t('mainFlowSection')}
           </div>
           <FlowItem
-            icon="hugeicons:workflow-square-10"
+            icon="tabler:square-rounded-letter-m-filled"
             name={ir?.meta.name ?? 'Main Flow'}
             active={activeFlowId === 'main'}
             onClick={() => void switchFlow('main')}
@@ -116,7 +116,7 @@ export function FlowsPanel() {
           {subflows.map((s) => (
             <FlowItem
               key={s.id}
-              icon="lucide:corner-up-right"
+              icon="tabler:square-rounded-letter-s-filled"
               name={s.name}
               active={activeFlowId === s.id}
               onClick={() => void switchFlow(s.id)}

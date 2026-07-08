@@ -24,9 +24,14 @@ export function Toolbar() {
         <div>
           <div className="flex items-center gap-2 text-base font-bold text-[var(--bk-text)]">
             <span className="max-w-[380px] truncate" title={title}>{title}</span>
-            {activeSub && (
+            {activeSub ? (
               <span className="max-w-[180px] truncate rounded-md bg-[var(--bk-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-accent)]" title={activeSub.name}>
                 {t('subFlowBadge')}: {activeSub.name}
+              </span>
+            ) : (
+              // Đang ở main flow: badge xanh lá (nền soft cùng tông để chữ nổi rõ).
+              <span className="rounded-md bg-[color-mix(in_srgb,#16a34a_14%,transparent)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#16a34a]">
+                {t('mainFlowBadge')}
               </span>
             )}
           </div>

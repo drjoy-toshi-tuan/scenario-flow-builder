@@ -126,13 +126,14 @@ const DICT: Record<Lang, Record<string, string>> = {
     disconnectConfirmMessage:
       'Ngắt kết nối sẽ xoá token khỏi trình duyệt này — lần sau phải nhập lại token. Bạn có chắc không?',
     // ── Panel Main/Sub Flow ──
-    flowsTitle: 'Main Flow / Sub Flow',
+    flowsTitle: 'Cài đặt flow',
     mainFlowSection: 'Main Flow',
     subFlowSection: 'Sub Flow',
     subFlowEmpty: 'Chưa có sub flow nào.',
     createSubflow: 'Tạo Sub Flow',
     subflowNamePlaceholder: 'Tên sub flow',
     subFlowBadge: 'Sub Flow',
+    mainFlowBadge: 'Main Flow',
     vtKanaName: 'Tên Kana',
     vtNumber: 'Số',
     vtPhone: 'Số điện thoại',
@@ -365,13 +366,14 @@ const DICT: Record<Lang, Record<string, string>> = {
     disconnectConfirmMessage:
       '切断するとトークンがこのブラウザから削除され、次回は再入力が必要になります。よろしいですか？',
     // ── Panel Main/Sub Flow ──
-    flowsTitle: 'メインフロー / サブフロー',
+    flowsTitle: 'フロー設定',
     mainFlowSection: 'メインフロー',
     subFlowSection: 'サブフロー',
     subFlowEmpty: 'サブフローはまだありません。',
     createSubflow: 'サブフロー作成',
     subflowNamePlaceholder: 'サブフロー名',
     subFlowBadge: 'サブフロー',
+    mainFlowBadge: 'メインフロー',
     vtKanaName: '氏名カナ',
     vtNumber: '数値',
     vtPhone: '電話番号',

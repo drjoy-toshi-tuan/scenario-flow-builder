@@ -19,6 +19,7 @@ import {
   lineMdSubset,
   mdiSubset,
   majesticonsSubset,
+  svgSpinnersSubset,
 } from './iconData';
 
 addCollection(lucideSubset);
@@ -37,6 +38,7 @@ addCollection(riSubset);
 addCollection(lineMdSubset);
 addCollection(mdiSubset);
 addCollection(majesticonsSubset);
+addCollection(svgSpinnersSubset);
 
 // Re-export để cả app import 1 chỗ (đảm bảo addCollection đã chạy trước khi render).
 export { Icon };
