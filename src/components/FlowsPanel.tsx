@@ -338,13 +338,13 @@ function FlowItem({
         </span>
       </button>
       {(onRename || onDelete) && (
-        // Hiện khi hover HOẶC khi sub flow này đang được chọn (click vào là thấy luôn).
-        // Nằm BÊN TRÁI icon check (icon chọn) — check luôn ở mép phải cùng.
+        // CHỈ hiện khi hover HOẶC khi focus (click vào hàng) — không hiện thường trực,
+        // kể cả khi sub flow đang được chọn (active). Nằm BÊN TRÁI icon check.
         <div
           className={[
-            'flex shrink-0 items-center gap-0.5 transition-opacity',
+            'flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
             // Active: icon check theo sau tự có mép phải (mr-2.5); còn lại tự chừa lề.
-            active ? 'opacity-100' : 'pr-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+            active ? '' : 'pr-1.5',
           ].join(' ')}
         >
           {onRename && (
