@@ -144,8 +144,9 @@ export function FlowsPanel() {
                 className={[
                   'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200',
                   newName.trim()
-                    ? // Sẵn sàng: accent-soft như các nút tile của app; hover mới đổ màu accent.
-                      'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)] hover:-translate-y-0.5 hover:bg-[var(--bk-accent)] hover:text-white hover:shadow-md active:translate-y-0 active:scale-95'
+                    ? // Sẵn sàng: xanh lá sáng (màu "OK/xác nhận"), nền soft cùng tông;
+                      // hover mới đổ màu xanh đầy.
+                      'bg-[color-mix(in_srgb,#22c55e_16%,transparent)] text-[#22c55e] hover:-translate-y-0.5 hover:bg-[#22c55e] hover:text-white hover:shadow-md active:translate-y-0 active:scale-95'
                     : // Chưa nhập tên: trung tính, mờ — không gào màu khi chưa bấm được.
                       'cursor-not-allowed bg-[var(--bk-surface-2)] text-[var(--bk-text-faint)] opacity-60',
                 ].join(' ')}
