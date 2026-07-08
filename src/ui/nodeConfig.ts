@@ -23,7 +23,7 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   faq: { icon: 'lucide:messages-square', typeLabel: 'FAQ', color: '#6366f1' },
   transfer: { icon: 'lucide:phone-forwarded', typeLabel: 'Transfer', color: '#06b6d4' },
   flag: { icon: 'mingcute:flag-4-fill', typeLabel: 'Flag', color: '#de5f1b' },
-  jump: { icon: 'lucide:corner-up-right', typeLabel: 'Jump', color: '#8b5cf6' },
+  jump: { icon: 'fluent:flow-32-regular', typeLabel: 'Jump', color: '#8b5cf6' },
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
 };
 
