@@ -62,7 +62,7 @@ export function LoginScreen() {
         />
         <div className="mb-6 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bk-accent)] text-white shadow-lg ring-4 ring-[var(--bk-accent-soft)]">
-            <Icon icon="line-md:account" width={34} height={34} />
+            <Icon icon="svg-spinners:blocks-scale" width={34} height={34} />
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--bk-text)]">
             Brekeke Flow Builder
