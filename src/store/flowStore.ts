@@ -420,7 +420,12 @@ export const useFlowStore = create<FlowState>((set, get) => {
           (e.sourceHandle ?? '') === (edge.sourceHandle ?? ''),
       );
       if (exists) return;
-      set({ ...snapshot(), ir: { ...ir, edges: [...ir.edges, edge] } });
+      // 1 output chỉ nối được 1 dây: nối dây mới từ handle đang có dây -> THAY dây cũ.
+      const handle = edge.sourceHandle ?? 'default';
+      const edges = ir.edges.filter(
+        (e) => !(e.source === edge.source && (e.sourceHandle ?? 'default') === handle),
+      );
+      set({ ...snapshot(), ir: { ...ir, edges: [...edges, edge] } });
     },
 
     removeEdge: (id) => {

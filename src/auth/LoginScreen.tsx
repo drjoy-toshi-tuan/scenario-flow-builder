@@ -24,6 +24,14 @@ export function LoginScreen() {
   // Sinh nonce một lần cho mỗi lần mở màn login (chống replay). Gắn vào <GoogleLogin>.
   const nonce = useMemo(() => createNonce(), []);
 
+  // Icon spinner (SMIL loop) giữ nguyên element giữa các lần render (đổi theme/lang/
+  // error đều re-render màn này) — nếu không, animation chết sau lần render thứ 2
+  // (xem giải thích ở FlowsPanel).
+  const logoIcon = useMemo(
+    () => <Icon icon="svg-spinners:gooey-balls-1" width={34} height={34} />,
+    [],
+  );
+
   return (
     <div className="relative flex h-full items-center justify-center overflow-hidden bg-[var(--bk-bg)] p-6">
       {/* Vầng sáng accent mờ phía sau — tạo chiều sâu, cảm giác cao cấp */}
@@ -62,7 +70,7 @@ export function LoginScreen() {
         />
         <div className="mb-6 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bk-accent)] text-white shadow-lg ring-4 ring-[var(--bk-accent-soft)]">
-            <Icon icon="svg-spinners:gooey-balls-1" width={34} height={34} />
+            {logoIcon}
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--bk-text)]">
             Brekeke Flow Builder
