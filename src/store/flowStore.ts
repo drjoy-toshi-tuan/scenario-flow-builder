@@ -8,8 +8,11 @@ import {
   defaultDataFor,
   readBranches,
   effectiveBranches,
+  catchAllEditable,
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
+  CDC_DEFAULT_BRANCHES,
+  LOGIC_MODULE_CDC,
   type DataBranch,
 } from '../ui/nodeSchema';
 import { DEFAULT_IVR_SETTINGS, formatDateTime, type IvrSettings } from '../ir/ivrProperty';
@@ -67,6 +70,10 @@ interface FlowState {
   // Thời điểm import YAML (yyyy-MM-dd HH:mm) -> điền vào 作成日時 của IVR Property.
   ivrCreatedAt: string;
 
+  // Tài liệu ĐẦY ĐỦ (main + mọi sub flow) — dùng cho export YAML, option xuyên
+  // flow (searchSelect) và context gửi AI. Không đổi state.
+  assembleDoc: () => FlowIR | null;
+
   // Nạp YAML -> IR -> auto-layout, rồi set vào store.
   loadYaml: (text: string) => Promise<void>;
   // Chạy lại ELK trên IR hiện tại.
@@ -80,6 +87,10 @@ interface FlowState {
 
   // Cập nhật vị trí sau khi kéo-thả (commit vào IR).
   setNodePositions: (positions: Record<string, { x: number; y: number }>) => void;
+
+  // Vá data của 1 node ĐÃ COMMIT (không qua draft, không ghi lịch sử Undo) —
+  // dùng cho ghi kết quả nền như phần giải thích script của AI.
+  setNodeData: (id: string, patch: Record<string, unknown>) => void;
 
   // Thêm 1 module (node) mới vào flow tại vị trí cho trước; trả về id vừa tạo.
   addNode: (type: NodeType, position: { x: number; y: number }) => string;
@@ -205,6 +216,8 @@ export const useFlowStore = create<FlowState>((set, get) => {
     mainStash: null,
     canvasPanel: null,
     setCanvasPanel: (panel) => set({ canvasPanel: panel }),
+
+    assembleDoc: () => assembleDoc(),
 
     switchFlow: async (id) => {
       const { activeFlowId } = get();
@@ -428,6 +441,17 @@ export const useFlowStore = create<FlowState>((set, get) => {
       });
     },
 
+    setNodeData: (id, patch) => {
+      const { ir } = get();
+      if (!ir) return;
+      set({
+        ir: {
+          ...ir,
+          nodes: ir.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
+        },
+      });
+    },
+
     addNode: (type, position) => {
       const { ir, activeFlowId } = get();
       if (!ir) return '';
@@ -574,7 +598,14 @@ export const useFlowStore = create<FlowState>((set, get) => {
     setDraftField: (key, value) => {
       const { draft } = get();
       if (!draft) return;
-      set({ draft: { ...draft, data: { ...draft.data, [key]: value } } });
+      const data: Record<string, unknown> = { ...draft.data, [key]: value };
+      // Chuyển module sang Clinic Day Classifier: seed bộ nhánh mặc định
+      // (休診日 / 不明 / 診療日) nếu node chưa có nhánh tuỳ biến nào.
+      if (key === 'moduleType' && value === LOGIC_MODULE_CDC) {
+        const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
+        if (!hasCustom) data.branches = CDC_DEFAULT_BRANCHES.map((b) => ({ ...b }));
+      }
+      set({ draft: { ...draft, data } });
     },
 
     draftAddBranch: () => {
@@ -591,8 +622,13 @@ export const useFlowStore = create<FlowState>((set, get) => {
     },
 
     draftUpdateBranch: (branchId, value) => {
-      const { draft } = get();
-      if (!draft || branchId === CATCH_ALL_ID) return; // catch-all không sửa value
+      const { draft, ir, selectedNodeId } = get();
+      if (!draft) return;
+      // Catch-all mặc định không sửa value — TRỪ node logic Module Result Binder.
+      if (branchId === CATCH_ALL_ID) {
+        const node = ir?.nodes.find((n) => n.id === selectedNodeId);
+        if (!node || !catchAllEditable(node.type, draft.data)) return;
+      }
       const branches = readBranches(draft.data).map((b) => (b.id === branchId ? { ...b, value } : b));
       set({ draft: { ...draft, data: { ...draft.data, branches } } });
     },

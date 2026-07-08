@@ -1,6 +1,6 @@
 import { useMemo, useRef, type UIEvent } from 'react';
 import { Icon } from '../ui/icons';
-import { lintScript } from '../ui/scriptLint';
+import { lintFor } from '../ui/scriptLint';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Editor code có tô sáng cú pháp — KHÔNG thêm thư viện (tech stack khoá cứng).
@@ -228,16 +228,19 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   rows?: number;
+  // 'js' (mặc định) lint bằng new Function; 'json' lint bằng JSON.parse.
+  // Bộ tô sáng dùng chung (scanner JS xử lý chuỗi/số/dấu câu của JSON ổn).
+  language?: 'js' | 'json';
 }
 
-export function CodeEditor({ value, onChange, rows = 18 }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, rows = 18, language = 'js' }: CodeEditorProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
 
   const lines = useMemo(() => value.split('\n'), [value]);
   const { guides } = useMemo(() => computeGuides(lines), [lines]);
   const html = useMemo(() => highlight(value), [value]);
-  const error = useMemo(() => lintScript(value), [value]);
+  const error = useMemo(() => lintFor(language, value), [language, value]);
 
   // Đồng bộ cuộn: textarea (trên) cuộn -> lớp highlight + gutter dịch theo (transform).
   const onScroll = (e: UIEvent<HTMLTextAreaElement>) => {

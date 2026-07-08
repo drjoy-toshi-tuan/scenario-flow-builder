@@ -151,7 +151,20 @@ function parseGraph(
       const dataBranches: { id: string; value: string; label?: string }[] = [];
       raw.branches.forEach((branch, index) => {
         const label = typeof branch.label === 'string' ? branch.label : undefined;
-        if (branch.when && branch.to) {
+        // Nhánh default (catch-all) xét TRƯỚC: có thể kèm `when` (value tuỳ biến
+        // của Module Result Binder) — vẫn giữ handle 'default'.
+        if (branch.default) {
+          const value = typeof branch.when === 'string' ? branch.when : '';
+          dataBranches.push({ id: 'default', value, label });
+          edges.push({
+            id: edgeId(raw.id, branch.default, 'default'),
+            source: raw.id,
+            target: branch.default,
+            sourceHandle: 'default',
+            ...(value ? { condition: value } : {}),
+            label: label || value || 'default',
+          });
+        } else if (branch.when && branch.to) {
           // Node logic (Context Match Router): nhánh Pair dùng handle 'pairN' để liên
           // động với danh sách Pair trong panel. Value mới là '1'/'2'…; vẫn nhận
           // dạng cũ 'Pair1' cho file đã lưu trước đó.
@@ -166,16 +179,6 @@ function parseGraph(
             sourceHandle: handle,
             condition: branch.when,
             label: label || branch.when,
-          });
-        } else if (branch.default) {
-          // Nhánh mặc định (else) -> handle 'default', giá trị rỗng.
-          dataBranches.push({ id: 'default', value: '', label });
-          edges.push({
-            id: edgeId(raw.id, branch.default, 'default'),
-            source: raw.id,
-            target: branch.default,
-            sourceHandle: 'default',
-            label: label || 'default',
           });
         }
       });

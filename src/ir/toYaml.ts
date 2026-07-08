@@ -92,7 +92,14 @@ function serializeGraph(
         const handle = e.sourceHandle ?? 'default';
         const info = dataBranches.get(handle);
         const value = info?.value ?? e.condition ?? '';
-        const out: OutBranch = value ? { when: value, to: e.target } : { default: e.target };
+        // Nhánh catch-all (handle 'default') LUÔN xuất dạng `default:` để giữ danh
+        // tính qua round-trip; value tuỳ biến (MRB cho sửa) ghi kèm ở `when`.
+        const out: OutBranch =
+          handle === 'default'
+            ? { ...(value ? { when: value } : {}), default: e.target }
+            : value
+              ? { when: value, to: e.target }
+              : { default: e.target };
         if (info?.label) out.label = info.label;
         return out;
       });

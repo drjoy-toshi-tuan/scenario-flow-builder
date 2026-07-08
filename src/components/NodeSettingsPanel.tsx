@@ -9,18 +9,23 @@ import {
   readPairs,
   effectiveBranches,
   isPairBranchNode,
+  catchAllEditable,
   optionsForSource,
   catchAllDisplay,
+  logicModuleOf,
   CATCH_ALL_ID,
+  LOGIC_MODULE_SCRIPT,
   type PropertyField,
 } from '../ui/nodeSchema';
 import { Icon } from '../ui/icons';
-import { useT, type TKey } from '../ui/i18n';
-import { lintScript, type ScriptError } from '../ui/scriptLint';
+import { useLang, useT, type TKey } from '../ui/i18n';
+import { lintFor, type ScriptError } from '../ui/scriptLint';
+import { refreshScriptExplanation } from '../ai/explain';
 import { CodeEditor } from './CodeEditor';
 import { RegexBranchInput } from './RegexBranchInput';
 import { AutoGrowTextarea } from './AutoGrowTextarea';
 import { HoverTip } from './HoverTip';
+import { AiFieldExtras } from './AiFieldExtras';
 
 // Key giải thích ý nghĩa loại node trong từ điển i18n (exStart, exAnnounce, …).
 function explainKey(type: NodeType): TKey {
@@ -93,19 +98,30 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
     if ((tab === 'property' && !hasProperty) || (tab === 'branch' && !hasBranch)) setTab('general');
   }, [tab, hasProperty, hasBranch]);
 
-  // Kiểm tra cú pháp các ô code (script) trong draft -> chặn LƯU khi có lỗi.
+  // Kiểm tra cú pháp các ô code (script JS / JSON) trong draft -> chặn LƯU khi có lỗi.
   const scriptError = useMemo<ScriptError | null>(() => {
     if (!draft) return null;
     for (const f of PROPERTY_FIELDS[node.type]) {
       if (f.kind !== 'code') continue;
       const v = draft.data[f.key];
       if (typeof v === 'string') {
-        const err = lintScript(v);
+        const err = lintFor(f.language, v);
         if (err) return err;
       }
     }
     return null;
   }, [draft, node.type]);
+
+  const { lang } = useLang();
+  // LƯU node logic (module Script) với script ĐÃ ĐỔI -> tự 再生成 phần giải thích
+  // AI ở nền để giải nghĩa luôn khớp code mới (thiếu key -> bỏ qua im lặng).
+  const maybeRefreshExplanation = () => {
+    if (!draft || node.type !== 'logic' || logicModuleOf(draft.data) !== LOGIC_MODULE_SCRIPT) return;
+    const script = typeof draft.data.script === 'string' ? draft.data.script : '';
+    if (script !== (typeof node.data.script === 'string' ? node.data.script : '')) {
+      refreshScriptExplanation(node.id, script, lang);
+    }
+  };
 
   const [showSyntaxWarn, setShowSyntaxWarn] = useState(false);
   const handleSave = () => {
@@ -114,6 +130,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
       setShowSyntaxWarn(true);
       return;
     }
+    maybeRefreshExplanation();
     commitDraft();
   };
 
@@ -167,7 +184,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {tab === 'general' && <GeneralTab label={editing.label} />}
-        {tab === 'property' && <PropertyTab type={node.type} data={editing.data} />}
+        {tab === 'property' && <PropertyTab node={node} data={editing.data} />}
         {tab === 'branch' && <BranchTab node={node} data={editing.data} />}
       </div>
 
@@ -313,22 +330,30 @@ function GeneralTab({ label }: { label: string }) {
 }
 
 // ── Property ──────────────────────────────────────────────────────────────────
-function PropertyTab({ type, data }: { type: NodeType; data: Record<string, unknown> }) {
+function PropertyTab({ node, data }: { node: FlowNode; data: Record<string, unknown> }) {
   const t = useT();
-  const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
+  const fields = PROPERTY_FIELDS[node.type].filter((f) => !f.showIf || f.showIf(data));
   if (fields.length === 0) {
     return <p className="text-sm text-[var(--bk-text-faint)]">{t('noPropertyNote')}</p>;
   }
   return (
     <div className="space-y-4">
       {fields.map((f) => (
-        <FieldControl key={f.key} field={f} data={data} />
+        <FieldControl key={f.key} node={node} field={f} data={data} />
       ))}
     </div>
   );
 }
 
-function FieldControl({ field, data }: { field: PropertyField; data: Record<string, unknown> }) {
+function FieldControl({
+  node,
+  field,
+  data,
+}: {
+  node: FlowNode;
+  field: PropertyField;
+  data: Record<string, unknown>;
+}) {
   const t = useT();
   const setDraftField = useFlowStore((s) => s.setDraftField);
   const raw = data[field.key];
@@ -387,15 +412,19 @@ function FieldControl({ field, data }: { field: PropertyField; data: Record<stri
       );
     case 'textarea':
       return (
-        <label className="block">
-          {label}
-          <textarea
-            className={`${inputClass} resize-y`}
-            rows={field.rows ?? 3}
-            value={value}
-            onChange={(e) => set(e.target.value)}
-          />
-        </label>
+        <div className="block">
+          <label className="block">
+            {label}
+            <textarea
+              className={`${inputClass} resize-y`}
+              rows={field.rows ?? 3}
+              value={value}
+              onChange={(e) => set(e.target.value)}
+            />
+          </label>
+          {/* Nút "AIで生成・修正" cho prompt (node OpenAI). */}
+          {field.aiGenerate && <AiFieldExtras node={node} field={field} value={value} data={data} />}
+        </div>
       );
     case 'select':
       return (
@@ -441,8 +470,10 @@ function FieldControl({ field, data }: { field: PropertyField; data: Record<stri
         <div className="block">
           {label}
           <div className="mt-1">
-            <CodeEditor value={value} onChange={set} rows={field.rows ?? 12} />
+            <CodeEditor value={value} onChange={set} rows={field.rows ?? 12} language={field.language} />
           </div>
+          {/* Nút "AIで生成・修正" + panel giải thích code (script của node Logic). */}
+          {field.aiGenerate && <AiFieldExtras node={node} field={field} value={value} data={data} />}
         </div>
       );
     case 'collapsibleTextarea':
@@ -511,10 +542,13 @@ function SearchSelect({
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const options = useMemo(
-    () => (field.optionsFrom ? optionsForSource(field.optionsFrom, ir) : []),
-    [field.optionsFrom, ir],
-  );
+  // Option lấy trên TÀI LIỆU ĐẦY ĐỦ (main flow + mọi sub flow) — không chỉ flow
+  // đang mở. `ir` trong deps để danh sách cập nhật theo mỗi thay đổi.
+  const options = useMemo(() => {
+    if (!field.optionsFrom) return [];
+    const doc = useFlowStore.getState().assembleDoc();
+    return optionsForSource(field.optionsFrom, doc);
+  }, [field.optionsFrom, ir]); // eslint-disable-line react-hooks/exhaustive-deps
   const query = value.trim().toLowerCase();
   // Đang gõ -> lọc theo chữ; giá trị khớp hẳn 1 option -> hiện đủ danh sách để đổi nhanh.
   const filtered =
@@ -719,6 +753,8 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
   // Node logic (Context Match Router): nhánh SINH TỪ Pair — value ^Pair{n}$ khoá cứng,
   // label sửa được, KHÔNG thêm/xoá nhánh ở đây (thêm/xoá Pair bên tab Property).
   const pairMode = isPairBranchNode(node.type, data);
+  // Node logic (Module Result Binder): value catch-all SỬA ĐƯỢC (vẫn không xoá được).
+  const editableCatchAll = catchAllEditable(node.type, data);
 
   // Nhánh tự do (nexus/logic/jump): nhánh catch-all (^.*$) đứng đầu, không sửa/xoá;
   // các nhánh còn lại thêm/sửa/xoá tuỳ ý. "+ Thêm nhánh" để thêm.
@@ -747,7 +783,15 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
           return (
             <div key={b.id} className="bk-branch-row">
               <div className="bk-branch-cond">
-                {isCatchAll ? (
+                {isCatchAll && editableCatchAll ? (
+                  // MRB: catch-all sửa được value như nhánh thường (không xoá được).
+                  <RegexBranchInput
+                    className={`${inputClass} !mt-0 w-full font-mono`}
+                    value={b.value}
+                    placeholder={t('branchConditionPlaceholder')}
+                    onChange={(v) => draftUpdateBranch(b.id, v)}
+                  />
+                ) : isCatchAll ? (
                   <input
                     className={`${inputClass} !mt-0 w-full font-mono bk-branch-catchall`}
                     value={catchAllValue}

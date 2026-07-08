@@ -679,6 +679,38 @@ body {
   color: #9aa4b5;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Icon "AI sparkles" (nút AIで生成・修正) — 2 sao lấp lánh lệch pha.
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes bk-ai-twinkle {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.75);
+    opacity: 0.3;
+  }
+}
+.bk-ai-star-big {
+  animation: bk-ai-twinkle 2s infinite ease-in-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bk-ai-star-small {
+  animation: bk-ai-twinkle 2s infinite ease-in-out;
+  animation-delay: 0.8s;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-ai-star-big,
+  .bk-ai-star-small {
+    animation: none;
+  }
+}
+
 /* Menu "Thêm node": phóng to ra khi mở, thu nhỏ + mờ dần khi đóng.
    Gốc phóng ở góc trên-trái (sát nút bấm). */
 @keyframes bk-addmenu-in {
