@@ -336,13 +336,13 @@ function FlowItem({
         <span className="min-w-0 flex-1 truncate text-sm" title={name}>
           {name}
         </span>
-        {active && <Icon icon="lucide:circle-check" width={14} height={14} className="shrink-0" />}
       </button>
       {(onRename || onDelete) && (
-        // Hiện khi hover HOẶC khi sub flow này đang được chọn (click vào là thấy luôn).
+        // Nút Đổi tên/Xoá đặt BÊN TRÁI icon check; chỉ hiện khi hover hàng này
+        // hoặc khi sub flow này đang được chọn (click vào là thấy luôn).
         <div
           className={[
-            'flex shrink-0 items-center gap-0.5 pr-1.5 transition-opacity',
+            'flex shrink-0 items-center gap-0.5 transition-opacity',
             active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
           ].join(' ')}
         >
@@ -369,6 +369,15 @@ function FlowItem({
             </button>
           )}
         </div>
+      )}
+      {/* Icon check (đang chọn) luôn nằm ngoài cùng bên phải. */}
+      {active && (
+        <Icon
+          icon="lucide:circle-check"
+          width={14}
+          height={14}
+          className="mr-2.5 shrink-0 text-[var(--bk-accent)]"
+        />
       )}
     </div>
   );
