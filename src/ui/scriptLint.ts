@@ -34,3 +34,22 @@ export function lintScript(code: string): ScriptError | null {
     return null; // không phải lỗi cú pháp -> bỏ qua
   }
 }
+
+// Kiểm tra cú pháp JSON (ô Context Setting của node Start). V8 mới báo lỗi kèm
+// "(line N column M)" — rút line nếu có để trỏ đúng dòng trong editor.
+export function lintJson(code: string): ScriptError | null {
+  if (!code.trim()) return null;
+  try {
+    JSON.parse(code);
+    return null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const m = /line (\d+)/i.exec(message);
+    return { message, line: m ? Number(m[1]) : undefined };
+  }
+}
+
+// Chọn linter theo ngôn ngữ của ô code.
+export function lintFor(language: 'js' | 'json' | undefined, code: string): ScriptError | null {
+  return language === 'json' ? lintJson(code) : lintScript(code);
+}

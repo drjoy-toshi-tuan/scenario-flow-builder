@@ -28,6 +28,11 @@ type FileRow = FlowFile & { meta: FlowMeta };
 // Bỏ đuôi .yaml/.yml khi hiển thị (danh sách chỉ hiện tên).
 const stripExt = (name: string) => name.replace(/\.ya?ml$/i, '');
 
+// Tên file trên repo theo quy ước <tên bệnh viện>_<tên flow>.yaml.
+// (Màn quản lý vẫn hiển thị 2 phần tách riêng theo metadata trong file.)
+const flowFileName = (facility: string, scenario: string) =>
+  sanitizeFileName(`${facility}_${scenario}`);
+
 // Cache metadata theo blob sha (sha = hash nội dung, đổi khi file đổi). Nhờ vậy khi
 // quay lại màn danh sách / bấm Làm mới mà file không đổi -> KHÔNG tải lại nội dung;
 // chỉ file mới hoặc vừa sửa (sha khác) mới phải fetch. Sống ở cấp module để giữ qua
@@ -220,8 +225,8 @@ export function FileManagerScreen() {
       setCreateErrorKey('fmScenarioRequired');
       return;
     }
-    // Tên file suy từ シナリオ名; đảm bảo duy nhất để không ghi đè file trùng tên.
-    const name = uniqueFileName(sanitizeFileName(scenario), new Set(files.map((f) => f.name)));
+    // Tên file theo quy ước 施設名_シナリオ名; đảm bảo duy nhất để không ghi đè.
+    const name = uniqueFileName(flowFileName(facility, scenario), new Set(files.map((f) => f.name)));
     setShowNew(false);
     const now = formatDateTime(new Date());
     const author = user?.name ?? user?.email ?? '';
@@ -237,6 +242,8 @@ export function FileManagerScreen() {
   };
 
   // Lưu đổi tên: đọc file -> vá metadata (giữ nguyên nodes) -> commit lại theo sha.
+  // Tên file theo quy ước 施設名_シナリオ名 nên đổi tên metadata cũng ĐỔI TÊN FILE
+  // (tạo file mới rồi xoá file cũ — Contents API không có thao tác move).
   const handleRename = async () => {
     if (!renameTarget) return;
     const target = renameTarget;
@@ -253,7 +260,15 @@ export function FileManagerScreen() {
         name: scenario,
         updatedAt: formatDateTime(new Date()),
       });
-      await putFlow(token!, target.path, next, t('commitRename', { name: target.name }), sha);
+      const desired = flowFileName(facility, scenario);
+      if (desired === target.name) {
+        await putFlow(token!, target.path, next, t('commitRename', { name: target.name }), sha);
+      } else {
+        const taken = new Set(files.filter((f) => f.path !== target.path).map((f) => f.name));
+        const newName = uniqueFileName(desired, taken);
+        await putFlow(token!, `${FLOWS_DIR}/${newName}`, next, t('commitRename', { name: newName }));
+        await deleteFlow(token!, target.path, sha, t('commitRename', { name: target.name }));
+      }
       await refresh();
     } catch (e) {
       setActionError(t(ghErrorKey(e)));
@@ -270,9 +285,13 @@ export function FileManagerScreen() {
     setActionError(null);
     try {
       const { content } = await getFlow(token!, file.path);
-      const newFileName = uniqueFileName(sanitizeFileName(file.name), new Set(files.map((f) => f.name)));
       const now = formatDateTime(new Date());
       const baseName = file.meta.name ?? stripExt(file.name);
+      // Tên file bản sao cũng theo quy ước 施設名_シナリオ名 (fallback tên cũ nếu thiếu 施設名).
+      const desired = file.meta.facility
+        ? flowFileName(file.meta.facility, `${baseName}-copy`)
+        : sanitizeFileName(file.name);
+      const newFileName = uniqueFileName(desired, new Set(files.map((f) => f.name)));
       const next = updateFlowMeta(content, {
         name: `${baseName} (Copy)`,
         createdAt: now,
@@ -330,7 +349,8 @@ export function FileManagerScreen() {
           <GithubConnectPanel />
         </div>
       ) : (
-        <main className="relative mx-auto w-full max-w-5xl flex-1 overflow-auto p-6">
+        // Panel nới rộng (max-w-7xl) để cột 施設名 có chỗ mở rộng.
+        <main className="relative mx-auto w-full max-w-7xl flex-1 overflow-auto p-6">
           {/* Vầng sáng accent mờ phía sau card — chiều sâu kiểu màn login. */}
           <div
             aria-hidden
@@ -411,7 +431,8 @@ export function FileManagerScreen() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--bk-border)]">
-                    <th className={th}>{t('colFacility')}</th>
+                    {/* Cột 施設名 rộng ~1.5 lần trước đây (ghim min-width). */}
+                    <th className={`${th} w-[270px] min-w-[270px]`}>{t('colFacility')}</th>
                     <th className={th}>{t('colScenario')}</th>
                     <th className={th}>{t('colCreatedAt')}</th>
                     <th className={th}>{t('colUpdatedAt')}</th>

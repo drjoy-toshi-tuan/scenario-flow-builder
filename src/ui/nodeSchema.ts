@@ -1,5 +1,6 @@
 import type { FlowIR, FlowNode, NodeType } from '../ir/types';
 import type { TKey } from './i18n';
+import { DEFAULT_CONTEXT_SETTING } from './defaultContextSetting';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Schema khai báo cho panel setting: MỖI loại node có
@@ -15,7 +16,7 @@ export type FieldKind =
   | 'number' // chỉ nhập số
   | 'textarea' // nhiều dòng
   | 'collapsibleTextarea' // textarea ẩn/hiện (nội dung dài)
-  | 'code' // editor có tô sáng cú pháp
+  | 'code' // editor có tô sáng cú pháp (JS mặc định; language: 'json' cho JSON)
   | 'select' // pull-down
   | 'searchSelect' // pull-down gõ để lọc; option lấy động từ flow (xem optionsFrom)
   | 'pairs' // danh sách Pair (2 ô text + dấu ×) của Context Match Router
@@ -43,6 +44,9 @@ export interface PropertyField {
   readOnly?: boolean; // hiển thị nhưng không cho sửa (vd holidaySource)
   default?: string;
   rows?: number; // cho textarea
+  language?: 'js' | 'json'; // cho kind 'code' — mặc định 'js'
+  // Nút "AIで生成・修正" cạnh ô nhập (script của Logic / prompt của OpenAI).
+  aiGenerate?: 'script' | 'prompt';
   // Chỉ hiển thị khi điều kiện đúng (vd Voice Type chỉ hiện khi Input Type là STT).
   showIf?: (data: Record<string, unknown>) => boolean;
 }
@@ -83,7 +87,8 @@ const INPUT_TYPE_OPTIONS: FieldOption[] = [
 ];
 
 const VOICE_TYPE_OPTIONS: FieldOption[] = [
-  { value: 'TEXT', label: 'TEXT' },
+  // TEXT hiển thị "Text / テキスト" (song ngữ) — cũng là lựa chọn mặc định.
+  { value: 'TEXT', labelKey: 'vtText' },
   { value: 'KANA_NAME', labelKey: 'vtKanaName' },
   { value: 'NUMBER', labelKey: 'vtNumber' },
   { value: 'PHONE_NUMBER', labelKey: 'vtPhone' },
@@ -112,11 +117,12 @@ export const LOGIC_MODULE_MRB = 'Module Result Binder';
 export const LOGIC_MODULE_SCRIPT = 'Script';
 
 // Bộ chọn module lưu ở data.moduleType ('module' là THAM SỐ của CDC/MRB — 参照元モジュール).
+// Script đứng đầu pulldown (module mặc định, dùng thường xuyên nhất).
 const MODULE_OPTIONS: FieldOption[] = [
+  { value: LOGIC_MODULE_SCRIPT, label: LOGIC_MODULE_SCRIPT },
   { value: LOGIC_MODULE_CDC, label: LOGIC_MODULE_CDC },
   { value: LOGIC_MODULE_CMR, label: LOGIC_MODULE_CMR },
   { value: LOGIC_MODULE_MRB, label: LOGIC_MODULE_MRB },
-  { value: LOGIC_MODULE_SCRIPT, label: LOGIC_MODULE_SCRIPT },
 ];
 
 // Module đang chọn của node logic (mặc định Script khi chưa chọn).
@@ -189,7 +195,16 @@ const mrbSaveContextOn = (d: Record<string, unknown>) => moduleIsMrb(d) && d.sav
 export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
   start: [
     { key: 'acceptanceTime', labelKey: 'fAcceptanceTime', kind: 'yesno', options: YESNO_OPTIONS, default: 'yes' },
-    { key: 'contextSetting', labelKey: 'fContextSetting', kind: 'collapsibleTextarea', rows: 6 },
+    // Context Setting dạng JSON — editor có tô sáng cú pháp + số dòng, seed sẵn
+    // bộ context mặc định (xem defaultContextSetting.ts).
+    {
+      key: 'contextSetting',
+      labelKey: 'fContextSetting',
+      kind: 'code',
+      language: 'json',
+      rows: 14,
+      default: DEFAULT_CONTEXT_SETTING,
+    },
   ],
   announce: [{ key: 'text', labelKey: 'fAnnounce', kind: 'autoText' }],
   interaction: [
@@ -203,7 +218,7 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       labelKey: 'fVoiceType',
       kind: 'select',
       options: VOICE_TYPE_OPTIONS,
-      default: 'KANA_NAME',
+      default: 'TEXT',
       showIf: inputHasStt,
     },
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
@@ -226,7 +241,7 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'moduleType', labelKey: 'fModule', kind: 'select', options: MODULE_OPTIONS, default: LOGIC_MODULE_SCRIPT },
 
     // ── Script ──
-    { key: 'script', labelKey: 'fScript', kind: 'code', rows: 18, showIf: moduleIsScript },
+    { key: 'script', labelKey: 'fScript', kind: 'code', rows: 18, showIf: moduleIsScript, aiGenerate: 'script' },
 
     // ── Clinic Day Classifier ──
     { key: 'module', labelKey: 'fRefModule', kind: 'searchSelect', optionsFrom: 'interactionNodes', showIf: moduleIsCdc },
@@ -248,7 +263,6 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       showIf: moduleIsCdc,
     },
     { key: 'blockDays', labelKey: 'fBlockDays', kind: 'number', default: '0', showIf: moduleIsCdc },
-    { key: 'acceptPastDay', labelKey: 'fAcceptPastDay', kind: 'yesno', options: YESNO_HAI_OPTIONS, default: 'no', showIf: moduleIsCdc },
     {
       key: 'output_type',
       labelKey: 'fOutputType',
@@ -267,6 +281,9 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       default: 'TEXT',
       showIf: cdcSaveContextOn,
     },
+    // Retry Count / Retry Announce (bộ đôi quen thuộc) — luôn ở CUỐI danh sách CDC.
+    { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2', showIf: moduleIsCdc },
+    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: moduleIsCdc },
 
     // ── Context Match Router ──
     { key: 'nodeContext1', labelKey: 'fNodeContext1', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCmr },
@@ -288,10 +305,11 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     },
   ],
   openai: [
+    // Prompt đứng đầu, sau đó mới tới Retry Count / Retry Announce.
+    { key: 'prompt', labelKey: 'fPrompt', kind: 'textarea', rows: 6, aiGenerate: 'prompt' },
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
     // Retry Announce luôn nằm ngay dưới Retry Count.
     { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText' },
-    { key: 'prompt', labelKey: 'fPrompt', kind: 'textarea', rows: 6 },
   ],
   faq: [{ key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' }],
   transfer: [
@@ -347,9 +365,23 @@ export interface DataBranch {
   label?: string; // nhãn hiển thị trên dây (thay cho value); rỗng -> dùng value
 }
 
-// Nhánh "catch-all" (else) của node có nhánh tự do: LUÔN có, không sửa/không xoá.
+// Nhánh "catch-all" (else) của node có nhánh tự do: LUÔN có, không xoá được.
 // Giá trị hiển thị tự tính: khớp mọi thứ TRỪ các nhánh còn lại.
 export const CATCH_ALL_ID = 'default';
+
+// Riêng node logic module Module Result Binder: value của catch-all SỬA ĐƯỢC
+// (vẫn không xoá được) — các loại khác giữ read-only tự tính.
+export function catchAllEditable(type: NodeType, data: Record<string, unknown>): boolean {
+  return type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_MRB;
+}
+
+// Bộ nhánh mặc định khi node logic chuyển sang module Clinic Day Classifier:
+//   ^NON_BUSINESS_DAY$ → 休診日, ^不明$ → 不明, catch-all → 診療日.
+export const CDC_DEFAULT_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: '', label: '診療日' },
+  { id: 'b0', value: 'NON_BUSINESS_DAY', label: '休診日' },
+  { id: 'b1', value: '不明', label: '不明' },
+] as const;
 
 // Đọc mảng nhánh tự do trong data (an toàn kiểu). Luôn đảm bảo có nhánh catch-all.
 export function readBranches(data: Record<string, unknown>): DataBranch[] {
@@ -431,18 +463,25 @@ export function effectiveBranches(type: NodeType, data: Record<string, unknown>)
 }
 
 // ── Option động cho searchSelect ─────────────────────────────────────────────
-// Tên các node Interaction trong flow (ưu tiên label, fallback id).
-export function interactionNodeNames(ir: FlowIR | null): string[] {
+// Duyệt TOÀN BỘ node trong tài liệu: main flow + mọi sub flow. Truyền vào đây
+// TÀI LIỆU ĐẦY ĐỦ (store.assembleDoc()) để option lấy được xuyên flow.
+export function allNodes(ir: FlowIR | null): FlowNode[] {
   if (!ir) return [];
-  return ir.nodes.filter((n) => n.type === 'interaction').map((n) => n.label.trim() || n.id);
+  return [...ir.nodes, ...(ir.subflows ?? []).flatMap((s) => s.nodes)];
 }
 
-// Tên context đã được tạo & lưu trong flow: Nexus (saveContext), Clinic Day
+// Tên các node Interaction trong tài liệu (ưu tiên label, fallback id).
+export function interactionNodeNames(ir: FlowIR | null): string[] {
+  return allNodes(ir)
+    .filter((n) => n.type === 'interaction')
+    .map((n) => n.label.trim() || n.id);
+}
+
+// Tên context đã được tạo & lưu trong tài liệu: Nexus (saveContext), Clinic Day
 // Classifier (saveContext2db) và Module Result Binder (saveContext2DB).
 export function savedContextNames(ir: FlowIR | null): string[] {
-  if (!ir) return [];
   const names: string[] = [];
-  for (const n of ir.nodes) {
+  for (const n of allNodes(ir)) {
     const d = n.data;
     const name = typeof d.contextName === 'string' ? d.contextName.trim() : '';
     if (!name) continue;

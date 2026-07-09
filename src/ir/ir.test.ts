@@ -194,6 +194,44 @@ flow:
     expect(out.branches![1].label).toBeUndefined();
   });
 
+  it('catch-all có value (Module Result Binder) round-trip: default kèm when', () => {
+    const withValue = `
+flow:
+  name: "f"
+  start: l
+  nodes:
+    - id: l
+      type: logic
+      moduleType: Module Result Binder
+      branches:
+        - when: "OK"
+          to: a
+        - when: "^.*$"
+          default: b
+          label: "診療日"
+    - id: a
+      type: hangup
+    - id: b
+      type: hangup
+`;
+    const ir = fromYaml(withValue);
+    const l = ir.nodes.find((n) => n.id === 'l')!;
+    // Nhánh default kèm when -> vẫn là catch-all (handle 'default') nhưng GIỮ value.
+    expect(readBranches(l.data)).toEqual([
+      { id: 'b0', value: 'OK' },
+      { id: 'default', value: '^.*$', label: '診療日' },
+    ]);
+    // toYaml xuất lại default + when (không biến thành nhánh when/to thường).
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; branches?: Array<Record<string, string>> }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'l')!;
+    expect(out.branches).toEqual([
+      { when: 'OK', to: 'a' },
+      { when: '^.*$', default: 'b', label: '診療日' },
+    ]);
+  });
+
   it('defaultDataFor: seed tham số mặc định + 1 nhánh cho node editable', () => {
     const interaction = defaultDataFor('interaction');
     expect(interaction.inputType).toBe('STT');
