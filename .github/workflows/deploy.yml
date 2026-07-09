@@ -30,6 +30,19 @@ jobs:
 
       - run: npm ci
 
+      # Kiểm tra secret có tới được job build không — CHỈ in có/rỗng + độ dài, KHÔNG
+      # lộ giá trị. Nếu in EMPTY nghĩa là secret đặt sai chỗ (vd Environment secret của
+      # môi trường github-pages, job build không đọc được) hoặc sai tên.
+      - name: Kiểm tra biến build (không lộ giá trị)
+        env:
+          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY || vars.VITE_OPENAI_API_KEY }}
+        run: |
+          if [ -z "$VITE_OPENAI_API_KEY" ]; then
+            echo "::warning::VITE_OPENAI_API_KEY EMPTY ở job build — đặt ở Repository secret/variable (KHÔNG phải Environment secret) và đúng tên."
+          else
+            echo "VITE_OPENAI_API_KEY OK (length=${#VITE_OPENAI_API_KEY})"
+          fi
+
       - run: npm run build
         env:
           # Client ID (không phải secret) — set ở Settings > Secrets and variables > Actions.
