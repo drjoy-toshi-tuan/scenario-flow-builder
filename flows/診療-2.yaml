@@ -3,7 +3,7 @@ flow:
   facility: 国立成育研究医療センター
   author: トシTuan
   createdAt: 2026-07-08 10:06
-  updatedAt: 2026-07-10 00:56
+  updatedAt: 2026-07-10 01:31
   start: welcome
   nodes:
     - id: welcome
@@ -37,6 +37,152 @@ flow:
       type: logic
       description: ""
       moduleType: Script
+      script: |-
+        var logger = $runner.getLogger();
+
+        // 入力取得（string / {text} 両対応）
+        var r = $runner.getModuleResult("interaction_1");
+        var text = (r && typeof r === "object" && r.text) ? String(r.text) : (r == null ? "" : String(r));
+        text = text.trim();
+        logger.info("raw input: " + text);
+
+        // 正規化（全角数字→半角、カナ→ひらがな）
+        function normalize(s) {
+          if (!s) return "";
+          var n = s.replace(/[０-９]/g, function(c) {
+            return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+          });
+          n = n.replace(/[Ａ-Ｚａ-ｚ]/g, function(c) {
+            return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+          });
+          n = n.replace(/[ァ-ヶ]/g, function(c) {
+            return String.fromCharCode(c.charCodeAt(0) - 0x60);
+          });
+          // 記号・空白・読点などを削除
+          n = n.replace(/[\s\t\r\n　、。・「」『』（）()［］\[\]！？!？‐\-―]/g, "");
+          return n;
+        }
+
+        // REPEAT 判定用（聞き返し要求）
+        function isRepeat(n) {
+          if (!n) return false;
+          if (/(もういちど|もう一度|もういっかい|もう一回|くりかえし|繰り返し)/.test(n)) return true;
+          if (/^(くりかえして|もういちどきかせて|もういちどおねがい|もういっかいおねがい)$/.test(n)) return true;
+          return false;
+        }
+
+        // DTMF 単独入力を優先判定
+        function classifyByDtmf(raw) {
+          var t = raw.replace(/\s/g, "");
+          if (!/^[0-9]$/.test(t)) return null;
+          if (t === "1") return "予約";
+          if (t === "2") return "変更";
+          if (t === "3") return "キャンセル";
+          if (t === "4") return "その他お問い合わせ";
+          return null;
+        }
+
+        function classify(rawText) {
+          if (!rawText) return "NO_RESULT";
+
+          // DTMF 単独数字判定
+          var byDtmf = classifyByDtmf(rawText);
+          if (byDtmf) return byDtmf;
+
+          var n = normalize(rawText);
+          logger.info("normalized input: " + n);
+          if (n.length === 0) return "NO_RESULT";
+
+          // REPEAT
+          if (isRepeat(n)) return "REPEAT";
+
+          // キャンセル（3番）を最優先
+          if (/^3$/.test(n) || /3(ばん|番)/.test(n)) return "キャンセル";
+          if (/キャンセル|きゃんせる|取消|とりけし/.test(n)) return "キャンセル";
+
+          // 変更（2番）
+          if (/^2$/.test(n) || /2(ばん|番)/.test(n)) return "変更";
+          if (/変更|へんこう|かえたい|かえます|日にちをかえ|時間をかえ/.test(n)) return "変更";
+
+          // 新規予約（1番） → 出力は「予約」
+          if (/^1$/.test(n) || /1(ばん|番)/.test(n)) return "予約";
+          if (/新規予約|しんきよやく|しんきでよやく|あたらしくよやく|はじめてのよやく/.test(n)) return "予約";
+          if (/予約|よやく/.test(n)) return "予約";
+
+          // その他お問い合わせ（4番）
+          if (/^4$/.test(n) || /4(ばん|番)/.test(n)) return "その他お問い合わせ";
+          if (/その他|そのた|ほかのおといあわせ|ほかのお問い合わせ|問い合わせ|といあわせ|質問|しつもん/.test(n)) {
+            return "その他お問い合わせ";
+          }
+
+          // どれにもはっきり該当しない
+          return "NO_RESULT";
+        }
+
+        var result = classify(text);
+
+        // classification をコンテキストに保存（REPEAT/NO_RESULT は保存しない）
+        if (result !== "NO_RESULT" && result !== "REPEAT") {
+          try {
+            $ivr.exec("save2db", "save", JSON.stringify({
+              contextField: {
+                contextName: "classification",
+                displayType: "CLASSIFICATION",
+                value: result
+              }
+            }));
+            $runner.setObject("classification", result);
+          } catch (e) {
+            logger.error(e);
+          }
+        }
+
+        logger.info("classification result: " + result);
+        $runner.setResult(result);
+      scriptExplanation: |-
+        (1) Script này làm gì
+        - Lấy kết quả nhập từ node `interaction_1` (có thể là text ASR hoặc DTMF).
+        - Chuẩn hóa câu nói: chuyển số/ký tự full-width → half-width, Katakana → Hiragana, loại bỏ khoảng trắng, dấu câu, ký hiệu.
+        - Nếu người dùng chỉ bấm 1 phím DTMF (1–4) thì ưu tiên dùng luôn phím đó để phân loại.
+        - Nhận diện người dùng yêu cầu “nghe lại” (repeat).
+        - Phân loại nội dung thành các nhóm: 予約 (đặt mới), 変更 (thay đổi), キャンセル (hủy), その他お問い合わせ (các hỏi đáp/khác), hoặc NO_RESULT (không rõ).
+        - Nếu là một trong 4 loại chính (khác REPEAT/NO_RESULT) thì lưu kết quả phân loại vào DB/context.
+        - Trả về chuỗi kết quả phân loại đó cho node Logic để rẽ nhánh.
+
+        (2) Các giá trị return có thể có và ý nghĩa
+        - "予約"  
+          - Người dùng muốn “đặt chỗ / đặt lịch mới”.  
+          - Khớp khi:  
+            - Bấm DTMF "1", hoặc nói “1番/1ばん”.  
+            - Nói các cụm như: 新規予約, しんきよやく, しんきでよやく, あたらしくよやく, はじめてのよやく, 予約, よやく...
+
+        - "変更"  
+          - Người dùng muốn “thay đổi / đổi ngày giờ đặt chỗ”.  
+          - Khớp khi:  
+            - Bấm DTMF "2", hoặc nói “2番/2ばん”.  
+            - Nói các cụm như: 変更, へんこう, かえたい, かえます, 日にちをかえ..., 時間をかえ...
+
+        - "キャンセル"  
+          - Người dùng muốn “hủy đặt chỗ”.  
+          - Được ưu tiên xét trước các loại khác.  
+          - Khớp khi:  
+            - Bấm DTMF "3", hoặc nói “3番/3ばん”.  
+            - Nói các cụm như: キャンセル, きゃんせる, 取消, とりけし...
+
+        - "その他お問い合わせ"  
+          - Người dùng muốn “các loại hỏi đáp khác / liên hệ khác”.  
+          - Khớp khi:  
+            - Bấm DTMF "4", hoặc nói “4番/4ばん”.  
+            - Nói các cụm như: その他, そのた, ほかのおといあわせ, ほかのお問い合わせ, 問い合わせ/といあわせ, 質問/しつもん...
+
+        - "REPEAT"  
+          - Người dùng yêu cầu “nghe lại / lặp lại lời thoại”.  
+          - Khớp khi: nói các mẫu như: もういちど, もう一度, もういっかい, もう一回, くりかえし, 繰り返し, くりかえして, もういちどきかせて, もういちどおねがい, もういっかいおねがい...  
+          - Không được lưu vào context/DB, chỉ dùng để rẽ nhánh xử lý “nghe lại”.
+
+        - "NO_RESULT"  
+          - Không có input, hoặc sau khi chuẩn hóa thì chuỗi rỗng, hoặc câu nói không khớp rõ ràng với bất kỳ nhóm nào ở trên.  
+          - Không lưu vào context/DB, thường dùng để rẽ nhánh sang xử lý “nghe không hiểu / yêu cầu nói lại”.
       branches:
         - default: interaction_1
           label: retry
