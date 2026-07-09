@@ -35,6 +35,12 @@ jobs:
           # Client ID (không phải secret) — set ở Settings > Secrets and variables > Actions.
           # Chấp nhận cả tab "Secrets" LẪN tab "Variables" để tránh cấu hình nhầm chỗ.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || vars.VITE_GOOGLE_CLIENT_ID }}
+          # OpenAI API key cho tính năng "AIで生成・修正". Là secret nhưng SẼ nằm trong
+          # bundle tĩnh sau build (app không có backend) — chấp nhận cả tab "Secrets"
+          # LẪN "Variables" để tránh cấu hình nhầm chỗ.
+          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY || vars.VITE_OPENAI_API_KEY }}
+          # Model tuỳ chọn — bỏ trống thì dùng mặc định gpt-5.1 (xem src/ai/config.ts).
+          VITE_OPENAI_MODEL: ${{ secrets.VITE_OPENAI_MODEL || vars.VITE_OPENAI_MODEL }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

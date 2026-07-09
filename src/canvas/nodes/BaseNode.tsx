@@ -53,17 +53,21 @@ export function makeNode(nodeType: NodeType) {
         onMouseEnter={showPreview}
         onMouseLeave={hidePreview}
       >
-        {/* Hover / chọn node -> xem nhanh các property đang set (bên phải node). */}
-        <NodeToolbar
-          isVisible={(hovered || selected) && !isPanning}
-          position={Position.Right}
-          offset={12}
-          align="start"
-        >
-          <div onMouseEnter={showPreview} onMouseLeave={hidePreview}>
-            <NodePreview type={nodeType} data={d.nodeData} />
-          </div>
-        </NodeToolbar>
+        {/* Hover / chọn node -> xem nhanh các property đang set (bên phải node).
+            Node không có property nào cũng không có mô tả (vd hangup) thì KHÔNG hiện
+            preview — tránh card "không có tham số" vô nghĩa. */}
+        {hasPreviewContent(nodeType, d.nodeData) && (
+          <NodeToolbar
+            isVisible={(hovered || selected) && !isPanning}
+            position={Position.Right}
+            offset={12}
+            align="start"
+          >
+            <div onMouseEnter={showPreview} onMouseLeave={hidePreview}>
+              <NodePreview type={nodeType} data={d.nodeData} />
+            </div>
+          </NodeToolbar>
+        )}
 
         {/* Thanh công cụ nổi phía trên node khi được chọn (bấm vào node).
             Ẩn trong lúc kéo/di chuyển canvas để không hiện lơ lửng sai chỗ. */}
@@ -147,21 +151,22 @@ function pickDescription(data: Record<string, unknown>): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
+// Preview có gì để hiện không: còn ít nhất 1 property (đang set/áp default) hoặc có
+// mô tả. Node như hangup không có field nào & không mô tả -> false, ẩn hẳn preview.
+function hasPreviewContent(type: NodeType, data: Record<string, unknown>): boolean {
+  const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
+  return fields.length > 0 || pickDescription(data) !== null;
+}
+
 // ── Preview property (hover/chọn node) ──────────────────────────────────────
 // Card nhỏ bên phải node: liệt kê các property đang set. Giá trị dài (announce,
 // prompt…) cắt 1 dòng + "…" cho vừa bề rộng card (xử lý bằng CSS text-ellipsis).
+// Chỉ render khi hasPreviewContent = true (component cha đã gác) nên không cần
+// nhánh "không có tham số" nữa.
 function NodePreview({ type, data }: { type: NodeType; data: Record<string, unknown> }) {
   const t = useT();
   const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
   const description = pickDescription(data);
-
-  if (fields.length === 0 && !description) {
-    return (
-      <div className="bk-node-preview">
-        <div className="bk-node-preview-empty">{t('noPropertyNote')}</div>
-      </div>
-    );
-  }
 
   return (
     <div className="bk-node-preview">
