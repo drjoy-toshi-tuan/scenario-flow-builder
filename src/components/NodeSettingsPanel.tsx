@@ -24,7 +24,7 @@ import { refreshScriptExplanation } from '../ai/explain';
 import { CodeEditor } from './CodeEditor';
 import { RegexBranchInput } from './RegexBranchInput';
 import { AutoGrowTextarea } from './AutoGrowTextarea';
-import { HoverTip } from './HoverTip';
+import { HoverTip, useClipTip } from './HoverTip';
 import { AiGenerateButton, ScriptExplain } from './AiFieldExtras';
 
 // Key giải thích ý nghĩa loại node trong từ điển i18n (exStart, exAnnounce, …).
@@ -732,15 +732,15 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
               <div key={b.id} className="bk-branch-row">
                 <div className="bk-branch-cond">
                   {/* VALUE: tên nhánh cố định neo ^…$ (giữ nguyên, không sửa). */}
-                  <span className="bk-branch-fixed" title={value}>
+                  <HoverTip className="bk-branch-fixed" content={value}>
                     {value}
-                  </span>
+                  </HoverTip>
                 </div>
                 <div className="bk-branch-label-col">
                   {/* LABEL: nhãn hiển thị (次へ / 失敗), read-only. */}
-                  <span className="bk-branch-fixed" title={label}>
+                  <HoverTip className="bk-branch-fixed" content={label}>
                     {label}
-                  </span>
+                  </HoverTip>
                 </div>
                 <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
                 <div className="bk-branch-target">
@@ -796,18 +796,17 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
                     onChange={(v) => draftUpdateBranch(b.id, v)}
                   />
                 ) : isCatchAll ? (
-                  <input
+                  // Read-only nhưng vẫn cho trỏ chuột vào & KÉO để cuộn xem hết chuỗi dài;
+                  // hover mà bị cắt "…" -> tooltip full text (xem ReadonlyBranchValue).
+                  <ReadonlyBranchValue
                     className={`${inputClass} !mt-0 w-full font-mono bk-branch-catchall`}
                     value={catchAllValue}
-                    readOnly
-                    tabIndex={-1}
-                    title={t('branchElse')}
                   />
                 ) : pairMode ? (
                   // Value nhánh Pair khoá cứng ^Pair{n}$ (hiển thị kèm neo như nhánh cố định).
-                  <span className="bk-branch-fixed" title={`^${b.value}$`}>
+                  <HoverTip className="bk-branch-fixed" content={`^${b.value}$`}>
                     {`^${b.value}$`}
-                  </span>
+                  </HoverTip>
                 ) : (
                   <RegexBranchInput
                     className={`${inputClass} !mt-0 w-full font-mono`}
@@ -858,6 +857,27 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
         </button>
       )}
     </div>
+  );
+}
+
+// Ô value read-only (nhánh catch-all): không cho sửa nhưng vẫn cho trỏ chuột vào &
+// KÉO để cuộn ngang xem hết chuỗi dài; nếu bị cắt "…" thì hover hiện tooltip full text
+// (giống preview property trên canvas). Không dùng title gốc -> tránh 2 tầng tooltip.
+function ReadonlyBranchValue({ value, className }: { value: string; className: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const { onMouseEnter, onMouseLeave, tip } = useClipTip(ref, value);
+  return (
+    <>
+      <input
+        ref={ref}
+        className={className}
+        value={value}
+        readOnly
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />
+      {tip}
+    </>
   );
 }
 

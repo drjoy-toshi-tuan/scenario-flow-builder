@@ -20,6 +20,7 @@ interface OutBranch {
 
 interface OutNode {
   id: string;
+  name?: string;
   type: string;
   [key: string]: unknown;
   next?: string;
@@ -66,6 +67,9 @@ function serializeGraph(
     if (node.id === SYNTHETIC_START_ID) continue; // start là field, không phải node YAML
 
     const out: OutNode = { id: node.id, type: node.type };
+    // Tên hiển thị (label) do người dùng đặt — LƯU thành field `name` để mở lại không
+    // mất tên. Chỉ ghi khi khác id (tránh rải field thừa cho node chưa đổi tên).
+    if (node.label && node.label !== node.id) out.name = node.label;
     // Trải phẳng data (text/prompt/mode/…) trở lại cấp node. Bỏ 'branches' vì đó là
     // dữ liệu cấu trúc (nhánh tự do), sẽ được dựng lại thành field branches bên dưới.
     for (const [key, value] of Object.entries(node.data)) {

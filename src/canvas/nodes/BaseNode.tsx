@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { Handle, NodeToolbar, Position, type NodeProps } from '@xyflow/react';
+import { Handle, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow/react';
 import type { RFNodeData } from '../irAdapter';
 import type { NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
@@ -14,7 +14,8 @@ import { HoverTip } from '../../components/HoverTip';
 //   - Bên TRÁI: icon của loại node (tile màu accent).
 //   - Bên phải xếp dọc: (trên) tên LOẠI module · (giữa) TÊN module · (dưới) mô tả.
 // Node 'condition' có nhiều handle output ở đáy (mỗi nhánh 1 chấm), chia đều & giữa.
-// Khi node được chọn -> hiện thanh công cụ phía trên (Sửa / Xoá) qua NodeToolbar.
+// Chọn ĐÚNG 1 node -> hiện thanh công cụ phía trên (Sửa / Xoá) qua NodeToolbar;
+// chọn NHIỀU node thì không hiện (chỉ là chọn). Preview property chỉ hiện khi HOVER.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Factory tạo 1 component node cho mỗi NodeType — tránh lặp markup.
@@ -30,6 +31,15 @@ export function makeNode(nodeType: NodeType) {
     const selectNode = useFlowStore((s) => s.selectNode);
     const requestDeleteNode = useFlowStore((s) => s.requestDeleteNode);
     const isPanning = useFlowStore((s) => s.isPanning);
+    // Số node đang chọn: khi chọn NHIỀU node (kéo khung / Shift-click) thì KHÔNG hiện
+    // thanh Sửa/Xoá trên từng node — chỉ đơn thuần là chọn. Chỉ hiện khi chọn đúng 1 node.
+    const multiSelected = useStore((s) => {
+      let count = 0;
+      for (const n of s.nodeLookup.values()) {
+        if (n.selected && ++count > 1) return true;
+      }
+      return false;
+    });
     const t = useT();
     const [hovered, setHovered] = useState(false);
     // Giữ preview mở khi rê chuột từ node sang card preview (có khoảng hở 12px):
@@ -58,7 +68,7 @@ export function makeNode(nodeType: NodeType) {
             preview — tránh card "không có tham số" vô nghĩa. */}
         {hasPreviewContent(nodeType, d.nodeData) && (
           <NodeToolbar
-            isVisible={(hovered || selected) && !isPanning}
+            isVisible={hovered && !isPanning}
             position={Position.Right}
             offset={12}
             align="start"
@@ -72,7 +82,7 @@ export function makeNode(nodeType: NodeType) {
         {/* Thanh công cụ nổi phía trên node khi được chọn (bấm vào node).
             Ẩn trong lúc kéo/di chuyển canvas để không hiện lơ lửng sai chỗ. */}
         <NodeToolbar
-          isVisible={selected && !isPanning}
+          isVisible={selected && !multiSelected && !isPanning}
           position={Position.Top}
           offset={10}
           align="center"

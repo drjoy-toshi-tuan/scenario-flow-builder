@@ -378,11 +378,12 @@ body {
 .bk-branch-arrow-spacer {
   flex: 0 0 18px;
 }
-/* Nhãn nhánh cố định (FAILED/NEXT) — trông như ô read-only, canh cao bằng input. */
+/* Nhãn nhánh cố định (FAILED/NEXT) — trông như ô read-only, canh cao bằng input.
+   Text dài -> cắt "…" (block + line-height canh giữa dọc); hover xem full (HoverTip). */
 .bk-branch-fixed {
-  display: flex;
-  align-items: center;
+  display: block;
   height: 38px;
+  line-height: 36px; /* = 38 - 2*border, canh giữa theo chiều dọc */
   width: 100%;
   padding: 0 12px;
   border-radius: 8px;
@@ -392,11 +393,16 @@ body {
   font-weight: 700;
   letter-spacing: 0.3px;
   color: var(--bk-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-/* Ô nhánh catch-all (else) — read-only, chữ mờ để phân biệt. */
+/* Ô nhánh catch-all (else) — read-only, chữ mờ để phân biệt. Cho cuộn ngang xem hết
+   chuỗi dài (kéo chuột trong ô); không xuống dòng. */
 .bk-branch-catchall {
   color: var(--bk-text-faint);
-  cursor: default;
+  cursor: text;
+  text-overflow: ellipsis;
 }
 /* Tag node đích: nền = màu đại diện của node (biến --tagc).
    Dùng inline-block (không inline-flex) để text-overflow ellipsis (…) hiển thị được;

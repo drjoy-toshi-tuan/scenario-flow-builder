@@ -35,6 +35,7 @@ interface RawBranch {
 
 interface RawNode {
   id: string;
+  name?: string; // tên hiển thị (label) do người dùng đặt
   type: string;
   next?: string;
   branches?: RawBranch[];
@@ -61,7 +62,8 @@ interface RawFlowFile {
 }
 
 // Field mang tính "cấu trúc" (không phải tham số riêng của node) — không đưa vào data.
-const STRUCTURAL_KEYS = new Set(['id', 'type', 'next', 'branches']);
+// `name` = tên hiển thị (label) do người dùng đặt; đọc riêng ra node.label.
+const STRUCTURAL_KEYS = new Set(['id', 'name', 'type', 'next', 'branches']);
 
 function coerceNodeType(raw: string): NodeType {
   if (raw in LEGACY_TYPE_ALIASES) return LEGACY_TYPE_ALIASES[raw]; // file cũ: input/condition/script/llm
@@ -129,7 +131,8 @@ function parseGraph(
     const node: FlowNode = {
       id: raw.id,
       type: nodeType,
-      label: raw.id,
+      // Tên hiển thị: ưu tiên field `name` (label người dùng đặt), fallback về id.
+      label: typeof raw.name === 'string' && raw.name.trim() ? raw.name : raw.id,
       position: { x: 0, y: 0 }, // ELK sẽ điền lại ở layout.ts
       data,
     };

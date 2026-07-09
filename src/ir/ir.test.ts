@@ -90,6 +90,28 @@ describe('fromYaml', () => {
 });
 
 describe('toYaml round-trip', () => {
+  it('giữ TÊN node (label) qua save/reopen: field `name`', () => {
+    const ir = fromYaml(SAMPLE);
+    // Người dùng đổi tên node 'greet' -> label mới.
+    const renamed = {
+      ...ir,
+      nodes: ir.nodes.map((n) => (n.id === 'greet' ? { ...n, label: '冒頭アナウンス' } : n)),
+    };
+    const yaml = toYaml(renamed);
+    // YAML ghi field `name` cho node đã đổi tên (khác id), không ghi cho node chưa đổi.
+    const parsed = parse(yaml) as {
+      flow: { nodes: Array<{ id: string; name?: string }> };
+    };
+    const greet = parsed.flow.nodes.find((n) => n.id === 'greet')!;
+    expect(greet.name).toBe('冒頭アナウンス');
+    const classify = parsed.flow.nodes.find((n) => n.id === 'classify')!;
+    expect(classify.name).toBeUndefined(); // chưa đổi tên -> label === id -> không ghi
+    // Mở lại: label được khôi phục từ `name` (không rớt về id).
+    const reopened = fromYaml(yaml);
+    expect(reopened.nodes.find((n) => n.id === 'greet')?.label).toBe('冒頭アナウンス');
+    expect(reopened.nodes.find((n) => n.id === 'classify')?.label).toBe('classify');
+  });
+
   it('IR -> YAML tái tạo cấu trúc flow', () => {
     const ir = fromYaml(SAMPLE);
     const yaml = toYaml(ir);
