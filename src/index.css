@@ -711,43 +711,33 @@ body {
   }
 }
 
-/* Nút "AI Generate": glow tím đập nhẹ (pulse) để nổi bật.
-   Chữ dùng text-shadow; icon SVG phải dùng drop-shadow (text-shadow không ăn
-   vào fill của SVG). 2 animation đồng bộ chu kỳ 2.2s. */
-@keyframes bk-ai-glow {
+/* Nút "AI Generate": hiệu ứng "lấp lánh" (shimmer) — KHÔNG glow.
+   Màu gốc (#d946ef) là điểm TỐI NHẤT; brightness được kéo sáng lên một chút
+   rồi trở lại màu gốc, lặp lại để tạo cảm giác lấp lánh. Dùng brightness (+
+   nhích saturate) ăn vào cả chữ lẫn fill của SVG nên chỉ cần 1 animation.
+   Chu kỳ lệch nhẹ + 2 đỉnh sáng để trông như "nhấp nháy" thay vì pulse đều. */
+@keyframes bk-ai-sparkle {
   0%,
   100% {
-    text-shadow: 0 0 6px rgba(217, 70, 239, 0.55), 0 0 12px rgba(217, 70, 239, 0.25);
+    filter: brightness(1) saturate(1);
   }
-  50% {
-    text-shadow: 0 0 12px rgba(217, 70, 239, 0.95), 0 0 22px rgba(217, 70, 239, 0.5);
+  30% {
+    filter: brightness(1.4) saturate(1.15);
   }
-}
-@keyframes bk-ai-glow-icon {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 3px rgba(217, 70, 239, 0.6));
+  55% {
+    filter: brightness(1.08) saturate(1.02);
   }
-  50% {
-    filter: drop-shadow(0 0 6px rgba(217, 70, 239, 0.95));
+  75% {
+    filter: brightness(1.32) saturate(1.12);
   }
 }
-.bk-ai-glow {
-  animation: bk-ai-glow 2.2s infinite ease-in-out;
-}
-.bk-ai-glow svg {
-  animation: bk-ai-glow-icon 2.2s infinite ease-in-out;
+.bk-ai-sparkle {
+  animation: bk-ai-sparkle 2.6s infinite ease-in-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  .bk-ai-glow,
-  .bk-ai-glow svg {
+  .bk-ai-sparkle {
     animation: none;
-  }
-  .bk-ai-glow {
-    text-shadow: 0 0 8px rgba(217, 70, 239, 0.7);
-  }
-  .bk-ai-glow svg {
-    filter: drop-shadow(0 0 4px rgba(217, 70, 239, 0.8));
+    filter: none;
   }
 }
 

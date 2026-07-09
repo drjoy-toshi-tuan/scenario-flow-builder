@@ -57,7 +57,7 @@ export function AiGenerateButton({
       <button
         type="button"
         onClick={() => setShowModal(true)}
-        className="bk-ai-glow flex shrink-0 items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold transition hover:brightness-90"
+        className="bk-ai-sparkle flex shrink-0 items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold transition hover:brightness-90"
         style={{ color: AI_PURPLE }}
       >
         <AiSparkleIcon size={16} />
