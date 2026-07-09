@@ -90,6 +90,42 @@ describe('fromYaml', () => {
 });
 
 describe('toYaml round-trip', () => {
+  it('giữ TOẠ ĐỘ node (position) qua save/reopen — không auto-layout lại', () => {
+    const withPos = `
+flow:
+  name: "f"
+  start: a
+  startPosition: { x: 96, y: 40 }
+  nodes:
+    - id: a
+      type: announce
+      text: "hi"
+      position: { x: 96, y: 200 }
+      next: b
+    - id: b
+      type: hangup
+      position: { x: 96, y: 360 }
+`;
+    const ir = fromYaml(withPos);
+    // Toạ độ đọc đúng: node thật + node Start tổng hợp.
+    expect(ir.nodes.find((n) => n.id === 'a')?.position).toEqual({ x: 96, y: 200 });
+    expect(ir.nodes.find((n) => n.id === 'b')?.position).toEqual({ x: 96, y: 360 });
+    expect(ir.nodes.find((n) => n.id === SYNTHETIC_START_ID)?.position).toEqual({ x: 96, y: 40 });
+    // Toạ độ không phải toàn (0,0) -> loadYaml sẽ GIỮ NGUYÊN (không ELK layout lại).
+    expect(ir.nodes.every((n) => n.position.x === 0 && n.position.y === 0)).toBe(false);
+    // Round-trip: toYaml ghi lại position từng node + flow.startPosition.
+    const parsed = parse(toYaml(ir)) as {
+      flow: { startPosition?: { x: number; y: number }; nodes: Array<{ id: string; position?: { x: number; y: number } }> };
+    };
+    expect(parsed.flow.startPosition).toEqual({ x: 96, y: 40 });
+    expect(parsed.flow.nodes.find((n) => n.id === 'a')?.position).toEqual({ x: 96, y: 200 });
+  });
+
+  it('file cũ KHÔNG có position -> mọi node (0,0) (loadYaml sẽ auto-layout)', () => {
+    const ir = fromYaml(SAMPLE);
+    expect(ir.nodes.every((n) => n.position.x === 0 && n.position.y === 0)).toBe(true);
+  });
+
   it('giữ TÊN node (label) qua save/reopen: field `name`', () => {
     const ir = fromYaml(SAMPLE);
     // Người dùng đổi tên node 'greet' -> label mới.

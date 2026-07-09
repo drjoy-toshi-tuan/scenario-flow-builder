@@ -18,10 +18,16 @@ interface OutBranch {
   label?: string;
 }
 
+interface Pos {
+  x: number;
+  y: number;
+}
+
 interface OutNode {
   id: string;
   name?: string;
   type: string;
+  position?: Pos;
   [key: string]: unknown;
   next?: string;
   branches?: OutBranch[];
@@ -29,6 +35,11 @@ interface OutNode {
 
 function outgoing(edges: FlowEdge[], nodeId: string): FlowEdge[] {
   return edges.filter((e) => e.source === nodeId);
+}
+
+// Toạ độ node -> số nguyên (gọn YAML). ELK trả số thực; kéo tay bám lưới 16px.
+function roundPos(p: { x: number; y: number }): Pos {
+  return { x: Math.round(p.x), y: Math.round(p.y) };
 }
 
 // Map handleId -> { value điều kiện, label hiển thị }, đọc từ node.data.branches.
@@ -52,14 +63,17 @@ function readDataBranches(data: Record<string, unknown>): Map<string, BranchInfo
   return map;
 }
 
-// Serialize 1 graph (main flow hoặc sub flow) -> { start, nodes } dạng YAML.
+// Serialize 1 graph (main flow hoặc sub flow) -> { start, startPosition, nodes }.
 function serializeGraph(
   irNodes: FlowIR['nodes'],
   irEdges: FlowEdge[],
-): { start?: string; nodes: OutNode[] } {
+): { start?: string; startPosition?: Pos; nodes: OutNode[] } {
   // Điểm bắt đầu = target của edge đi ra từ node 'start' tổng hợp (nếu có).
   const startEdge = irEdges.find((e) => e.source === SYNTHETIC_START_ID);
   const start = startEdge?.target;
+  // Toạ độ node Start tổng hợp lưu riêng (flow.startPosition) vì nó không là node YAML.
+  const startNode = irNodes.find((n) => n.id === SYNTHETIC_START_ID);
+  const startPosition = startNode ? roundPos(startNode.position) : undefined;
 
   const outNodes: OutNode[] = [];
 
@@ -70,6 +84,8 @@ function serializeGraph(
     // Tên hiển thị (label) do người dùng đặt — LƯU thành field `name` để mở lại không
     // mất tên. Chỉ ghi khi khác id (tránh rải field thừa cho node chưa đổi tên).
     if (node.label && node.label !== node.id) out.name = node.label;
+    // Toạ độ node -> LƯU để mở lại giữ nguyên bố cục (không auto-layout lại mỗi lần mở).
+    out.position = roundPos(node.position);
     // Trải phẳng data (text/prompt/mode/…) trở lại cấp node. Bỏ 'branches' vì đó là
     // dữ liệu cấu trúc (nhánh tự do), sẽ được dựng lại thành field branches bên dưới.
     for (const [key, value] of Object.entries(node.data)) {
@@ -117,7 +133,7 @@ function serializeGraph(
     outNodes.push(out);
   }
 
-  return { ...(start ? { start } : {}), nodes: outNodes };
+  return { ...(start ? { start } : {}), ...(startPosition ? { startPosition } : {}), nodes: outNodes };
 }
 
 export function toYaml(ir: FlowIR): string {
@@ -138,6 +154,7 @@ export function toYaml(ir: FlowIR): string {
       ...(ir.meta.createdAt ? { createdAt: ir.meta.createdAt } : {}),
       ...(ir.meta.updatedAt ? { updatedAt: ir.meta.updatedAt } : {}),
       ...(main.start ? { start: main.start } : {}),
+      ...(main.startPosition ? { startPosition: main.startPosition } : {}),
       nodes: main.nodes,
       ...(subflows.length > 0 ? { subflows } : {}),
     },

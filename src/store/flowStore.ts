@@ -384,8 +384,13 @@ export const useFlowStore = create<FlowState>((set, get) => {
     ivrCreatedAt: formatDateTime(new Date()),
 
     loadYaml: async (text) => {
-      const ir = fromYaml(text);
-      const laidOut = await layout(ir);
+      const parsed = fromYaml(text);
+      // File đã lưu toạ độ (mọi lần lưu đều ghi position) -> GIỮ NGUYÊN bố cục, không
+      // auto-layout lại. Chỉ ELK layout khi toạ độ trống (file cũ / viết tay: tất cả 0,0).
+      const needsLayout =
+        parsed.nodes.length > 1 &&
+        parsed.nodes.every((n) => n.position.x === 0 && n.position.y === 0);
+      const laidOut = needsLayout ? await layout(parsed) : parsed;
       // Seed 施設名 từ meta.facility nếu người dùng chưa nhập.
       const { ivr } = get();
       const nextIvr =
