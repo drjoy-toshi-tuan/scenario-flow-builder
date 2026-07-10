@@ -49,7 +49,7 @@ export function LoginScreen() {
           className="pointer-events-none absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--bk-accent)] opacity-[0.08] blur-[100px]"
         />
 
-        <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-8 shadow-[var(--bk-shadow)]">
+        <div className="relative w-full max-w-[480px] overflow-hidden rounded-3xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-8 shadow-[var(--bk-shadow)]">
           {/* Dải accent mảnh trên đỉnh thẻ */}
           <div
             aria-hidden
