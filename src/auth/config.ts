@@ -18,3 +18,24 @@ export const ALLOWED_ISSUERS = ['accounts.google.com', 'https://accounts.google.
 // Độ lệch đồng hồ cho phép (giây) khi kiểm tra exp/iat — tránh loại nhầm token
 // hợp lệ do lệch giờ nhẹ giữa client và Google.
 export const CLOCK_SKEW_SECONDS = 60;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Thời hạn PHIÊN của app (tách khỏi exp ~1 giờ của ID token Google).
+//
+// ID token Google chỉ sống ~1 giờ; nếu buộc đăng xuất đúng lúc token hết hạn thì
+// người dùng bị đá ra sau ~1 giờ dù vẫn đang dùng bình thường. Vì gating domain ở
+// client CHỈ là cổng UX (không có backend, không quyết định bảo mật — xem README
+// §Bảo mật), ta duy trì phiên theo một "cửa sổ idle trượt" riêng: mỗi lần có thao
+// tác thì gia hạn thêm, chỉ đăng xuất khi KHÔNG thao tác suốt quá thời hạn này.
+//
+// Đổi qua env `VITE_SESSION_IDLE_MINUTES` (phút). Mặc định 12 giờ ~ đủ một ngày làm việc.
+const DEFAULT_SESSION_IDLE_MINUTES = 12 * 60;
+
+function readIdleMinutes(): number {
+  const raw = import.meta.env.VITE_SESSION_IDLE_MINUTES;
+  const parsed = typeof raw === 'string' ? Number.parseFloat(raw) : NaN;
+  // Chỉ nhận số dương hợp lệ; ngược lại dùng mặc định.
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_SESSION_IDLE_MINUTES;
+}
+
+export const SESSION_IDLE_TIMEOUT_MS = readIdleMinutes() * 60 * 1000;

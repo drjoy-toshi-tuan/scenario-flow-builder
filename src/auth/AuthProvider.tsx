@@ -1,14 +1,26 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthContext, type AuthUser } from './context';
-import { GOOGLE_CLIENT_ID } from './config';
+import { GOOGLE_CLIENT_ID, SESSION_IDLE_TIMEOUT_MS } from './config';
 
 const STORAGE_KEY = 'brekeke-flow-builder.auth';
 
-// Session còn hợp lệ không? Nếu ID token đã hết hạn (exp) thì coi như hết phiên.
+// Các sự kiện coi là "người dùng đang thao tác" — mỗi lần xảy ra thì gia hạn phiên.
+const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'] as const;
+
+// Chu kỳ (ms) kiểm tra idle + ghi lại hạn phiên xuống storage. Nhỏ hơn nhiều so với
+// SESSION_IDLE_TIMEOUT_MS nên phát hiện hết hạn gần như tức thời mà không tốn tài nguyên.
+const CHECK_INTERVAL_MS = 30_000;
+
+// Session còn hợp lệ không? Phiên app tính theo `sessionExpiresAt` (cửa sổ idle trượt),
+// KHÔNG theo exp ~1 giờ của ID token Google — tránh đá người dùng ra khi vẫn đang dùng.
 function isStillValid(user: AuthUser): boolean {
-  if (user.demo) return true; // chế độ demo không có exp.
-  if (typeof user.exp !== 'number') return true; // token cũ trước khi lưu exp — chấp nhận.
+  if (user.demo) return true; // chế độ demo không hết hạn.
+  if (typeof user.sessionExpiresAt === 'number') {
+    return user.sessionExpiresAt > Date.now();
+  }
+  // Phiên cũ (trước khi có sessionExpiresAt): fallback về exp token nếu có.
+  if (typeof user.exp !== 'number') return true;
   return user.exp * 1000 > Date.now();
 }
 
@@ -17,7 +29,7 @@ function loadStoredUser(): AuthUser | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const user = JSON.parse(raw) as AuthUser;
-    // Token hết hạn -> bỏ, buộc đăng nhập lại.
+    // Phiên hết hạn -> bỏ, buộc đăng nhập lại.
     if (!isStillValid(user)) {
       sessionStorage.removeItem(STORAGE_KEY);
       return null;
@@ -25,6 +37,14 @@ function loadStoredUser(): AuthUser | null {
     return user;
   } catch {
     return null;
+  }
+}
+
+function persistUser(user: AuthUser): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // sessionStorage không khả dụng — bỏ qua, giữ state trong bộ nhớ.
   }
 }
 
@@ -37,12 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadStoredUser);
 
   const authenticate = useCallback((next: AuthUser) => {
-    setUser(next);
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // sessionStorage không khả dụng — bỏ qua, giữ state trong bộ nhớ.
-    }
+    // Đóng dấu hạn phiên ban đầu = bây giờ + cửa sổ idle. Sẽ được gia hạn khi có thao tác.
+    const stamped: AuthUser = next.demo
+      ? next
+      : { ...next, sessionExpiresAt: Date.now() + SESSION_IDLE_TIMEOUT_MS };
+    setUser(stamped);
+    persistUser(stamped);
   }, []);
 
   const signOut = useCallback(() => {
@@ -54,16 +74,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Tự đăng xuất đúng thời điểm ID token hết hạn (không chờ tới lần load sau).
+  // ── Cửa sổ idle trượt: gia hạn phiên theo thao tác, tự đăng xuất khi idle quá lâu ──
+  // Dùng ref cho hạn phiên để KHÔNG re-render mỗi lần người dùng động vào (rẻ). Chỉ
+  // ghi xuống storage định kỳ để reload trang cũng giữ đúng hạn.
+  const expiresAtRef = useRef<number>(0);
   useEffect(() => {
-    if (!user || user.demo || typeof user.exp !== 'number') return;
-    const msLeft = user.exp * 1000 - Date.now();
-    if (msLeft <= 0) {
-      signOut();
-      return;
+    if (!user || user.demo) return; // demo không hết hạn.
+
+    expiresAtRef.current = user.sessionExpiresAt ?? Date.now() + SESSION_IDLE_TIMEOUT_MS;
+
+    // Mỗi thao tác đẩy hạn phiên xa thêm một cửa sổ idle (chỉ sửa ref — không re-render).
+    const bump = () => {
+      expiresAtRef.current = Date.now() + SESSION_IDLE_TIMEOUT_MS;
+    };
+    for (const evt of ACTIVITY_EVENTS) {
+      window.addEventListener(evt, bump, { passive: true });
     }
-    const timer = setTimeout(signOut, msLeft);
-    return () => clearTimeout(timer);
+
+    const tick = () => {
+      if (Date.now() >= expiresAtRef.current) {
+        signOut();
+        return;
+      }
+      // Lưu lại hạn mới để reload/tab khác thấy đúng trạng thái.
+      persistUser({ ...user, sessionExpiresAt: expiresAtRef.current });
+    };
+    const interval = window.setInterval(tick, CHECK_INTERVAL_MS);
+
+    return () => {
+      for (const evt of ACTIVITY_EVENTS) {
+        window.removeEventListener(evt, bump);
+      }
+      window.clearInterval(interval);
+    };
   }, [user, signOut]);
 
   const value = useMemo(

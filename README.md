@@ -101,7 +101,7 @@ Khi nhận ID token từ Google, [`src/auth/verifyIdToken.ts`](src/auth/verifyId
 
 - `iss` ∈ `accounts.google.com` / `https://accounts.google.com`
 - `aud` === `VITE_GOOGLE_CLIENT_ID` (token phát cho **đúng app này**)
-- `exp` còn hạn, `iat`/`nbf` không ở tương lai (có clock-skew 60s) → tự đăng xuất khi hết hạn
+- `exp` còn hạn, `iat`/`nbf` không ở tương lai (có clock-skew 60s) tại thời điểm đăng nhập
 - `hd` === `drjoy.jp` **và** email kết thúc bằng `@drjoy.jp` **và** `email_verified === true`
 - `nonce` khớp nonce ngẫu nhiên sinh trước mỗi lần đăng nhập (chống **replay**)
 - có `sub`
@@ -156,6 +156,15 @@ duyệt gọi thẳng **GitHub Contents API** bằng **fine-grained personal acc
 > khi token hết hạn hoặc bạn **"Ngắt kết nối"**). Không đưa vào bundle, không commit. Hãy cấp
 > **quyền tối thiểu** (đúng 1 repo, chỉ Contents) và **"Ngắt kết nối"** trước khi rời máy dùng chung.
 > (Đăng nhập Google vẫn theo `sessionStorage` — đóng tab/tắt trình duyệt là đăng nhập lại.)
+
+### Thời hạn phiên đăng nhập (không bị đá ra khi đang dùng)
+
+ID token của Google chỉ sống ~1 giờ. Trước đây app tự đăng xuất đúng lúc token hết hạn nên
+để lâu (kể cả vẫn đang mở) là bị buộc đăng nhập lại. Nay phiên app tính theo **cửa sổ idle
+trượt**: mỗi thao tác (chuột/bàn phím/cuộn…) gia hạn thêm, **chỉ đăng xuất khi KHÔNG thao tác
+liên tục quá thời hạn** (mặc định **12 giờ**, đổi qua `VITE_SESSION_IDLE_MINUTES`). Việc này
+tách khỏi `exp` của token Google — hợp lý vì gating domain ở client chỉ là **cổng UX** (khi có
+dữ liệu thật, verify server-side mới là ranh giới bảo mật thật, xem trên).
 
 Cấu hình repo/nhánh/thư mục qua biến `VITE_GITHUB_OWNER` / `VITE_GITHUB_REPO` /
 `VITE_FLOWS_BRANCH` / `VITE_FLOWS_DIR` (xem `.env.example`).
