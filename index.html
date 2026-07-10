@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Favicon SVG (Vite tự thêm tiền tố `base` khi build cho GitHub Pages) -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Favicon SVG (Vite tự thêm tiền tố `base` khi build cho GitHub Pages).
+         `?v=` là cache-buster: trình duyệt cache favicon rất "lì", tách khỏi cache
+         trang và không đổi kể cả hard-refresh. Tăng số này mỗi lần đổi favicon. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
     <meta name="theme-color" content="#ff7a1a" />
     <title>Brekeke Flow Builder</title>
     <!-- Phông chữ: Noto Sans (Latin + tiếng Việt, dấu câu chuẩn) & Noto Sans JP (tiếng Nhật) -->
