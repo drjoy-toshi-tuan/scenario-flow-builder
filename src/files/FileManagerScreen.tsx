@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useGithubToken } from '../github/token';
 import { GithubConnectPanel } from './GithubConnectPanel';
@@ -29,6 +29,12 @@ type FileRow = FlowFile & { meta: FlowMeta };
 
 // Bỏ đuôi .yaml/.yml khi hiển thị (danh sách chỉ hiện tên).
 const stripExt = (name: string) => name.replace(/\.ya?ml$/i, '');
+
+// Chuẩn hoá chuỗi cho tìm kiếm: NFKC (đồng nhất full/half-width tiếng Nhật) + thường + trim.
+const normalizeSearch = (s: string) => s.normalize('NFKC').toLowerCase().trim();
+
+// Các mức số dòng hiển thị mỗi trang (tối đa 50).
+const PAGE_SIZES = [20, 50] as const;
 
 // Tên file trên repo theo quy ước <tên bệnh viện>_<tên flow>.yaml.
 // (Màn quản lý vẫn hiển thị 2 phần tách riêng theo metadata trong file.)
@@ -114,6 +120,55 @@ export function FileManagerScreen() {
   const [renameScenario, setRenameScenario] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Tìm kiếm + phân trang ──
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]); // 20 mặc định
+  const [page, setPage] = useState(1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Lọc theo tên bệnh viện / tên kịch bản / người tạo. Ghép "施設名_シナリオ名" để
+  // gõ đúng chuỗi ghép là ra đúng kịch bản (khớp cả tên file theo quy ước).
+  const filtered = useMemo(() => {
+    const q = normalizeSearch(query);
+    if (!q) return files;
+    return files.filter((f) => {
+      const facility = f.meta.facility ?? '';
+      const scenario = f.meta.name ?? stripExt(f.name);
+      const author = f.meta.author ?? '';
+      const haystacks = [facility, scenario, author, `${facility}_${scenario}`, stripExt(f.name)];
+      return haystacks.some((h) => normalizeSearch(h).includes(q));
+    });
+  }, [files, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = useMemo(
+    () => filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filtered, safePage, pageSize],
+  );
+
+  // Về trang 1 khi đổi từ khoá / số dòng mỗi trang.
+  useEffect(() => {
+    setPage(1);
+  }, [query, pageSize]);
+
+  // Giữ trang trong khoảng hợp lệ (vd sau khi xoá file làm giảm số trang).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // Mở ô tìm kiếm -> focus; đóng -> xoá từ khoá.
+  const toggleSearch = () => {
+    setSearchOpen((open) => {
+      if (open) setQuery('');
+      return !open;
+    });
+  };
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -388,6 +443,7 @@ export function FileManagerScreen() {
 
           {/* Thanh hành động */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
+            {/* Tải file lên */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -397,6 +453,7 @@ export function FileManagerScreen() {
               <Icon icon="line-md:upload-loop" width={17} height={17} />
               {t('fmUpload')}
             </button>
+            {/* Tạo flow mới */}
             <button
               type="button"
               onClick={openNewModal}
@@ -406,16 +463,118 @@ export function FileManagerScreen() {
               <Icon icon="line-md:plus" width={17} height={17} />
               {t('fmNew')}
             </button>
+            {/* Làm mới — giữ cạnh nút Tạo flow mới */}
             <button
               type="button"
               onClick={() => void refresh()}
               disabled={loading || busy}
               title={t('fmRefresh')}
               aria-label={t('fmRefresh')}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--bk-text-muted)] transition-all duration-200 hover:-translate-y-0.5 hover:text-[var(--bk-accent)] active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--bk-text-muted)] transition-all duration-200 hover:-translate-y-0.5 hover:text-[var(--bk-accent)] active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
             >
               <Icon icon="lucide:refresh-cw" width={18} height={18} className={loading ? 'animate-spin' : ''} />
             </button>
+            {/* Nút tìm kiếm (icon line-md:search) — ngay sau nút Làm mới */}
+            <button
+              type="button"
+              onClick={toggleSearch}
+              title={t('fmSearch')}
+              aria-label={t('fmSearch')}
+              aria-pressed={searchOpen}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${
+                searchOpen
+                  ? 'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
+                  : 'text-[var(--bk-text-muted)] hover:text-[var(--bk-accent)]'
+              }`}
+            >
+              <Icon icon="line-md:search" width={18} height={18} />
+            </button>
+
+            {/* Ô tìm kiếm: bấm nút kính lúp -> input trượt ra, kéo dài về phía cụm chọn trang */}
+            <div
+              className={`relative flex items-center overflow-hidden transition-[flex-grow,opacity,margin] duration-300 ease-out ${
+                searchOpen ? 'ml-0.5 min-w-[160px] flex-1 opacity-100' : 'ml-0 w-0 flex-none opacity-0'
+              }`}
+            >
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') toggleSearch();
+                }}
+                placeholder={t('fmSearchPlaceholder')}
+                aria-label={t('fmSearch')}
+                className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] py-2 pl-3 pr-8 text-sm text-[var(--bk-text)] outline-none transition focus:border-[var(--bk-accent)] focus:ring-2 focus:ring-[var(--bk-accent-soft)]"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  title={t('fmSearchClear')}
+                  aria-label={t('fmSearchClear')}
+                  className="absolute right-1.5 flex h-6 w-6 items-center justify-center rounded-md text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+                >
+                  <Icon icon="lucide:x" width={14} height={14} />
+                </button>
+              )}
+            </div>
+
+            {/* ── Phần trang: số kết quả · số dòng mỗi trang · điều hướng (đẩy về bên phải) ── */}
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {/* Số kết quả (khi màn đủ rộng) */}
+              <span className="hidden whitespace-nowrap text-xs text-[var(--bk-text-faint)] lg:inline">
+                {t('fmResultCount', { n: filtered.length })}
+              </span>
+
+              {/* Số dòng mỗi trang (20 / 50) */}
+              <div className="flex shrink-0 items-center gap-1.5 text-sm text-[var(--bk-text-muted)]">
+                <span className="hidden sm:inline">{t('fmPerPage')}</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  aria-label={t('fmPerPage')}
+                  className="cursor-pointer rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-2 py-1.5 text-sm font-medium text-[var(--bk-text)] outline-none transition hover:border-[var(--bk-accent)] focus:border-[var(--bk-accent)]"
+                >
+                  {PAGE_SIZES.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Điều hướng trang */}
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  title={t('fmPrevPage')}
+                  aria-label={t('fmPrevPage')}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-accent-soft)] hover:text-[var(--bk-accent)] disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Icon icon="lucide:chevron-left" width={18} height={18} />
+                </button>
+                <span className="min-w-[84px] whitespace-nowrap text-center text-xs font-medium text-[var(--bk-text-muted)]">
+                  {t('fmPageOf', { page: safePage, total: totalPages })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                  title={t('fmNextPage')}
+                  aria-label={t('fmNextPage')}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-accent-soft)] hover:text-[var(--bk-accent)] disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Icon icon="lucide:chevron-right" width={18} height={18} />
+                </button>
+              </div>
+            </div>
           </div>
 
           <input
@@ -445,6 +604,11 @@ export function FileManagerScreen() {
                 <Icon icon="lucide:folder" width={28} height={28} className="text-[var(--bk-text-faint)]" />
                 <span className="text-sm">{t('fmEmpty')}</span>
               </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 p-10 text-center text-[var(--bk-text-muted)]">
+                <Icon icon="lucide:search-x" width={28} height={28} className="text-[var(--bk-text-faint)]" />
+                <span className="text-sm">{t('fmNoResults')}</span>
+              </div>
             ) : (
               <table className="w-full border-collapse">
                 <thead>
@@ -459,7 +623,7 @@ export function FileManagerScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {files.map((file) => (
+                  {pageRows.map((file) => (
                     <tr
                       key={file.path}
                       className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
