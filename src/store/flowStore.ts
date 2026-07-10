@@ -11,8 +11,7 @@ import {
   catchAllEditable,
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
-  CDC_DEFAULT_BRANCHES,
-  LOGIC_MODULE_CDC,
+  MODULE_DEFAULT_BRANCHES,
   type DataBranch,
 } from '../ui/nodeSchema';
 import { DEFAULT_IVR_SETTINGS, formatDateTime, type IvrSettings } from '../ir/ivrProperty';
@@ -604,11 +603,14 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const { draft } = get();
       if (!draft) return;
       const data: Record<string, unknown> = { ...draft.data, [key]: value };
-      // Chuyển module sang Clinic Day Classifier: seed bộ nhánh mặc định
-      // (休診日 / 不明 / 診療日) nếu node chưa có nhánh tuỳ biến nào.
-      if (key === 'moduleType' && value === LOGIC_MODULE_CDC) {
-        const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
-        if (!hasCustom) data.branches = CDC_DEFAULT_BRANCHES.map((b) => ({ ...b }));
+      // Chuyển sang module có bộ nhánh mặc định (CDC / Incoming Classifier /
+      // Date Of Call Classifier): seed nếu node chưa có nhánh tuỳ biến nào.
+      if (key === 'moduleType' && typeof value === 'string') {
+        const defaults = MODULE_DEFAULT_BRANCHES[value];
+        if (defaults) {
+          const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
+          if (!hasCustom) data.branches = defaults.map((b) => ({ ...b }));
+        }
       }
       set({ draft: { ...draft, data } });
     },

@@ -14,6 +14,11 @@ import {
   optionsForSource,
   BRANCH_SCHEMA,
   SAVE_MODULE_FLAG,
+  MODULE_DEFAULT_BRANCHES,
+  LOGIC_MODULE_IC,
+  LOGIC_MODULE_DOCC,
+  CATCH_ALL_ID,
+  formatTimeInput,
 } from '../ui/nodeSchema';
 import { parseFlowMeta, updateFlowMeta } from './flowMeta';
 
@@ -493,6 +498,94 @@ flow:
     expect(parsed.flow.subflows![0].start).toBeUndefined();
     expect(parsed.flow.subflows![0].nodes.map((n) => n.id)).toEqual(['s1', 's2']);
     expect(parsed.flow.subflows![0].nodes[0].type).toBe('interaction');
+  });
+});
+
+describe('logic module mới: Incoming Classifier / Date Of Call Classifier', () => {
+  it('bộ nhánh mặc định IC: catch-all + 非通知/海外/WebRTC/固定/携帯', () => {
+    expect(MODULE_DEFAULT_BRANCHES[LOGIC_MODULE_IC]).toEqual([
+      { id: CATCH_ALL_ID, value: '' },
+      { id: 'b0', value: '非通知' },
+      { id: 'b1', value: '海外' },
+      { id: 'b2', value: 'WebRTC' },
+      { id: 'b3', value: '固定' },
+      { id: 'b4', value: '携帯' },
+    ]);
+  });
+
+  it('bộ nhánh mặc định DOCC: catch-all = ^ERROR$ (giống FAILED) + 時間後/時間一致/時間前', () => {
+    expect(MODULE_DEFAULT_BRANCHES[LOGIC_MODULE_DOCC]).toEqual([
+      { id: CATCH_ALL_ID, value: 'ERROR', label: '失敗' },
+      { id: 'b0', value: '時間後' },
+      { id: 'b1', value: '時間一致' },
+      { id: 'b2', value: '時間前' },
+    ]);
+  });
+
+  it('catchAllEditable: DOCC sửa được value catch-all (ERROR); IC thì không', () => {
+    expect(catchAllEditable('logic', { moduleType: LOGIC_MODULE_DOCC })).toBe(true);
+    expect(catchAllEditable('logic', { moduleType: LOGIC_MODULE_IC })).toBe(false);
+  });
+
+  it('formatTimeInput: chỉ giữ chữ số, tự chèn ":" theo HH:mm:ss', () => {
+    expect(formatTimeInput('123456')).toBe('12:34:56');
+    expect(formatTimeInput('12:34:56')).toBe('12:34:56');
+    expect(formatTimeInput('1234')).toBe('12:34');
+    expect(formatTimeInput('1')).toBe('1');
+    expect(formatTimeInput('')).toBe('');
+    expect(formatTimeInput('ab!12x34時56')).toBe('12:34:56'); // ký tự lạ bị loại
+    expect(formatTimeInput('1234567890')).toBe('12:34:56'); // cắt còn 6 chữ số
+  });
+
+  it('DOCC round-trip YAML: catch-all ERROR (when + default) + compareTime', () => {
+    const DOCC = `
+flow:
+  name: "f"
+  start: d
+  nodes:
+    - id: d
+      type: logic
+      moduleType: Date Of Call Classifier
+      compareTime: "12:30:00"
+      branches:
+        - when: "ERROR"
+          default: e
+          label: "失敗"
+        - when: "時間後"
+          to: a
+        - when: "時間一致"
+          to: b
+        - when: "時間前"
+          to: c
+    - id: a
+      type: hangup
+    - id: b
+      type: hangup
+    - id: c
+      type: hangup
+    - id: e
+      type: hangup
+`;
+    const ir = fromYaml(DOCC);
+    const d = ir.nodes.find((n) => n.id === 'd')!;
+    expect(d.data.compareTime).toBe('12:30:00');
+    expect(readBranches(d.data)).toEqual([
+      { id: 'default', value: 'ERROR', label: '失敗' },
+      { id: 'b1', value: '時間後' },
+      { id: 'b2', value: '時間一致' },
+      { id: 'b3', value: '時間前' },
+    ]);
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; compareTime?: string; branches?: Array<Record<string, string>> }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'd')!;
+    expect(out.compareTime).toBe('12:30:00');
+    expect(out.branches).toEqual([
+      { when: 'ERROR', default: 'e', label: '失敗' },
+      { when: '時間後', to: 'a' },
+      { when: '時間一致', to: 'b' },
+      { when: '時間前', to: 'c' },
+    ]);
   });
 });
 

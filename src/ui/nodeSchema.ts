@@ -20,6 +20,7 @@ export type FieldKind =
   | 'select' // pull-down
   | 'searchSelect' // pull-down gõ để lọc; option lấy động từ flow (xem optionsFrom)
   | 'pairs' // danh sách Pair (2 ô text + dấu ×) của Context Match Router
+  | 'time' // giờ HH:mm:ss — chỉ nhận chữ số, tự chèn ':' theo format
   | 'yesno'; // checkbox 2 lựa chọn あり / なし
 
 // Nguồn option động cho searchSelect (tính từ IR hiện tại, xem optionsForSource).
@@ -42,6 +43,7 @@ export interface PropertyField {
   options?: FieldOption[]; // cho select / yesno
   optionsFrom?: OptionsSource; // cho searchSelect
   readOnly?: boolean; // hiển thị nhưng không cho sửa (vd holidaySource)
+  placeholder?: string; // gợi ý trong ô nhập (vd HH:mm:ss)
   default?: string;
   rows?: number; // cho textarea
   language?: 'js' | 'json'; // cho kind 'code' — mặc định 'js'
@@ -115,6 +117,12 @@ export const LOGIC_MODULE_CDC = 'Clinic Day Classifier';
 export const LOGIC_MODULE_CMR = 'Context Match Router';
 export const LOGIC_MODULE_MRB = 'Module Result Binder';
 export const LOGIC_MODULE_SCRIPT = 'Script';
+// Incoming Classifier: phân loại số gọi đến (非通知/海外/WebRTC/固定/携帯) — không có
+// tham số, chỉ có Branch Settings (bộ nhánh mặc định seed khi chọn module).
+export const LOGIC_MODULE_IC = 'Incoming Classifier';
+// Date Of Call Classifier: so thời điểm gọi với mốc HH:mm:ss (時間前/時間一致/時間後;
+// lỗi -> ERROR, đóng vai trò nhánh else giống FAILED).
+export const LOGIC_MODULE_DOCC = 'Date Of Call Classifier';
 
 // Bộ chọn module lưu ở data.moduleType ('module' là THAM SỐ của CDC/MRB — 参照元モジュール).
 // Script đứng đầu pulldown (module mặc định, dùng thường xuyên nhất).
@@ -123,6 +131,8 @@ const MODULE_OPTIONS: FieldOption[] = [
   { value: LOGIC_MODULE_CDC, label: LOGIC_MODULE_CDC },
   { value: LOGIC_MODULE_CMR, label: LOGIC_MODULE_CMR },
   { value: LOGIC_MODULE_MRB, label: LOGIC_MODULE_MRB },
+  { value: LOGIC_MODULE_IC, label: LOGIC_MODULE_IC },
+  { value: LOGIC_MODULE_DOCC, label: LOGIC_MODULE_DOCC },
 ];
 
 // Module đang chọn của node logic (mặc định Script khi chưa chọn).
@@ -138,6 +148,7 @@ function moduleIsScript(data: Record<string, unknown>): boolean {
 const moduleIsCdc = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_CDC;
 const moduleIsCmr = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_CMR;
 const moduleIsMrb = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_MRB;
+const moduleIsDocc = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_DOCC;
 
 // ── Clinic Day Classifier ──
 // Nguồn ngày lễ cố định (nội các Nhật公開) — hiển thị read-only, không cho sửa.
@@ -311,6 +322,10 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'nodeContext2', labelKey: 'fNodeContext2', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCmr },
     { key: 'pairs', labelKey: 'fPairs', kind: 'pairs', showIf: moduleIsCmr },
 
+    // ── Date Of Call Classifier ──
+    // Mốc thời gian để so sánh (比較時点) — chỉ nhận đúng format HH:mm:ss.
+    { key: 'compareTime', labelKey: 'fCompareTime', kind: 'time', placeholder: 'HH:mm:ss', showIf: moduleIsDocc },
+
     // ── Module Result Binder ──
     { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsMrb },
     { key: 'variable', labelKey: 'fVariable', kind: 'text', showIf: moduleIsMrb },
@@ -395,9 +410,14 @@ export const CATCH_ALL_ID = 'default';
 // Node có value catch-all SỬA ĐƯỢC (vẫn không xoá được — luôn giữ nhánh else):
 //   - Nexus: cho người dùng tự đặt điều kiện thay vì để catch-all tự tính.
 //   - Logic module Module Result Binder.
+//   - Logic module Date Of Call Classifier: catch-all mang value ERROR (nhánh lỗi,
+//     vai trò giống FAILED) — hiển thị ^ERROR$ thay vì regex loại trừ tự tính.
 // Các loại còn lại giữ read-only tự tính (^(?!…)$.*$).
 export function catchAllEditable(type: NodeType, data: Record<string, unknown>): boolean {
-  return type === 'nexus' || (type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_MRB);
+  if (type === 'nexus') return true;
+  if (type !== 'logic') return false;
+  const m = logicModuleOf(data);
+  return m === LOGIC_MODULE_MRB || m === LOGIC_MODULE_DOCC;
 }
 
 // Bộ nhánh mặc định khi node logic chuyển sang module Clinic Day Classifier:
@@ -407,6 +427,40 @@ export const CDC_DEFAULT_BRANCHES: readonly DataBranch[] = [
   { id: 'b0', value: 'NON_BUSINESS_DAY', label: '休診日' },
   { id: 'b1', value: '不明', label: '不明' },
 ] as const;
+
+// Incoming Classifier: catch-all + 5 loại số gọi đến.
+export const IC_DEFAULT_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: '' },
+  { id: 'b0', value: '非通知' },
+  { id: 'b1', value: '海外' },
+  { id: 'b2', value: 'WebRTC' },
+  { id: 'b3', value: '固定' },
+  { id: 'b4', value: '携帯' },
+] as const;
+
+// Date Of Call Classifier: catch-all chính là nhánh ^ERROR$ (giống FAILED)
+// + 3 kết quả so sánh thời gian.
+export const DOCC_DEFAULT_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: 'ERROR', label: '失敗' },
+  { id: 'b0', value: '時間後' },
+  { id: 'b1', value: '時間一致' },
+  { id: 'b2', value: '時間前' },
+] as const;
+
+// Bộ nhánh mặc định theo module (seed khi đổi module ở panel — xem flowStore.setDraftField).
+export const MODULE_DEFAULT_BRANCHES: Record<string, readonly DataBranch[]> = {
+  [LOGIC_MODULE_CDC]: CDC_DEFAULT_BRANCHES,
+  [LOGIC_MODULE_IC]: IC_DEFAULT_BRANCHES,
+  [LOGIC_MODULE_DOCC]: DOCC_DEFAULT_BRANCHES,
+};
+
+// Ép chuỗi nhập về định dạng HH:mm:ss (ô kind 'time'): chỉ giữ chữ số (tối đa 6),
+// tự chèn ':' sau mỗi cặp — gõ/dán gì cũng ra dạng 12:34:56 (có thể dở dang khi đang gõ).
+export function formatTimeInput(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, '').slice(0, 6);
+  const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 6)];
+  return parts.filter((p) => p.length > 0).join(':');
+}
 
 // Đọc mảng nhánh tự do trong data (an toàn kiểu). Luôn đảm bảo có nhánh catch-all.
 export function readBranches(data: Record<string, unknown>): DataBranch[] {

@@ -93,6 +93,8 @@ const LOGIC_MODULE_NAMES = new Set([
   'Clinic Day Classifier',
   'Context Match Router',
   'Module Result Binder',
+  'Incoming Classifier',
+  'Date Of Call Classifier',
 ]);
 
 function edgeId(source: string, target: string, suffix?: string): string {

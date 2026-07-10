@@ -13,6 +13,7 @@ import {
   optionsForSource,
   catchAllDisplay,
   logicModuleOf,
+  formatTimeInput,
   CATCH_ALL_ID,
   LOGIC_MODULE_SCRIPT,
   type PropertyField,
@@ -407,6 +408,22 @@ function FieldControl({
             className={inputClass}
             value={value}
             onChange={(e) => set(e.target.value.replace(/[^0-9]/g, ''))}
+          />
+        </label>
+      );
+    case 'time':
+      // Giờ HH:mm:ss (vd 比較時点 của Date Of Call Classifier): chỉ nhận chữ số,
+      // ':' tự chèn theo format — không gõ được text khác định dạng.
+      return (
+        <label className="block">
+          {label}
+          <input
+            type="text"
+            inputMode="numeric"
+            className={inputClass}
+            value={value}
+            placeholder={field.placeholder}
+            onChange={(e) => set(formatTimeInput(e.target.value))}
           />
         </label>
       );

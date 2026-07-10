@@ -117,6 +117,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── Logic: Module Result Binder ──
     fMrbModule: 'Tên Node / Tên Context',
     fVariable: 'Tên biến',
+    // ── Logic: Date Of Call Classifier ──
+    fCompareTime: 'Mốc thời gian để so sánh',
     // ── searchSelect ──
     searchSelectPlaceholder: 'Chọn hoặc gõ để lọc…',
     searchSelectEmpty: 'Không có lựa chọn',
@@ -388,6 +390,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── Logic: Module Result Binder ──
     fMrbModule: '参照元モジュール名 / 変数名',
     fVariable: '変数名',
+    // ── Logic: Date Of Call Classifier ──
+    fCompareTime: '比較時点',
     // ── searchSelect ──
     searchSelectPlaceholder: '選択または入力で絞り込み…',
     searchSelectEmpty: '候補がありません',
