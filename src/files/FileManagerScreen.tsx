@@ -22,6 +22,7 @@ import { useFlowStore } from '../store/flowStore';
 import { useFileStore } from '../store/fileStore';
 import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
+import { BrandLockup } from '../ui/BrandLockup';
 
 // File kèm metadata đọc từ header YAML (để hiển thị theo cột).
 type FileRow = FlowFile & { meta: FlowMeta };
@@ -350,11 +351,8 @@ export function FileManagerScreen() {
     <div className="relative flex h-full flex-col bg-[var(--bk-bg)]">
       {/* ── Top bar: tiêu đề + nút menu (giống canvas) ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
-        {/* Không đặt icon ở đây — tránh nhầm là nút bấm (nút icon chỉ có ở màn canvas). */}
-        <div>
-          <div className="text-base font-bold text-[var(--bk-text)]">Brekeke Flow Builder</div>
-          <div className="text-[11px] text-[var(--bk-text-faint)]">{t('fmTitle')}</div>
-        </div>
+        {/* Thương hiệu (logo ếch nét + wordmark) đồng bộ với màn login. */}
+        <BrandLockup logoClass="h-8 w-8" textClass="text-lg" />
         <FileManagerMenu />
       </header>
 
