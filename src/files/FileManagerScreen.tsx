@@ -534,18 +534,26 @@ export function FileManagerScreen() {
               {/* Số dòng mỗi trang (20 / 50) */}
               <div className="flex shrink-0 items-center gap-1.5 text-sm text-[var(--bk-text-muted)]">
                 <span className="hidden sm:inline">{t('fmPerPage')}</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
-                  aria-label={t('fmPerPage')}
-                  className="cursor-pointer rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-2 py-1.5 text-sm font-medium text-[var(--bk-text)] outline-none transition hover:border-[var(--bk-accent)] focus:border-[var(--bk-accent)]"
-                >
-                  {PAGE_SIZES.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative inline-flex shrink-0 items-center">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    aria-label={t('fmPerPage')}
+                    className="cursor-pointer appearance-none rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] py-1.5 pl-2 pr-6 text-sm font-medium text-[var(--bk-text)] outline-none transition hover:border-[var(--bk-accent)] focus:border-[var(--bk-accent)]"
+                  >
+                    {PAGE_SIZES.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  <Icon
+                    icon="lucide:chevron-down"
+                    width={14}
+                    height={14}
+                    className="pointer-events-none absolute right-1.5 text-[var(--bk-text-muted)]"
+                  />
+                </div>
               </div>
 
               {/* Điều hướng trang */}
