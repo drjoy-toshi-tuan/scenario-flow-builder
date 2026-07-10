@@ -13,7 +13,7 @@ of truth duy nhất; YAML chỉ là adapter import/export.
 
 ## Tính năng phase 1
 
-- 📥 Đọc YAML flow → **IR** → **auto-layout ELK** (top-down) → canvas React Flow.
+- 📥 Đọc YAML flow → **IR** → **auto-layout** (top-down, thuật toán cây tự viết) → canvas React Flow.
 - 🖱️ Kéo-thả node, chọn nhiều node (rê vùng), zoom/pan, minimap, fit-view.
 - 🔌 Nối dây (kéo từ output → input), **xoá dây** bằng icon 🗑 hiện khi hover.
 - ✏️ **Double-click node** mở panel sửa `label` và các field trong `data`.
@@ -168,7 +168,7 @@ Xem [`CLAUDE.md`](CLAUDE.md) — IR là source of truth; `ir/` thuần (không R
 render từ IR; `irAdapter.ts` là 2 hàm thuần IR ↔ React Flow.
 
 ```
-YAML ──fromYaml──► IR ──layout(ELK)──► IR(+position) ──irToReactFlow──► Canvas
+YAML ──fromYaml──► IR ──layout(cây)──► IR(+position) ──irToReactFlow──► Canvas
                     ▲                                                      │
                     └──────────── reactFlowToIr / store actions ◄──────────┘
 IR ──toYaml──► YAML (Export)

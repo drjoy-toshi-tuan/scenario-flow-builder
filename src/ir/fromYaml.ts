@@ -93,6 +93,8 @@ const LOGIC_MODULE_NAMES = new Set([
   'Clinic Day Classifier',
   'Context Match Router',
   'Module Result Binder',
+  'Incoming Classifier',
+  'Date Of Call Classifier',
 ]);
 
 function edgeId(source: string, target: string, suffix?: string): string {
@@ -149,7 +151,7 @@ function parseGraph(
       type: nodeType,
       // Tên hiển thị: ưu tiên field `name` (label người dùng đặt), fallback về id.
       label: typeof raw.name === 'string' && raw.name.trim() ? raw.name : raw.id,
-      // Toạ độ đã lưu (nếu có); thiếu -> {0,0} -> loadYaml/switchFlow sẽ ELK layout.
+      // Toạ độ đã lưu (nếu có); thiếu -> {0,0} -> loadYaml/switchFlow sẽ auto-layout.
       position: readPos(raw.position),
       data,
     };

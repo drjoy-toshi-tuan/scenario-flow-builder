@@ -14,7 +14,9 @@ n8n, đọc/ghi từ file YAML. **IR (Intermediate Representation)** là source 
 - Build tool: **Vite**
 - Framework: **React 18 + TypeScript** (strict mode)
 - Canvas: **@xyflow/react** (React Flow v12)
-- Auto-layout: **elkjs** (`elkjs/lib/elk.bundled.js`)
+- Auto-layout: **thuật toán cây tự viết** (`src/ir/layout.ts`, thuần TS): flow top-down
+  bước tầng đều nhau; chuỗi `failed` nằm ngang cùng hàng; nhánh rẽ cách đều quanh tâm
+  node cha, chống chồng chéo bằng contour. (Đã bỏ elkjs.)
 - State: **zustand** (giữ IR + trạng thái canvas)
 - YAML: package **`yaml`**
 - Styling: **Tailwind CSS v4** (plugin `@tailwindcss/vite`, `@import "tailwindcss"`)
@@ -52,8 +54,9 @@ flows/       # kho file YAML trên repo (mở/upload/tạo/lưu qua GitHub Conte
 Định nghĩa chính thức ở `src/ir/types.ts`. Tóm tắt:
 
 - `FlowIR { version, meta{id,name,facility?,createdAt,updatedAt}, nodes[], edges[] }`
-- `NodeType = start | announce | input | condition | script | llm | transfer | hangup | end`
-- `FlowNode { id, type, label, position{x,y}, data }` — `position` do ELK điền, `data` là tham số riêng theo type.
+- `NodeType = start | announce | interaction | nexus | logic | openai | faq | transfer | save | jump | hangup`
+  (tên cũ input/condition/script/llm/flag vẫn đọc được qua `LEGACY_TYPE_ALIASES`)
+- `FlowNode { id, type, label, position{x,y}, data }` — `position` do auto-layout điền, `data` là tham số riêng theo type.
 - `FlowEdge { id, source, target, sourceHandle?, condition?, label? }`
 
 Quy ước YAML `flow.start` → tạo 1 node `start` tổng hợp (id `__start__`) + edge tới node đầu.

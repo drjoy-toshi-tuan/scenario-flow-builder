@@ -38,7 +38,7 @@ function outgoing(edges: FlowEdge[], nodeId: string): FlowEdge[] {
   return edges.filter((e) => e.source === nodeId);
 }
 
-// Toạ độ node -> số nguyên (gọn YAML). ELK trả số thực; kéo tay bám lưới 16px.
+// Toạ độ node -> số nguyên (gọn YAML). Auto-layout có thể trả số thực; kéo tay bám lưới 16px.
 function roundPos(p: { x: number; y: number }): Pos {
   return { x: Math.round(p.x), y: Math.round(p.y) };
 }

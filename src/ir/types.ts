@@ -38,7 +38,7 @@ export type NodeType =
   | 'openai' // gọi OpenAI / LLM (tên cũ: llm)
   | 'faq' // hỏi-đáp (FAQ)
   | 'transfer' // chuyển máy
-  | 'flag' // đặt cờ (ステータスフラグ / SMSフラグ)
+  | 'save' // lưu dữ liệu — module Flag (ステータスフラグ / SMSフラグ) hoặc Save Data 2 Dr.JOY
   | 'jump' // nhảy sang sub flow khác
   | 'hangup';
 
@@ -51,7 +51,7 @@ export const NODE_TYPES: readonly NodeType[] = [
   'openai',
   'faq',
   'transfer',
-  'flag',
+  'save',
   'jump',
   'hangup',
 ] as const;
@@ -62,6 +62,7 @@ export const LEGACY_TYPE_ALIASES: Record<string, NodeType> = {
   condition: 'nexus',
   script: 'logic',
   llm: 'openai',
+  flag: 'save',
 };
 
 // Loại node có nhánh TỰ DO (data.branches) — dùng chung cho fromYaml/toYaml/nodeSchema
@@ -72,7 +73,7 @@ export interface FlowNode {
   id: string;
   type: NodeType;
   label: string;
-  position: { x: number; y: number }; // do ELK auto-layout điền; người dùng có thể kéo
+  position: { x: number; y: number }; // do auto-layout (ir/layout.ts) điền; người dùng có thể kéo
   data: Record<string, unknown>; // tham số riêng theo type (vd announce: { text })
 }
 

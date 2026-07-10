@@ -117,6 +117,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── Logic: Module Result Binder ──
     fMrbModule: 'Tên Node / Tên Context',
     fVariable: 'Tên biến',
+    // ── Logic: Date Of Call Classifier ──
+    fCompareTime: 'Mốc thời gian để so sánh',
     // ── searchSelect ──
     searchSelectPlaceholder: 'Chọn hoặc gõ để lọc…',
     searchSelectEmpty: 'Không có lựa chọn',
@@ -205,7 +207,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     exOpenai: 'Gọi mô hình AI (LLM) để xử lý hội thoại',
     exFaq: 'Trả lời câu hỏi thường gặp (FAQ)',
     exTransfer: 'Chuyển cuộc gọi tới máy nhánh / người khác',
-    exFlag: 'Đặt cờ trạng thái / SMS cho cuộc gọi',
+    exSave: 'Lưu dữ liệu (Flag / Save Data 2 Dr.JOY)',
     exJump: 'Nhảy tới sub flow khác',
     exHangup: 'Kết thúc và ngắt cuộc gọi',
     loginSubtitle: 'Đăng nhập bằng tài khoản Google @{domain} để truy cập.',
@@ -388,6 +390,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── Logic: Module Result Binder ──
     fMrbModule: '参照元モジュール名 / 変数名',
     fVariable: '変数名',
+    // ── Logic: Date Of Call Classifier ──
+    fCompareTime: '比較時点',
     // ── searchSelect ──
     searchSelectPlaceholder: '選択または入力で絞り込み…',
     searchSelectEmpty: '候補がありません',
@@ -476,7 +480,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     exOpenai: 'AI（LLM）で会話を処理する',
     exFaq: 'よくある質問（FAQ）に回答する',
     exTransfer: '他の内線・担当者へ転送する',
-    exFlag: 'ステータス／SMSフラグを設定する',
+    exSave: 'データを保存する（Flag／Save Data 2 Dr.JOY）',
     exJump: 'サブフローへジャンプする',
     exHangup: '通話を終了して切断する',
     loginSubtitle: '@{domain} の Google アカウントでログインしてアクセスします。',

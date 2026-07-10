@@ -12,28 +12,6 @@ declare module '*.js?raw' {
   export default content;
 }
 
-// elkjs bản bundled không kèm type cho đường dẫn con này → khai báo tối thiểu.
-declare module 'elkjs/lib/elk.bundled.js' {
-  export interface ElkNode {
-    id: string;
-    width?: number;
-    height?: number;
-    x?: number;
-    y?: number;
-    children?: ElkNode[];
-    edges?: ElkExtendedEdge[];
-    layoutOptions?: Record<string, string>;
-  }
-  export interface ElkExtendedEdge {
-    id: string;
-    sources: string[];
-    targets: string[];
-  }
-  export default class ELK {
-    layout(graph: ElkNode): Promise<ElkNode>;
-  }
-}
-
 interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string;
   // 'true' để bật chế độ demo (bỏ qua đăng nhập) trên bản build. Mặc định tắt.

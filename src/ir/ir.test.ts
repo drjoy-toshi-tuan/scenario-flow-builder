@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fromYaml } from './fromYaml';
 import { toYaml } from './toYaml';
+import { layout } from './layout';
 import { parse } from 'yaml';
 import { SYNTHETIC_START_ID } from './types';
 import {
@@ -11,6 +12,13 @@ import {
   catchAllEditable,
   effectiveBranches,
   optionsForSource,
+  BRANCH_SCHEMA,
+  SAVE_MODULE_FLAG,
+  MODULE_DEFAULT_BRANCHES,
+  LOGIC_MODULE_IC,
+  LOGIC_MODULE_DOCC,
+  CATCH_ALL_ID,
+  formatTimeInput,
 } from '../ui/nodeSchema';
 import { parseFlowMeta, updateFlowMeta } from './flowMeta';
 
@@ -111,7 +119,7 @@ flow:
     expect(ir.nodes.find((n) => n.id === 'a')?.position).toEqual({ x: 96, y: 200 });
     expect(ir.nodes.find((n) => n.id === 'b')?.position).toEqual({ x: 96, y: 360 });
     expect(ir.nodes.find((n) => n.id === SYNTHETIC_START_ID)?.position).toEqual({ x: 96, y: 40 });
-    // Toạ độ không phải toàn (0,0) -> loadYaml sẽ GIỮ NGUYÊN (không ELK layout lại).
+    // Toạ độ không phải toàn (0,0) -> loadYaml sẽ GIỮ NGUYÊN (không auto-layout lại).
     expect(ir.nodes.every((n) => n.position.x === 0 && n.position.y === 0)).toBe(false);
     // Round-trip: toYaml ghi lại position từng node + flow.startPosition.
     const parsed = parse(toYaml(ir)) as {
@@ -490,6 +498,270 @@ flow:
     expect(parsed.flow.subflows![0].start).toBeUndefined();
     expect(parsed.flow.subflows![0].nodes.map((n) => n.id)).toEqual(['s1', 's2']);
     expect(parsed.flow.subflows![0].nodes[0].type).toBe('interaction');
+  });
+});
+
+describe('logic module mới: Incoming Classifier / Date Of Call Classifier', () => {
+  it('bộ nhánh mặc định IC: catch-all + 非通知/海外/WebRTC/固定/携帯', () => {
+    expect(MODULE_DEFAULT_BRANCHES[LOGIC_MODULE_IC]).toEqual([
+      { id: CATCH_ALL_ID, value: '' },
+      { id: 'b0', value: '非通知' },
+      { id: 'b1', value: '海外' },
+      { id: 'b2', value: 'WebRTC' },
+      { id: 'b3', value: '固定' },
+      { id: 'b4', value: '携帯' },
+    ]);
+  });
+
+  it('bộ nhánh mặc định DOCC: catch-all = ^ERROR$ (giống FAILED) + 時間後/時間一致/時間前', () => {
+    expect(MODULE_DEFAULT_BRANCHES[LOGIC_MODULE_DOCC]).toEqual([
+      { id: CATCH_ALL_ID, value: 'ERROR', label: '失敗' },
+      { id: 'b0', value: '時間後' },
+      { id: 'b1', value: '時間一致' },
+      { id: 'b2', value: '時間前' },
+    ]);
+  });
+
+  it('catchAllEditable: DOCC sửa được value catch-all (ERROR); IC thì không', () => {
+    expect(catchAllEditable('logic', { moduleType: LOGIC_MODULE_DOCC })).toBe(true);
+    expect(catchAllEditable('logic', { moduleType: LOGIC_MODULE_IC })).toBe(false);
+  });
+
+  it('formatTimeInput: chỉ giữ chữ số, tự chèn ":" theo HH:mm:ss', () => {
+    expect(formatTimeInput('123456')).toBe('12:34:56');
+    expect(formatTimeInput('12:34:56')).toBe('12:34:56');
+    expect(formatTimeInput('1234')).toBe('12:34');
+    expect(formatTimeInput('1')).toBe('1');
+    expect(formatTimeInput('')).toBe('');
+    expect(formatTimeInput('ab!12x34時56')).toBe('12:34:56'); // ký tự lạ bị loại
+    expect(formatTimeInput('1234567890')).toBe('12:34:56'); // cắt còn 6 chữ số
+  });
+
+  it('DOCC round-trip YAML: catch-all ERROR (when + default) + compareTime', () => {
+    const DOCC = `
+flow:
+  name: "f"
+  start: d
+  nodes:
+    - id: d
+      type: logic
+      moduleType: Date Of Call Classifier
+      compareTime: "12:30:00"
+      branches:
+        - when: "ERROR"
+          default: e
+          label: "失敗"
+        - when: "時間後"
+          to: a
+        - when: "時間一致"
+          to: b
+        - when: "時間前"
+          to: c
+    - id: a
+      type: hangup
+    - id: b
+      type: hangup
+    - id: c
+      type: hangup
+    - id: e
+      type: hangup
+`;
+    const ir = fromYaml(DOCC);
+    const d = ir.nodes.find((n) => n.id === 'd')!;
+    expect(d.data.compareTime).toBe('12:30:00');
+    expect(readBranches(d.data)).toEqual([
+      { id: 'default', value: 'ERROR', label: '失敗' },
+      { id: 'b1', value: '時間後' },
+      { id: 'b2', value: '時間一致' },
+      { id: 'b3', value: '時間前' },
+    ]);
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; compareTime?: string; branches?: Array<Record<string, string>> }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'd')!;
+    expect(out.compareTime).toBe('12:30:00');
+    expect(out.branches).toEqual([
+      { when: 'ERROR', default: 'e', label: '失敗' },
+      { when: '時間後', to: 'a' },
+      { when: '時間一致', to: 'b' },
+      { when: '時間前', to: 'c' },
+    ]);
+  });
+});
+
+describe('node Save (thay node Flag cũ)', () => {
+  it('file cũ type flag -> node save, giữ nguyên Status/SMS Flag; toYaml ghi type save', () => {
+    const LEGACY = `
+flow:
+  name: "f"
+  start: fl
+  nodes:
+    - id: fl
+      type: flag
+      statusFlag: "3"
+      smsFlag: "1"
+      next: bye
+    - id: bye
+      type: hangup
+`;
+    const ir = fromYaml(LEGACY);
+    const fl = ir.nodes.find((n) => n.id === 'fl')!;
+    expect(fl.type).toBe('save');
+    expect(fl.data.statusFlag).toBe('3');
+    expect(fl.data.smsFlag).toBe('1');
+    // Chưa có moduleType -> panel hiểu là module Flag (mặc định), không cần migrate data.
+    expect(fl.data.moduleType).toBeUndefined();
+    const parsed = parse(toYaml(ir)) as { flow: { nodes: Array<{ id: string; type: string }> } };
+    expect(parsed.flow.nodes.find((n) => n.id === 'fl')?.type).toBe('save');
+  });
+
+  it('defaultDataFor(save): seed module mặc định Flag, nhánh cố định NEXT', () => {
+    const data = defaultDataFor('save');
+    expect(data.moduleType).toBe(SAVE_MODULE_FLAG);
+    expect(data.branches).toBeUndefined(); // nhánh cố định, không có nhánh tự do
+    expect(BRANCH_SCHEMA.save.mode).toBe('fixed');
+  });
+
+  it('nhánh cố định NEXT hiển thị VALUE ^.*$ (FAILED giữ ^FAILED$)', () => {
+    // name là phần giữa ^…$ ở cột VALUE của Branch Settings.
+    expect(BRANCH_SCHEMA.announce.fixed![0]).toMatchObject({ id: 'default', name: '.*' });
+    expect(BRANCH_SCHEMA.save.fixed![0]).toMatchObject({ id: 'default', name: '.*' });
+    expect(BRANCH_SCHEMA.interaction.fixed).toEqual([
+      expect.objectContaining({ id: 'failed', name: 'FAILED' }),
+      expect.objectContaining({ id: 'default', name: '.*' }),
+    ]);
+    expect(BRANCH_SCHEMA.start.fixed![0].name).toBe('.*');
+  });
+});
+
+describe('auto-layout (quy tắc bố cục chuẩn)', () => {
+  // Cấu trúc mô phỏng flow 診療 thật: mạch chính dọc + chuỗi failed + nexus 4 nhánh
+  // + vòng lặp retry (logic quay lại interaction).
+  const FLOW = `
+flow:
+  name: "診療"
+  start: welcome
+  nodes:
+    - id: welcome
+      type: announce
+      text: "hi"
+      next: ask
+    - id: ask
+      type: interaction
+      announce: "用件?"
+      next: classify
+      failed: sorry
+    - id: sorry
+      type: announce
+      text: "sorry"
+      next: flag_ng
+    - id: flag_ng
+      type: flag
+      next: bye_ng
+    - id: bye_ng
+      type: hangup
+    - id: classify
+      type: logic
+      branches:
+        - default: ask
+          label: retry
+        - when: "OK"
+          to: route
+          label: success
+    - id: route
+      type: nexus
+      branches:
+        - default: jump_1
+        - when: "変更"
+          to: jump_2
+        - when: "キャンセル"
+          to: jump_3
+        - when: "その他"
+          to: jump_4
+    - id: jump_1
+      type: jump
+    - id: jump_2
+      type: jump
+    - id: jump_3
+      type: jump
+    - id: jump_4
+      type: jump
+`;
+
+  const centerX = (ir: Awaited<ReturnType<typeof layout>>, id: string) =>
+    ir.nodes.find((n) => n.id === id)!.position.x + 122; // NODE_WIDTH / 2
+  const posY = (ir: Awaited<ReturnType<typeof layout>>, id: string) =>
+    ir.nodes.find((n) => n.id === id)!.position.y;
+
+  it('mạch chính đi thẳng đứng, khoảng cách tầng LUÔN bằng nhau', async () => {
+    const ir = await layout(fromYaml(FLOW));
+    const chain = [SYNTHETIC_START_ID, 'welcome', 'ask', 'classify', 'route'];
+    // Cùng 1 đường dọc (tâm x bằng nhau).
+    const xs = chain.map((id) => centerX(ir, id));
+    expect(new Set(xs).size).toBe(1);
+    // Bước y giữa các tầng liên tiếp bằng nhau tuyệt đối.
+    const ys = chain.map((id) => posY(ir, id));
+    const steps = ys.slice(1).map((y, i) => y - ys[i]);
+    expect(new Set(steps).size).toBe(1);
+    expect(steps[0]).toBeGreaterThan(0);
+  });
+
+  it('chuỗi failed nằm NGANG cùng hàng với node nguồn, lấn dần sang trái', async () => {
+    const ir = await layout(fromYaml(FLOW));
+    const rowY = posY(ir, 'ask');
+    for (const id of ['sorry', 'flag_ng', 'bye_ng']) expect(posY(ir, id)).toBe(rowY);
+    // Thứ tự trái dần: ask > sorry > flag_ng > bye_ng, bước ngang đều nhau.
+    const xs = ['ask', 'sorry', 'flag_ng', 'bye_ng'].map((id) => centerX(ir, id));
+    const steps = xs.slice(1).map((x, i) => xs[i] - x);
+    expect(steps.every((s) => s > 0)).toBe(true);
+    expect(new Set(steps).size).toBe(1);
+  });
+
+  it('nhánh nexus dàn hàng dưới, cách đều & đối xứng quanh tâm node cha', async () => {
+    const ir = await layout(fromYaml(FLOW));
+    const jumps = ['jump_1', 'jump_2', 'jump_3', 'jump_4'];
+    // Cùng 1 hàng, ngay dưới nexus.
+    const ys = new Set(jumps.map((id) => posY(ir, id)));
+    expect(ys.size).toBe(1);
+    expect([...ys][0]).toBeGreaterThan(posY(ir, 'route'));
+    // Cách đều nhau với khoảng cách lớn (mép–mép >= 320) và giữ thứ tự nhánh.
+    const xs = jumps.map((id) => centerX(ir, id));
+    const steps = xs.slice(1).map((x, i) => x - xs[i]);
+    expect(new Set(steps).size).toBe(1);
+    expect(steps[0]).toBeGreaterThanOrEqual(244 + 320);
+    // Cụm nhánh đối xứng qua tâm node cha.
+    expect((xs[0] + xs[3]) / 2).toBe(centerX(ir, 'route'));
+  });
+
+  it('node không chồng chéo nhau (bounding box rời nhau)', async () => {
+    const ir = await layout(fromYaml(FLOW));
+    for (let i = 0; i < ir.nodes.length; i++) {
+      for (let j = i + 1; j < ir.nodes.length; j++) {
+        const a = ir.nodes[i].position;
+        const b = ir.nodes[j].position;
+        const overlap = Math.abs(a.x - b.x) < 244 && Math.abs(a.y - b.y) < 80;
+        expect(overlap, `${ir.nodes[i].id} đè lên ${ir.nodes[j].id}`).toBe(false);
+      }
+    }
+  });
+
+  it('cụm node rời nhau (không dây nối) xếp cạnh nhau, không đè lên nhau', async () => {
+    const TWO = `
+flow:
+  name: "f"
+  start: a
+  nodes:
+    - id: a
+      type: announce
+      text: "hi"
+    - id: b
+      type: announce
+      text: "đảo rời"
+`;
+    const ir = await layout(fromYaml(TWO));
+    const a = ir.nodes.find((n) => n.id === 'a')!.position;
+    const b = ir.nodes.find((n) => n.id === 'b')!.position;
+    expect(Math.abs(a.x - b.x) >= 244 || Math.abs(a.y - b.y) >= 80).toBe(true);
   });
 });
 

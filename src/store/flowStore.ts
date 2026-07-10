@@ -11,8 +11,7 @@ import {
   catchAllEditable,
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
-  CDC_DEFAULT_BRANCHES,
-  LOGIC_MODULE_CDC,
+  MODULE_DEFAULT_BRANCHES,
   type DataBranch,
 } from '../ui/nodeSchema';
 import { DEFAULT_IVR_SETTINGS, formatDateTime, type IvrSettings } from '../ir/ivrProperty';
@@ -46,7 +45,7 @@ interface FlowState {
   // Flow đang mở trên canvas: 'main' hoặc id của 1 sub flow.
   activeFlowId: string;
   mainStash: { nodes: FlowNode[]; edges: FlowEdge[] } | null;
-  // Chuyển sang main flow / sub flow khác (tự ELK layout lần đầu mở sub flow).
+  // Chuyển sang main flow / sub flow khác (tự auto-layout lần đầu mở sub flow).
   switchFlow: (id: string) => Promise<void>;
   // Tạo sub flow mới (seed node Start) rồi chuyển sang nó.
   createSubflow: (name: string) => Promise<void>;
@@ -76,7 +75,7 @@ interface FlowState {
 
   // Nạp YAML -> IR -> auto-layout, rồi set vào store.
   loadYaml: (text: string) => Promise<void>;
-  // Chạy lại ELK trên IR hiện tại.
+  // Chạy lại auto-layout trên IR hiện tại.
   autoLayout: () => Promise<void>;
   // Xuất IR hiện tại ra chuỗi YAML (round-trip).
   exportYaml: () => string;
@@ -237,7 +236,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
         mainStash = { nodes: doc.nodes, edges: doc.edges };
       }
 
-      // Sub flow đọc từ YAML chưa có toạ độ (0,0 hết) -> ELK layout lần đầu mở.
+      // Sub flow đọc từ YAML chưa có toạ độ (0,0 hết) -> auto-layout lần đầu mở.
       const needsLayout =
         next.nodes.length > 1 && next.nodes.every((n) => n.position.x === 0 && n.position.y === 0);
       if (needsLayout) next = await layout(next);
@@ -386,7 +385,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
     loadYaml: async (text) => {
       const parsed = fromYaml(text);
       // File đã lưu toạ độ (mọi lần lưu đều ghi position) -> GIỮ NGUYÊN bố cục, không
-      // auto-layout lại. Chỉ ELK layout khi toạ độ trống (file cũ / viết tay: tất cả 0,0).
+      // auto-layout lại. Chỉ auto-layout khi toạ độ trống (file cũ / viết tay: tất cả 0,0).
       const needsLayout =
         parsed.nodes.length > 1 &&
         parsed.nodes.every((n) => n.position.x === 0 && n.position.y === 0);
@@ -604,11 +603,14 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const { draft } = get();
       if (!draft) return;
       const data: Record<string, unknown> = { ...draft.data, [key]: value };
-      // Chuyển module sang Clinic Day Classifier: seed bộ nhánh mặc định
-      // (休診日 / 不明 / 診療日) nếu node chưa có nhánh tuỳ biến nào.
-      if (key === 'moduleType' && value === LOGIC_MODULE_CDC) {
-        const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
-        if (!hasCustom) data.branches = CDC_DEFAULT_BRANCHES.map((b) => ({ ...b }));
+      // Chuyển sang module có bộ nhánh mặc định (CDC / Incoming Classifier /
+      // Date Of Call Classifier): seed nếu node chưa có nhánh tuỳ biến nào.
+      if (key === 'moduleType' && typeof value === 'string') {
+        const defaults = MODULE_DEFAULT_BRANCHES[value];
+        if (defaults) {
+          const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
+          if (!hasCustom) data.branches = defaults.map((b) => ({ ...b }));
+        }
       }
       set({ draft: { ...draft, data } });
     },
