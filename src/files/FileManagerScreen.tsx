@@ -10,6 +10,7 @@ import {
   deleteFlow,
   sanitizeFileName,
   uniqueFileName,
+  GithubApiError,
   type FlowFile,
 } from '../github/api';
 import { ghErrorKey } from '../github/errors';
@@ -73,7 +74,20 @@ function isValidFlowYaml(text: string): boolean {
 export function FileManagerScreen() {
   const { user } = useAuth();
   const { token } = useGithubToken();
+  const invalidateToken = useGithubToken((s) => s.invalidate);
   const t = useT();
+
+  // Token bị GitHub từ chối (hết hạn / thu hồi / mất quyền) khi đang thao tác:
+  // KHÔNG hiện banner đỏ trên màn danh sách — thay vào đó xoá token và đưa người
+  // dùng về ô nhập token kèm cảnh báo (xem GithubConnectPanel). Trả true nếu đã
+  // xử lý (là lỗi auth) để nơi gọi dừng, không set banner nữa.
+  const handledAsExpired = (e: unknown): boolean => {
+    if (e instanceof GithubApiError && e.code === 'auth') {
+      invalidateToken();
+      return true;
+    }
+    return false;
+  };
 
   const loadYaml = useFlowStore((s) => s.loadYaml);
   const openFile = useFileStore((s) => s.openFile);
@@ -129,10 +143,14 @@ export function FileManagerScreen() {
       }
       setFiles(rows);
     } catch (e) {
+      if (handledAsExpired(e)) return;
       setListErrorKey(ghErrorKey(e));
     } finally {
       setLoading(false);
     }
+    // handledAsExpired dùng action zustand ổn định (invalidateToken) nên không cần
+    // đưa vào deps — giữ deps = [token] để tránh vòng lặp fetch (xem ghi chú listErrorKey).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
@@ -156,8 +174,9 @@ export function FileManagerScreen() {
       const { content, sha } = await getFlow(token!, file.path);
       await openContent(content, file.path, file.name, sha);
     } catch (e) {
-      setActionError(t(ghErrorKey(e)));
       setBusy(false);
+      if (handledAsExpired(e)) return;
+      setActionError(t(ghErrorKey(e)));
     }
   };
 
@@ -170,8 +189,9 @@ export function FileManagerScreen() {
       const res = await putFlow(token!, path, content, commitMsg, sha);
       await openContent(content, path, name, res.sha);
     } catch (e) {
-      setActionError(t(ghErrorKey(e)));
       setBusy(false);
+      if (handledAsExpired(e)) return;
+      setActionError(t(ghErrorKey(e)));
     }
   };
 
@@ -271,7 +291,7 @@ export function FileManagerScreen() {
       }
       await refresh();
     } catch (e) {
-      setActionError(t(ghErrorKey(e)));
+      if (!handledAsExpired(e)) setActionError(t(ghErrorKey(e)));
     } finally {
       setBusy(false);
     }
@@ -301,7 +321,7 @@ export function FileManagerScreen() {
       await putFlow(token!, `${FLOWS_DIR}/${newFileName}`, next, t('commitDuplicate', { name: newFileName }));
       await refresh();
     } catch (e) {
-      setActionError(t(ghErrorKey(e)));
+      if (!handledAsExpired(e)) setActionError(t(ghErrorKey(e)));
     } finally {
       setBusy(false);
     }
@@ -317,7 +337,7 @@ export function FileManagerScreen() {
       await deleteFlow(token!, target.path, target.sha, t('commitDelete', { name: target.name }));
       await refresh();
     } catch (e) {
-      setActionError(t(ghErrorKey(e)));
+      if (!handledAsExpired(e)) setActionError(t(ghErrorKey(e)));
     } finally {
       setBusy(false);
     }

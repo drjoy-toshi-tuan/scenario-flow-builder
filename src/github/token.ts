@@ -28,9 +28,13 @@ interface GithubTokenState {
   login: string | null; // tên đăng nhập GitHub (hiển thị khi đã kết nối).
   connecting: boolean;
   error: string | null;
+  // Token đã lưu bị GitHub từ chối (hết hạn / thu hồi / mất quyền) trong lúc dùng.
+  // Bật cờ này để màn hình đưa người dùng về ô nhập token kèm cảnh báo dễ hiểu.
+  expired: boolean;
   // Xác thực token rồi lưu nếu hợp lệ. Trả true nếu kết nối thành công.
   connect: (token: string) => Promise<boolean>;
   disconnect: () => void;
+  invalidate: () => void;
   clearError: () => void;
 }
 
@@ -39,6 +43,7 @@ export const useGithubToken = create<GithubTokenState>((set) => ({
   login: load(LOGIN_KEY),
   connecting: false,
   error: null,
+  expired: false,
 
   connect: async (raw) => {
     const token = raw.trim();
@@ -55,7 +60,7 @@ export const useGithubToken = create<GithubTokenState>((set) => ({
       } catch {
         // localStorage không khả dụng — vẫn giữ trong bộ nhớ phiên này.
       }
-      set({ token, login, connecting: false, error: null });
+      set({ token, login, connecting: false, error: null, expired: false });
       return true;
     } catch (e) {
       // Ánh xạ lỗi API -> mã ngắn cho UI (auth/notfound/network…).
@@ -73,7 +78,20 @@ export const useGithubToken = create<GithubTokenState>((set) => ({
     } catch {
       // ignore
     }
-    set({ token: null, login: null, error: null });
+    set({ token: null, login: null, error: null, expired: false });
+  },
+
+  // Token bị từ chối (401/403) khi đang thao tác: xoá khỏi máy và bật cờ `expired`.
+  // Nhờ `token = null`, màn quản lý file quay về ô nhập token; `expired` để panel
+  // hiển thị cảnh báo "token hết hạn/bị thu hồi, hãy nhập lại".
+  invalidate: () => {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(LOGIN_KEY);
+    } catch {
+      // ignore
+    }
+    set({ token: null, login: null, connecting: false, error: null, expired: true });
   },
 
   clearError: () => set({ error: null }),

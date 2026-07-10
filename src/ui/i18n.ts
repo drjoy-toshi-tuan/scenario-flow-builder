@@ -230,6 +230,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmTokenHelpClassic: 'Tạo Classic Token',
     fmTokenPersistNote: 'Token được lưu trên trình duyệt này qua các phiên',
     fmTokenPersistNote2: 'Chỉ nhập lại token khi hết hạn hoặc chủ động “Ngắt kết nối”',
+    fmTokenExpiredWarning:
+      'Token GitHub đã hết hạn hoặc bị thu hồi. Vui lòng nhập lại token để tiếp tục sử dụng.',
     fmOpen: 'Mở',
     fmRename: 'Đổi tên',
     fmRenameTitle: 'Đổi tên bệnh viện / tên flow',
@@ -499,6 +501,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmTokenHelpClassic: 'Classic Token を作成',
     fmTokenPersistNote: 'トークンはこのブラウザに保存され、セッションをまたいで保持されます',
     fmTokenPersistNote2: '期限切れ、または手動で「切断」した場合のみ再入力が必要です',
+    fmTokenExpiredWarning:
+      'GitHubトークンの有効期限が切れたか、無効になりました。続けるにはトークンを再入力してください。',
     fmOpen: '開く',
     fmRename: '名称変更',
     fmRenameTitle: '施設名・フロー名の変更',

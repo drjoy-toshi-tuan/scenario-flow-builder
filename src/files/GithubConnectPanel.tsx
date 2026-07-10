@@ -15,7 +15,7 @@ const CLASSIC_TOKEN_CREATE_URL =
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function GithubConnectPanel() {
-  const { connect, connecting, error } = useGithubToken();
+  const { connect, connecting, error, expired } = useGithubToken();
   const t = useT();
   const [value, setValue] = useState('');
 
@@ -35,6 +35,15 @@ export function GithubConnectPanel() {
           <p className="text-xs text-[var(--bk-text-muted)]">{t('fmConnectDesc')}</p>
         </div>
       </div>
+
+      {/* Token đã lưu vừa bị từ chối (hết hạn/thu hồi) — nhắc người dùng nhập lại.
+          Ẩn khi có lỗi kết nối mới (error) để không hiện chồng 2 thông báo. */}
+      {expired && !error && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Icon icon="lucide:triangle-alert" className="mt-0.5 shrink-0" />
+          <span>{t('fmTokenExpiredWarning')}</span>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
