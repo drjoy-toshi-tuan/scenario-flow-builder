@@ -12,6 +12,7 @@ import {
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
   MODULE_DEFAULT_BRANCHES,
+  MODULE_FIXED_BRANCHES,
   type DataBranch,
 } from '../ui/nodeSchema';
 import { DEFAULT_IVR_SETTINGS, formatDateTime, type IvrSettings } from '../ir/ivrProperty';
@@ -603,11 +604,16 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const { draft } = get();
       if (!draft) return;
       const data: Record<string, unknown> = { ...draft.data, [key]: value };
-      // Chuyển sang module có bộ nhánh mặc định (CDC / Incoming Classifier /
-      // Date Of Call Classifier): seed nếu node chưa có nhánh tuỳ biến nào.
       if (key === 'moduleType' && typeof value === 'string') {
+        const fixed = MODULE_FIXED_BRANCHES[value];
         const defaults = MODULE_DEFAULT_BRANCHES[value];
-        if (defaults) {
+        if (fixed) {
+          // Module nhánh CỐ ĐỊNH (Incoming Classifier / Date Of Call Classifier):
+          // THAY HẲN bằng bộ chuẩn — không giữ nhánh của module trước.
+          data.branches = fixed.map((b) => ({ ...b }));
+        } else if (defaults) {
+          // Module có bộ nhánh mặc định sửa được (CDC): chỉ seed khi node chưa có
+          // nhánh tuỳ biến nào.
           const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
           if (!hasCustom) data.branches = defaults.map((b) => ({ ...b }));
         }

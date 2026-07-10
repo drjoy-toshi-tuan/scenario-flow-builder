@@ -410,14 +410,9 @@ export const CATCH_ALL_ID = 'default';
 // Node có value catch-all SỬA ĐƯỢC (vẫn không xoá được — luôn giữ nhánh else):
 //   - Nexus: cho người dùng tự đặt điều kiện thay vì để catch-all tự tính.
 //   - Logic module Module Result Binder.
-//   - Logic module Date Of Call Classifier: catch-all mang value ERROR (nhánh lỗi,
-//     vai trò giống FAILED) — hiển thị ^ERROR$ thay vì regex loại trừ tự tính.
-// Các loại còn lại giữ read-only tự tính (^(?!…)$.*$).
+// Các loại còn lại giữ read-only (tự tính ^(?!…)$.*$, hoặc value cố định theo module).
 export function catchAllEditable(type: NodeType, data: Record<string, unknown>): boolean {
-  if (type === 'nexus') return true;
-  if (type !== 'logic') return false;
-  const m = logicModuleOf(data);
-  return m === LOGIC_MODULE_MRB || m === LOGIC_MODULE_DOCC;
+  return type === 'nexus' || (type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_MRB);
 }
 
 // Bộ nhánh mặc định khi node logic chuyển sang module Clinic Day Classifier:
@@ -428,30 +423,47 @@ export const CDC_DEFAULT_BRANCHES: readonly DataBranch[] = [
   { id: 'b1', value: '不明', label: '不明' },
 ] as const;
 
-// Incoming Classifier: catch-all + 5 loại số gọi đến.
-export const IC_DEFAULT_BRANCHES: readonly DataBranch[] = [
-  { id: CATCH_ALL_ID, value: '' },
-  { id: 'b0', value: '非通知' },
-  { id: 'b1', value: '海外' },
-  { id: 'b2', value: 'WebRTC' },
-  { id: 'b3', value: '固定' },
-  { id: 'b4', value: '携帯' },
+// Incoming Classifier: catch-all (その他) + 5 loại số gọi đến — bộ nhánh CỐ ĐỊNH,
+// value lẫn label đều không sửa được.
+export const IC_FIXED_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: '', label: 'その他' },
+  { id: 'b0', value: '非通知', label: '非通知' },
+  { id: 'b1', value: '海外', label: '海外' },
+  { id: 'b2', value: 'WebRTC', label: 'WebRTC' },
+  { id: 'b3', value: '固定', label: '固定' },
+  { id: 'b4', value: '携帯', label: '携帯' },
 ] as const;
 
-// Date Of Call Classifier: catch-all chính là nhánh ^ERROR$ (giống FAILED)
-// + 3 kết quả so sánh thời gian.
-export const DOCC_DEFAULT_BRANCHES: readonly DataBranch[] = [
-  { id: CATCH_ALL_ID, value: 'ERROR', label: '失敗' },
-  { id: 'b0', value: '時間後' },
-  { id: 'b1', value: '時間一致' },
-  { id: 'b2', value: '時間前' },
+// Date Of Call Classifier: catch-all chính là nhánh ^ERROR$ (vai trò giống FAILED,
+// label エラー) + 3 kết quả so sánh thời gian.
+export const DOCC_FIXED_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: 'ERROR', label: 'エラー' },
+  { id: 'b0', value: '時間後', label: '時間後' },
+  { id: 'b1', value: '時間一致', label: '時間一致' },
+  { id: 'b2', value: '時間前', label: '時間前' },
 ] as const;
 
-// Bộ nhánh mặc định theo module (seed khi đổi module ở panel — xem flowStore.setDraftField).
+// Module có bộ nhánh CỐ ĐỊNH: value + label khoá cứng, không thêm/xoá nhánh. Đổi sang
+// các module này thì data.branches bị THAY HẲN bằng bộ chuẩn (xem flowStore.setDraftField)
+// — không giữ nhánh của module trước (tránh DOCC mang nhầm nhánh của IC).
+export const MODULE_FIXED_BRANCHES: Record<string, readonly DataBranch[]> = {
+  [LOGIC_MODULE_IC]: IC_FIXED_BRANCHES,
+  [LOGIC_MODULE_DOCC]: DOCC_FIXED_BRANCHES,
+};
+
+// Bộ nhánh cố định của node (null nếu node dùng nhánh tự do bình thường).
+export function fixedModuleBranches(
+  type: NodeType,
+  data: Record<string, unknown>,
+): readonly DataBranch[] | null {
+  if (type !== 'logic') return null;
+  return MODULE_FIXED_BRANCHES[logicModuleOf(data)] ?? null;
+}
+
+// Bộ nhánh mặc định theo module — seed khi đổi module ở panel NẾU node chưa có nhánh
+// tuỳ biến (khác bộ cố định ở trên: CDC seed xong người dùng vẫn sửa được).
 export const MODULE_DEFAULT_BRANCHES: Record<string, readonly DataBranch[]> = {
   [LOGIC_MODULE_CDC]: CDC_DEFAULT_BRANCHES,
-  [LOGIC_MODULE_IC]: IC_DEFAULT_BRANCHES,
-  [LOGIC_MODULE_DOCC]: DOCC_DEFAULT_BRANCHES,
 };
 
 // Ép chuỗi nhập về định dạng HH:mm:ss (ô kind 'time'): chỉ giữ chữ số (tối đa 6),
@@ -525,11 +537,42 @@ export function isPairBranchNode(type: NodeType, data: Record<string, unknown>):
 }
 
 // Danh sách nhánh "hiệu lực" của node:
+//   - Module có bộ nhánh CỐ ĐỊNH (IC/DOCC): LUÔN trả về bộ chuẩn — value/label khoá
+//     cứng, data.branches lệch (vd còn sót nhánh module trước) cũng bị đè lại.
 //   - CMR: CHỈ các nhánh sinh từ Pair (pair1, pair2, …; value 1, 2, … hiển thị ^1$),
 //     KHÔNG có nhánh catch-all loại trừ; label giữ từ data.branches.
 //   - còn lại: đọc thẳng data.branches.
 export function effectiveBranches(type: NodeType, data: Record<string, unknown>): DataBranch[] {
   const branches = readBranches(data);
+  const fixed = fixedModuleBranches(type, data);
+  if (fixed) {
+    // Khớp nhánh cố định với nhánh sẵn có theo VALUE (file YAML đánh id theo thứ tự
+    // b1, b2… nên không so theo id được) — GIỮ id trong data để dây nối không lệch
+    // handle; nhánh không khớp (data sai/thiếu) nhận id trống kế tiếp.
+    const byValue = new Map<string, DataBranch>();
+    for (const b of branches) {
+      if (b.id !== CATCH_ALL_ID && !byValue.has(b.value)) byValue.set(b.value, b);
+    }
+    const matched = fixed.map((f) => ({
+      f,
+      old: f.id === CATCH_ALL_ID ? branches.find((b) => b.id === CATCH_ALL_ID) : byValue.get(f.value),
+    }));
+    const usedIds = new Set(matched.map(({ f, old }) => (f.id === CATCH_ALL_ID ? CATCH_ALL_ID : old?.id)));
+    let n = 0;
+    return matched.map(({ f, old }) => {
+      let id: string;
+      if (f.id === CATCH_ALL_ID) id = CATCH_ALL_ID;
+      else if (old) id = old.id;
+      else {
+        do id = `b${n++}`;
+        while (usedIds.has(id));
+        usedIds.add(id);
+      }
+      const branch: DataBranch = { id, value: f.value };
+      if (f.label) branch.label = f.label;
+      return branch;
+    });
+  }
   if (!isPairBranchNode(type, data)) return branches;
   const byId = new Map(branches.map((b) => [b.id, b]));
   return readPairs(data).map((_, i) => {

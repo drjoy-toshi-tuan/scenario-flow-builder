@@ -9,6 +9,7 @@ import {
   readPairs,
   effectiveBranches,
   isPairBranchNode,
+  fixedModuleBranches,
   catchAllEditable,
   optionsForSource,
   catchAllDisplay,
@@ -772,12 +773,16 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
   // Node logic (Context Match Router): nhánh SINH TỪ Pair — value ^Pair{n}$ khoá cứng,
   // label sửa được, KHÔNG thêm/xoá nhánh ở đây (thêm/xoá Pair bên tab Property).
   const pairMode = isPairBranchNode(node.type, data);
+  // Module có bộ nhánh CỐ ĐỊNH (Incoming Classifier / Date Of Call Classifier):
+  // value + label khoá cứng, không thêm/xoá nhánh.
+  const fixedModule = fixedModuleBranches(node.type, data) !== null;
   // Node logic (Module Result Binder): value catch-all SỬA ĐƯỢC (vẫn không xoá được).
   const editableCatchAll = catchAllEditable(node.type, data);
 
   // Nhánh tự do (nexus/logic/jump): nhánh catch-all (^.*$) đứng đầu, không sửa/xoá;
   // các nhánh còn lại thêm/sửa/xoá tuỳ ý. "+ Thêm nhánh" để thêm.
-  const branches = pairMode ? effectiveBranches(node.type, data) : readBranches(data);
+  const branches =
+    pairMode || fixedModule ? effectiveBranches(node.type, data) : readBranches(data);
   const catchAllValue = catchAllDisplay(branches);
   // catch-all luôn hiển thị trước, các nhánh khác theo sau.
   const ordered = [
@@ -788,6 +793,7 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
   return (
     <div className="space-y-3">
       {pairMode && <p className="text-xs text-[var(--bk-text-faint)]">{t('branchPairNote')}</p>}
+      {fixedModule && <p className="text-xs text-[var(--bk-text-faint)]">{t('branchFixedNote')}</p>}
       <div className="space-y-2.5">
         {/* Tiêu đề cột: VALUE · LABEL · NODE (nhãn hiển thị trên dây thay cho value). */}
         <div className="bk-branch-row bk-branch-head">
@@ -810,6 +816,11 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
                     placeholder={t('branchConditionPlaceholder')}
                     onChange={(v) => draftUpdateBranch(b.id, v)}
                   />
+                ) : isCatchAll && fixedModule && b.value ? (
+                  // Catch-all có value cố định theo module (DOCC: ^ERROR$) — khoá cứng.
+                  <HoverTip className="bk-branch-fixed" content={`^${b.value}$`}>
+                    {`^${b.value}$`}
+                  </HoverTip>
                 ) : isCatchAll ? (
                   // Read-only nhưng vẫn cho trỏ chuột vào & KÉO để cuộn xem hết chuỗi dài;
                   // hover mà bị cắt "…" -> tooltip full text (xem ReadonlyBranchValue).
@@ -817,8 +828,8 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
                     className={`${inputClass} !mt-0 w-full font-mono bk-branch-catchall`}
                     value={catchAllValue}
                   />
-                ) : pairMode ? (
-                  // Value nhánh Pair khoá cứng ^Pair{n}$ (hiển thị kèm neo như nhánh cố định).
+                ) : pairMode || fixedModule ? (
+                  // Value khoá cứng: nhánh Pair (^Pair{n}$) / bộ nhánh cố định của IC & DOCC.
                   <HoverTip className="bk-branch-fixed" content={`^${b.value}$`}>
                     {`^${b.value}$`}
                   </HoverTip>
@@ -832,19 +843,26 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
                 )}
               </div>
               <div className="bk-branch-label-col">
-                <input
-                  type="text"
-                  className={`${inputClass} !mt-0 w-full`}
-                  value={b.label ?? ''}
-                  placeholder={t('branchLabelPlaceholder')}
-                  onChange={(e) => draftSetBranchLabel(b.id, e.target.value.replace(/[\r\n]+/g, ' '))}
-                />
+                {fixedModule ? (
+                  // IC/DOCC: label cũng thuộc bộ chuẩn (その他/エラー/…) — read-only.
+                  <HoverTip className="bk-branch-fixed" content={b.label ?? ''}>
+                    {b.label ?? ''}
+                  </HoverTip>
+                ) : (
+                  <input
+                    type="text"
+                    className={`${inputClass} !mt-0 w-full`}
+                    value={b.label ?? ''}
+                    placeholder={t('branchLabelPlaceholder')}
+                    onChange={(e) => draftSetBranchLabel(b.id, e.target.value.replace(/[\r\n]+/g, ' '))}
+                  />
+                )}
               </div>
               <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
               <div className="bk-branch-target">
                 <BranchTarget info={targetInfo(b.id)} />
               </div>
-              {isCatchAll || pairMode ? (
+              {isCatchAll || pairMode || fixedModule ? (
                 <span className="bk-branch-del-spacer" aria-hidden />
               ) : (
                 <button
@@ -861,7 +879,7 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
           );
         })}
       </div>
-      {!pairMode && (
+      {!pairMode && !fixedModule && (
         <button
           type="button"
           onClick={draftAddBranch}
