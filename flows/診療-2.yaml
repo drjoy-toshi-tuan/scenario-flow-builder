@@ -3,7 +3,7 @@ flow:
   facility: 国立成育研究医療センター
   author: トシTuan
   createdAt: 2026-07-08 10:06
-  updatedAt: 2026-07-10 09:43
+  updatedAt: 2026-07-10 09:46
   start: welcome
   startPosition:
     x: 1205
@@ -74,7 +74,7 @@ flow:
         text = text.trim();
         logger.info("raw input: " + text);
 
-        // 正規化（全角数字→半角、カナ→ひらがな）
+        // 正規化（全角数字→半角、英字→半角、カナ→ひらがな、記号・空白削除）
         function normalize(s) {
           if (!s) return "";
           var n = s.replace(/[０-９]/g, function(c) {
@@ -86,12 +86,11 @@ flow:
           n = n.replace(/[ァ-ヶ]/g, function(c) {
             return String.fromCharCode(c.charCodeAt(0) - 0x60);
           });
-          // 記号・空白・読点などを削除
           n = n.replace(/[\s\t\r\n　、。・「」『』（）()［］\[\]！？!？‐\-―]/g, "");
           return n;
         }
 
-        // REPEAT 判定用（聞き返し要求）
+        // REPEAT 判定用
         function isRepeat(n) {
           if (!n) return false;
           if (/(もういちど|もう一度|もういっかい|もう一回|くりかえし|繰り返し)/.test(n)) return true;
@@ -101,12 +100,13 @@ flow:
 
         // DTMF 単独入力を優先判定
         function classifyByDtmf(raw) {
+          if (!raw) return null;
           var t = raw.replace(/\s/g, "");
           if (!/^[0-9]$/.test(t)) return null;
           if (t === "1") return "予約";
           if (t === "2") return "変更";
           if (t === "3") return "キャンセル";
-          if (t === "4") return "その他お問い合わせ";
+          if (t === "4") return "その他問い合わせ";
           return null;
         }
 
@@ -126,24 +126,25 @@ flow:
 
           // キャンセル（3番）を最優先
           if (/^3$/.test(n) || /3(ばん|番)/.test(n)) return "キャンセル";
-          if (/キャンセル|きゃんせる|取消|とりけし/.test(n)) return "キャンセル";
+          if (/きゃんせる|キャンセル|取消|とりけし|やめたい|やめます/.test(n)) return "キャンセル";
 
           // 変更（2番）
           if (/^2$/.test(n) || /2(ばん|番)/.test(n)) return "変更";
-          if (/変更|へんこう|かえたい|かえます|日にちをかえ|時間をかえ/.test(n)) return "変更";
+          if (/変更|へんこう|かえたい|かえます|日時をかえ|日にちをかえ|時間をかえ|じかんをかえ/.test(n)) return "変更";
 
           // 新規予約（1番） → 出力は「予約」
           if (/^1$/.test(n) || /1(ばん|番)/.test(n)) return "予約";
           if (/新規予約|しんきよやく|しんきでよやく|あたらしくよやく|はじめてのよやく/.test(n)) return "予約";
           if (/予約|よやく/.test(n)) return "予約";
 
-          // その他お問い合わせ（4番）
-          if (/^4$/.test(n) || /4(ばん|番)/.test(n)) return "その他お問い合わせ";
-          if (/その他|そのた|ほかのおといあわせ|ほかのお問い合わせ|問い合わせ|といあわせ|質問|しつもん/.test(n)) {
-            return "その他お問い合わせ";
+          // その他お問い合わせ（4番） → 出力は「その他問い合わせ」
+          if (/^4$/.test(n) || /4(ばん|番)/.test(n)) return "その他問い合わせ";
+          if (/その他|そのた|ほかのおといあわせ|ほかのお問い合わせ|問い合わせ|といあわせ|質問|しつもん|相談|そうだん/.test(n)) {
+            return "その他問い合わせ";
           }
 
-          // どれにもはっきり該当しない
+          // どれにもはっきり該当しない → とりあえず「その他問い合わせ」に寄せるか、NO_RESULT にするか
+          // 今回ははっきりしない場合は NO_RESULT を返し、上位ノードでリトライさせる前提
           return "NO_RESULT";
         }
 
@@ -168,34 +169,13 @@ flow:
         logger.info("classification result: " + result);
         $runner.setResult(result);
       scriptExplanation: |-
-        1) Script làm gì
-        - Lấy kết quả nhập từ node `interaction_1` (có thể là text hoặc object có field `text`), trim khoảng trắng.
-        - Chuẩn hóa tiếng Nhật: đổi số/ký tự full-width → half-width, katakana → hiragana, bỏ khoảng trắng/ký hiệu/dấu câu.
-        - Nếu là nhập DTMF 1 ký tự (0–9) thì ưu tiên map trực tiếp:
-          - 1 → 予約
-          - 2 → 変更
-          - 3 → キャンセル
-          - 4 → その他お問い合わせ
-        - Nếu không phải DTMF đơn, dùng text đã chuẩn hóa để:
-          - Nhận biết yêu cầu nghe lại → REPEAT
-          - Phân loại ý định: キャンセル, 変更, 予約, その他お問い合わせ dựa trên số + “番/ばん” hoặc các cụm từ tiếng Nhật tương ứng.
-        - Nếu không khớp được rõ ràng → NO_RESULT.
-        - Nếu kết quả là 予約 / 変更 / キャンセル / その他お問い合わせ thì lưu vào DB (contextName = "classification") và set vào context; nếu là REPEAT hoặc NO_RESULT thì không lưu.
-        - Trả kết quả phân loại về node Logic bằng `$runner.setResult(result)`.
-
-        2) Các giá trị output/return có thể có và ý nghĩa
-        - "予約"  
-          Người gọi muốn “đặt mới” (新規予約, 予約 nói chung, hoặc chọn phím 1 / nói 1番).
-        - "変更"  
-          Người gọi muốn “thay đổi” nội dung đặt trước (ngày/giờ, v.v.; hoặc chọn phím 2 / nói 2番 / dùng các cụm từ thay đổi).
-        - "キャンセル"  
-          Người gọi muốn “hủy” đặt chỗ (キャンセル, 取消…, hoặc chọn phím 3 / nói 3番). Được ưu tiên xử lý trước các loại khác.
-        - "その他お問い合わせ"  
-          Người gọi có “các loại hỏi đáp khác / thắc mắc, liên hệ” (その他, 問い合わせ, 質問…, hoặc chọn phím 4 / nói 4番).
-        - "REPEAT"  
-          Người gọi yêu cầu “nghe lại / lặp lại” (các cụm như もう一度, くりかえし…). Dùng để rẽ nhánh sang flow nói lại lời hướng dẫn.
-        - "NO_RESULT"  
-          Không có input, hoặc input sau khi chuẩn hóa rỗng, hoặc không khớp rõ ràng với bất kỳ nhóm nào trên. Dùng để rẽ nhánh xử lý lỗi nhận dạng / hỏi lại.
+        - Script lấy kết quả nhập (giọng nói hoặc DTMF), chuẩn hóa, phân loại ý định khách (予約/変更/キャンセル/その他問い合わせ/REPEAT/NO_RESULT), log lại và lưu kết quả phân loại (trừ REPEAT, NO_RESULT) vào context/DB.  
+        - "予約": khách muốn đặt mới (hoặc chọn phím 1).  
+        - "変更": khách muốn thay đổi nội dung/Ngày giờ đặt (hoặc chọn phím 2).  
+        - "キャンセル": khách muốn hủy đặt chỗ (hoặc chọn phím 3).  
+        - "その他問い合わせ": khách có các hỏi đáp/trao đổi khác (hoặc chọn phím 4).  
+        - "REPEAT": khách yêu cầu lặp lại/nhắc lại nội dung.  
+        - "NO_RESULT": không hiểu/không phân loại được, để node trên xử lý retry.
       branches:
         - default: interaction_1
           label: retry
@@ -251,66 +231,6 @@ flow:
         x: 2224
         y: 896
       description: ""
-    - id: openai_1
-      type: openai
-      name: OpenAI 1
-      position:
-        x: 1808
-        y: 608
-      description: ""
-      retryCount: "2"
-      prompt: |-
-        あなたは日本語音声通話のテキスト回答を分類するAIアシスタントです。
-
-        【前提・役割】
-        - 入力は音声認識（STT）結果のテキストです。
-        - 直前に案内された質問内容は次の通りです：
-          「はじめに、ご用件を次の4つのうち、いずれかでお話しください。 1番. 新規予約、2番. 予約変更、3番. 予約キャンセル、4番. その他お問い合わせ。プッシュボタンでも操作可能です。」
-        - 発話内容から、発話者の「用件」を4つのいずれかに必ず1つだけ分類してください。
-
-        【入力】
-        - あなたが受け取るのは、通話相手の発話をSTTしたテキスト1文または数文です。
-        - 内容には、「番号だけ」「番号＋番」「用件名そのもの」「それに相当する自然な言い回し」が含まれる可能性があります。
-          例：
-          - 「1」, 「１」, 「1番」, 「1番で」, 「新規予約」, 「予約をしたい」
-          - 「2」, 「２」, 「2番」, 「予約変更」, 「日程を変えたい」
-          - 「3」, 「３」, 「3番」, 「キャンセル」, 「予約を取り消したい」
-          - 「4」, 「４」, 「4番」, 「問い合わせ」, 「質問がある」など
-
-        【分類すべき4ラベル（出力候補はこの4つのみ）】
-        1. 予約  
-           - 「新規予約」や「予約したい」「予約をお願いします」など、予約そのものを新しく取りたい意図。
-           - 数字で「1」「１」「1番」「１番」と答えている場合も、意味としては新規予約なので「予約」とする。
-
-        2. 変更  
-           - 「予約変更」「変更したい」「日にちを変えたい」「時間を変えたい」など、既存の予約内容を変えたい意図。
-           - 数字で「2」「２」「2番」「２番」と答えている場合も「変更」とする。
-
-        3. キャンセル  
-           - 「予約キャンセル」「キャンセルしたい」「取り消したい」「やめたい」など、既に取ってある予約をやめたい意図。
-           - 数字で「3」「３」「3番」「３番」と答えている場合も「キャンセル」とする。
-
-        4. その他お問い合わせ  
-           - 上記3つ（新規予約・変更・キャンセル）にはっきり当てはまらず、「問い合わせ」「質問」「確認したいことがある」「相談したい」など、その他の問い合わせ全般。
-           - 数字で「4」「４」「4番」「４番」と答えている場合も「その他お問い合わせ」とする。
-
-        【判断のガイドライン】
-        - DTMF的な入力（「1」「2」「3」「4」や「1番」「2番」など数字中心の応答）があれば、それを最優先して該当する用件に対応づけてください。
-        - 「新規予約」と「変更」「キャンセル」が混ざっている場合は、発話の主目的を読み取り、もっとも自然な用件1つに決めてください。
-          - 例：「前の予約はキャンセルして、新しく取り直したい」→ 主目的が新しく取り直す場合は「予約」として扱ってよい。
-          - 例：「予約の時間を変えたいんですが」→ 「変更」
-        - 明らかに3つ（予約・変更・キャンセル）のどれにも当てはまらず、単なる質問や相談・確認・案内依頼である場合は「その他お問い合わせ」としてください。
-        - 上記4つのどれかには必ず分類できる前提で考え、曖昧な場合は内容からもっとも近いものを1つだけ選んでください。
-
-        【出力形式（重要）】
-        - 出力は、以下の4つの文字列のうち、どれか1つだけをそのまま返してください。
-          - 予約
-          - 変更
-          - キャンセル
-          - その他お問い合わせ
-
-        - それ以外の文字、記号、説明文、改行は一切付け加えないでください。
-        - 必ず上記4つのいずれか1語のみを返してください。
   subflows:
     - name: 個人情報
       nodes: []
