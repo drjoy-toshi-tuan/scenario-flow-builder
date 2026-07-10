@@ -5,6 +5,7 @@ import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID, ALLOW_DEMO } from './config';
 import { verifyIdToken, reasonToMessageKey } from './verifyIdToken';
 import { createNonce, clearNonce, peekNonce } from './nonce';
 import { Icon } from '../ui/icons';
+import { BrekekeLogo } from '../ui/BrekekeLogo';
 import { useLang, useT, type TKey } from '../ui/i18n';
 import { useTheme } from '../ui/theme';
 import { SlideToggle } from '../components/SlideToggle';
@@ -24,14 +25,6 @@ export function LoginScreen() {
   // Sinh nonce một lần cho mỗi lần mở màn login (chống replay). Gắn vào <GoogleLogin>.
   const nonce = useMemo(() => createNonce(), []);
 
-  // Icon spinner (SMIL loop) giữ nguyên element giữa các lần render (đổi theme/lang/
-  // error đều re-render màn này) — nếu không, animation chết sau lần render thứ 2
-  // (xem giải thích ở FlowsPanel).
-  const logoIcon = useMemo(
-    () => <Icon icon="svg-spinners:gooey-balls-1" width={34} height={34} />,
-    [],
-  );
-
   return (
     <div className="relative flex h-full items-center justify-center overflow-hidden bg-[var(--bk-bg)] p-6">
       {/* Vầng sáng accent mờ phía sau — tạo chiều sâu, cảm giác cao cấp */}
@@ -39,6 +32,19 @@ export function LoginScreen() {
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--bk-accent)] opacity-[0.08] blur-[100px]"
       />
+
+      {/* Brand lockup trên cùng: logo ếch dạng nét (bỏ nền, tô accent) + wordmark.
+          Wordmark dùng Space Grotesk (geometric, hiện đại, hợp tech/AI) màu --bk-text
+          (trắng ở dark mode, đậm ở light mode để luôn nổi bật). */}
+      <div className="absolute left-5 top-5 flex items-center gap-2.5">
+        <BrekekeLogo className="h-9 w-9 shrink-0 text-[var(--bk-accent)]" />
+        <span
+          className="text-lg font-semibold tracking-tight text-[var(--bk-text)]"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          Brekeke Flow Builder
+        </span>
+      </div>
 
       {/* Toggle ngôn ngữ & theme ngay trên màn login */}
       <div className="absolute right-5 top-5 flex items-center gap-2">
@@ -69,12 +75,9 @@ export function LoginScreen() {
           className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-[var(--bk-accent)] to-transparent opacity-70"
         />
         <div className="mb-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bk-accent)] text-white shadow-lg ring-4 ring-[var(--bk-accent-soft)]">
-            {logoIcon}
-          </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-[var(--bk-text)]">
-            Brekeke Flow Builder
-          </h1>
+          <h2 className="text-xl font-bold tracking-tight text-[var(--bk-text)]">
+            {t('loginTitle')}
+          </h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--bk-text-muted)]">
             {t('loginSubtitle', { domain: ALLOWED_DOMAIN })}
           </p>
