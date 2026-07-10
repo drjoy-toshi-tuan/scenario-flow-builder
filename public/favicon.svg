@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Brekeke Flow Builder">
+  <!-- Nền bo góc, dùng brand accent (cam #ff7a1a) -->
+  <rect width="64" height="64" rx="14" fill="#ff7a1a"/>
+  <!-- Sơ đồ flow: 1 node nguồn (trái) rẽ nhánh tới 2 node (phải), giống canvas n8n -->
+  <g fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round">
+    <path d="M22 32 H33"/>
+    <path d="M33 32 C40 32 40 21 47 21"/>
+    <path d="M33 32 C40 32 40 43 47 43"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="18" cy="32" r="6"/>
+    <circle cx="47" cy="21" r="5"/>
+    <circle cx="47" cy="43" r="5"/>
+  </g>
+</svg>
