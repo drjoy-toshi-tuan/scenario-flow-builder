@@ -43,37 +43,39 @@ function aiErrorKey(e: unknown): TKey {
   return 'aiErrCall';
 }
 
-// Gõ dần `text` vào ô (hiệu ứng đánh máy). Thời lượng co giãn theo độ dài, chặn trong
-// [500ms, 2600ms]; ease-out để đoạn cuối chậm lại chút -> cảm giác tự nhiên, chuyên
-// nghiệp (không quá nhanh cũng không quá chậm). isCancelled -> ghi hết ngay & dừng.
+// Gõ dần `text` vào ô theo TỪNG DÒNG một (hiện thêm 1 dòng sau mỗi nhịp) — cảm giác
+// AI đang soạn code/prompt chuyên nghiệp, không nhảy hết cùng lúc. Chậm hơn một chút
+// so với gõ theo ký tự nhưng "có nhịp". Nhịp mỗi dòng co theo số dòng để flow dài
+// không quá lê thê, chặn trong [55ms, 140ms]. isCancelled -> ghi hết ngay & dừng.
 function typeInto(
   text: string,
   onChange: (v: string) => void,
   isCancelled: () => boolean,
 ): Promise<void> {
   return new Promise((resolve) => {
-    const len = text.length;
-    if (len === 0) {
+    if (text.length === 0) {
       onChange('');
       resolve();
       return;
     }
-    const duration = Math.min(2600, Math.max(500, len * 7));
-    const start = performance.now();
-    const tick = (now: number) => {
+    const lines = text.split('\n');
+    const perLine = Math.min(140, Math.max(55, Math.round(3200 / lines.length)));
+    let shown = 0;
+    const step = () => {
       if (isCancelled()) {
         onChange(text);
         resolve();
         return;
       }
-      const p = Math.min(1, (now - start) / duration);
-      const eased = 1 - (1 - p) * (1 - p); // ease-out quad
-      const chars = Math.max(1, Math.round(len * eased));
-      onChange(text.slice(0, chars));
-      if (p < 1) requestAnimationFrame(tick);
-      else resolve();
+      shown += 1;
+      onChange(lines.slice(0, shown).join('\n'));
+      if (shown >= lines.length) {
+        resolve();
+        return;
+      }
+      window.setTimeout(step, perLine);
     };
-    requestAnimationFrame(tick);
+    step();
   });
 }
 
@@ -155,7 +157,15 @@ export function AiEditableField({
 
       <div className="relative mt-1">
         {field.kind === 'code' ? (
-          <CodeEditor value={value} onChange={onChange} rows={field.rows ?? 12} language={field.language} />
+          // AI đang gõ dần (typing/waiting) -> tắt báo lỗi cú pháp: code chưa hoàn chỉnh
+          // nên đừng nháy lỗi. Gõ xong (phase idle) hoặc người dùng tự sửa -> lint lại.
+          <CodeEditor
+            value={value}
+            onChange={onChange}
+            rows={field.rows ?? 12}
+            language={field.language}
+            suppressLint={busy}
+          />
         ) : (
           <textarea
             className={`${FIELD_CLASS} resize-y`}

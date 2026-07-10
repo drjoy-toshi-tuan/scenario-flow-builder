@@ -231,16 +231,19 @@ interface CodeEditorProps {
   // 'js' (mặc định) lint bằng new Function; 'json' lint bằng JSON.parse.
   // Bộ tô sáng dùng chung (scanner JS xử lý chuỗi/số/dấu câu của JSON ổn).
   language?: 'js' | 'json';
+  // Tạm TẮT kiểm tra cú pháp (vd khi AI đang gõ dần code) — code chưa hoàn chỉnh
+  // nên đừng nháy báo lỗi liên tục; lint lại bình thường khi gõ xong / người dùng tự gõ.
+  suppressLint?: boolean;
 }
 
-export function CodeEditor({ value, onChange, rows = 18, language = 'js' }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, rows = 18, language = 'js', suppressLint = false }: CodeEditorProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
 
   const lines = useMemo(() => value.split('\n'), [value]);
   const { guides } = useMemo(() => computeGuides(lines), [lines]);
   const html = useMemo(() => highlight(value), [value]);
-  const error = useMemo(() => lintFor(language, value), [language, value]);
+  const error = useMemo(() => (suppressLint ? null : lintFor(language, value)), [language, value, suppressLint]);
 
   // Đồng bộ cuộn: textarea (trên) cuộn -> lớp highlight + gutter dịch theo (transform).
   const onScroll = (e: UIEvent<HTMLTextAreaElement>) => {

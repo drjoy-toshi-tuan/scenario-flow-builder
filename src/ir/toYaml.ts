@@ -30,6 +30,7 @@ interface OutNode {
   position?: Pos;
   [key: string]: unknown;
   next?: string;
+  failed?: string;
   branches?: OutBranch[];
 }
 
@@ -125,9 +126,15 @@ function serializeGraph(
       });
       if (branches.length > 0) out.branches = branches;
     } else {
-      // Node thường: lấy edge default đầu tiên làm next.
-      const nextEdge = edges.find((e) => (e.sourceHandle ?? 'default') === 'default') ?? edges[0];
+      // Node thường: edge default -> next. Node có nhánh thất bại CỐ ĐỊNH
+      // (interaction/openai/faq/transfer) — edge handle 'failed' -> field `failed`
+      // để không mất nhánh khi round-trip qua YAML.
+      const nextEdge = edges.find((e) => (e.sourceHandle ?? 'default') === 'default');
+      const failedEdge = edges.find((e) => e.sourceHandle === 'failed');
       if (nextEdge) out.next = nextEdge.target;
+      // Dữ liệu cũ: chỉ có 1 edge với handle lạ (không 'default'/'failed') -> vẫn coi là next.
+      else if (!failedEdge && edges[0]) out.next = edges[0].target;
+      if (failedEdge) out.failed = failedEdge.target;
     }
 
     outNodes.push(out);

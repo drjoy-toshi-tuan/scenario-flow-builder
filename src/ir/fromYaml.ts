@@ -44,6 +44,7 @@ interface RawNode {
   type: string;
   position?: RawPos; // toạ độ đã lưu (giữ bố cục, khỏi auto-layout lại)
   next?: string;
+  failed?: string; // nhánh thất bại cố định (interaction/openai/faq/transfer)
   branches?: RawBranch[];
   [key: string]: unknown;
 }
@@ -77,7 +78,7 @@ function readPos(raw: RawPos | undefined): { x: number; y: number } {
 
 // Field mang tính "cấu trúc" (không phải tham số riêng của node) — không đưa vào data.
 // `name` = tên hiển thị (label) do người dùng đặt; đọc riêng ra node.label.
-const STRUCTURAL_KEYS = new Set(['id', 'name', 'type', 'position', 'next', 'branches']);
+const STRUCTURAL_KEYS = new Set(['id', 'name', 'type', 'position', 'next', 'failed', 'branches']);
 
 function coerceNodeType(raw: string): NodeType {
   if (raw in LEGACY_TYPE_ALIASES) return LEGACY_TYPE_ALIASES[raw]; // file cũ: input/condition/script/llm
@@ -161,6 +162,16 @@ function parseGraph(
         source: raw.id,
         target: raw.next,
         sourceHandle: 'default',
+      });
+    }
+
+    // failed -> edge nhánh thất bại cố định (handle 'failed').
+    if (typeof raw.failed === 'string') {
+      edges.push({
+        id: edgeId(raw.id, raw.failed, 'failed'),
+        source: raw.id,
+        target: raw.failed,
+        sourceHandle: 'failed',
       });
     }
 

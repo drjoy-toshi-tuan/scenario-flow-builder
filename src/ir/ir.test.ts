@@ -291,6 +291,38 @@ flow:
     ]);
   });
 
+  it('nhánh FAILED (interaction/openai/faq/transfer) round-trip qua YAML', () => {
+    const withFailed = `
+flow:
+  name: "f"
+  start: ask
+  nodes:
+    - id: ask
+      type: input
+      announce: "お名前を"
+      next: ok
+      failed: retry
+    - id: ok
+      type: hangup
+    - id: retry
+      type: hangup
+`;
+    const ir = fromYaml(withFailed);
+    // fromYaml: field failed -> edge handle 'failed'.
+    const failedEdge = ir.edges.find((e) => e.source === 'ask' && e.sourceHandle === 'failed');
+    expect(failedEdge?.target).toBe('retry');
+    const nextEdge = ir.edges.find((e) => e.source === 'ask' && (e.sourceHandle ?? 'default') === 'default');
+    expect(nextEdge?.target).toBe('ok');
+
+    // toYaml: giữ cả next lẫn failed (trước đây nhánh failed bị mất khi lưu).
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; next?: string; failed?: string }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'ask')!;
+    expect(out.next).toBe('ok');
+    expect(out.failed).toBe('retry');
+  });
+
   it('defaultDataFor: seed tham số mặc định + 1 nhánh cho node editable', () => {
     const interaction = defaultDataFor('interaction');
     expect(interaction.inputType).toBe('STT');
