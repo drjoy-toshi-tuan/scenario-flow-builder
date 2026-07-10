@@ -220,7 +220,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginNotConfigured:
       'Chưa cấu hình đăng nhập Google (thiếu Client ID). Vui lòng liên hệ quản trị viên.',
     // ── Quản lý file YAML (GitHub) ──
-    fmTitle: 'Quản lý file YAML',
+    fmTitle: 'Quản lý flow (YAML)',
     fmSubtitle: 'Chọn file có sẵn hoặc tải lên file mới để mở trên canvas.',
     fmConnectTitle: 'Kết nối GitHub',
     fmConnectDesc: 'Nhập Classic Token có quyền ghi Contents trên Repo.',
@@ -250,7 +250,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmBrowseRepo: 'Xem trên GitHub',
     fmFolderNote: 'Thư mục: {dir}',
     fmBackToFiles: 'Danh sách file',
-    fmBackToManager: 'Về màn quản lý file',
+    fmBackToManager: 'Về màn quản lý flow',
     fmSaveToRepo: 'Lưu flow',
     fmSaving: 'Đang lưu…',
     fmSaved: 'Lưu flow thành công',
@@ -494,7 +494,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     loginNotConfigured:
       'Googleログインが未設定です（Client IDがありません）。管理者にお問い合わせください。',
     // ── YAMLファイル管理（GitHub） ──
-    fmTitle: 'YAMLファイル管理',
+    fmTitle: 'フロー管理（YAML）',
     fmSubtitle: '既存のファイルを選ぶか、新しいファイルをアップロードしてキャンバスで開きます。',
     fmConnectTitle: 'GitHub接続',
     fmConnectDesc: 'リポジトリの Contents 書き込み権限を持つ Classic Token を入力してください。',
@@ -524,7 +524,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     fmBrowseRepo: 'GitHubで開く',
     fmFolderNote: 'フォルダ: {dir}',
     fmBackToFiles: 'ファイル一覧',
-    fmBackToManager: 'ファイル管理へ戻る',
+    fmBackToManager: 'フロー管理へ戻る',
     fmSaveToRepo: 'フロー保存',
     fmSaving: '保存中…',
     fmSaved: 'フローを保存しました',

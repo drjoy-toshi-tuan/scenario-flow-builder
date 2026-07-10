@@ -5,10 +5,10 @@ import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID, ALLOW_DEMO } from './config';
 import { verifyIdToken, reasonToMessageKey } from './verifyIdToken';
 import { createNonce, clearNonce, peekNonce } from './nonce';
 import { Icon } from '../ui/icons';
-import { BrekekeLogo } from '../ui/BrekekeLogo';
+import { BrandLockup } from '../ui/BrandLockup';
 import { useLang, useT, type TKey } from '../ui/i18n';
 import { useTheme } from '../ui/theme';
-import { SlideToggle } from '../components/SlideToggle';
+import { InterfaceMenu } from '../components/InterfaceMenu';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Màn hình đăng nhập. Chỉ tài khoản @drjoy.jp (claim hd) và email_verified mới vào.
@@ -17,8 +17,9 @@ import { SlideToggle } from '../components/SlideToggle';
 
 export function LoginScreen() {
   const { authenticate } = useAuth();
-  const { lang, setLang } = useLang();
-  const { theme, setTheme } = useTheme();
+  // Chỉ đọc lang/theme để truyền cho <GoogleLogin>; đổi giá trị nằm trong InterfaceMenu.
+  const { lang } = useLang();
+  const { theme } = useTheme();
   const t = useT();
   const [error, setError] = useState<string | null>(null);
 
@@ -33,39 +34,12 @@ export function LoginScreen() {
         className="pointer-events-none absolute left-1/2 top-1/2 h-[460px] w-[460px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--bk-accent)] opacity-[0.08] blur-[100px]"
       />
 
-      {/* Brand lockup trên cùng: logo ếch dạng nét (bỏ nền, tô accent) + wordmark.
-          Wordmark dùng Space Grotesk (geometric, hiện đại, hợp tech/AI) màu --bk-text
-          (trắng ở dark mode, đậm ở light mode để luôn nổi bật). */}
-      <div className="absolute left-5 top-5 flex items-center gap-2.5">
-        <BrekekeLogo className="h-9 w-9 shrink-0 text-[var(--bk-accent)]" />
-        <span
-          className="text-lg font-semibold tracking-tight text-[var(--bk-text)]"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Brekeke Flow Builder
-        </span>
-      </div>
+      {/* Brand lockup trên cùng bên trái (logo ếch nét + wordmark). */}
+      <BrandLockup className="absolute left-5 top-5" logoClass="h-9 w-9" textClass="text-2xl" />
 
-      {/* Toggle ngôn ngữ & theme ngay trên màn login */}
-      <div className="absolute right-5 top-5 flex items-center gap-2">
-        <SlideToggle
-          value={lang}
-          options={[
-            { key: 'vi', label: 'Tiếng Việt' },
-            { key: 'ja', label: '日本語' },
-          ]}
-          onChange={(k) => setLang(k as 'vi' | 'ja')}
-          ariaLabel="Language"
-        />
-        <SlideToggle
-          value={theme}
-          options={[
-            { key: 'light', icon: 'line-md:sunny-loop' },
-            { key: 'dark', icon: 'line-md:moon-alt-loop' },
-          ]}
-          onChange={(k) => setTheme(k as 'light' | 'dark')}
-          ariaLabel="Theme"
-        />
+      {/* Nút menu (ngôn ngữ + theme) — panel đóng/mở giống các màn khác. */}
+      <div className="absolute right-5 top-5">
+        <InterfaceMenu />
       </div>
 
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-8 shadow-[var(--bk-shadow)]">
