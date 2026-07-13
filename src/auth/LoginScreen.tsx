@@ -56,7 +56,7 @@ export function LoginScreen() {
             className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-[var(--bk-accent)] to-transparent opacity-70"
           />
           <div className="mb-6 text-center">
-            {/* Icon spinner cam như thiết kế cũ (không kèm chữ "Brekeke Flow Builder"
+            {/* Icon spinner cam như thiết kế cũ (không kèm chữ "Scenario Flow Builder"
                 vì thương hiệu đã nằm ở header trên cùng bên trái). */}
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bk-accent)] text-white shadow-lg ring-4 ring-[var(--bk-accent-soft)]">
               {logoIcon}

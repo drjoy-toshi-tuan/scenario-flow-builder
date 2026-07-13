@@ -13,7 +13,7 @@ export function Toolbar() {
   // thì kèm badge tên sub flow để biết mình đang sửa graph nào.
   const activeSub =
     activeFlowId !== 'main' ? ir?.subflows?.find((s) => s.id === activeFlowId) : undefined;
-  const flowName = ir?.meta.name ?? 'Brekeke Flow Builder';
+  const flowName = ir?.meta.name ?? 'Scenario Flow Builder';
   const title = ir?.meta.facility ? `${ir.meta.facility} | ${flowName}` : flowName;
   const subCount = ir?.subflows?.length ?? 0;
 

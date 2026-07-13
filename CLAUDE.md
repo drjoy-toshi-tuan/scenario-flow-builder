@@ -1,4 +1,4 @@
-# CLAUDE.md — ngữ cảnh lâu dài cho AI電話 Flow Builder
+# CLAUDE.md — ngữ cảnh lâu dài cho Scenario Flow Builder
 
 > Tách từ §1 (tech stack) + §3 (IR) + §9 (nguyên tắc code) của `BUILD_PROMPT.md`.
 > Đây là ngữ cảnh kiến trúc phải giữ cho các phase sau.

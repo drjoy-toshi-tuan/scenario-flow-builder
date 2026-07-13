@@ -1,4 +1,4 @@
-# AI電話 Flow Builder — Build Prompt (Phase 1)
+# Scenario Flow Builder — Build Prompt (Phase 1)
 
 > File này là prompt/spec để đưa cho **Claude Code**. Cách dùng:
 > tạo repo rỗng trên GitHub → clone về → chạy `claude` trong thư mục đó →
