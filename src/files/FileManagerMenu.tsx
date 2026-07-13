@@ -5,6 +5,7 @@ import { useTheme } from '../ui/theme';
 import { useLang, useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { SlideToggle } from '../components/SlideToggle';
+import { MenuBrandHeader } from '../components/MenuBrandHeader';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Menu dọc cho màn Quản lý file (giống HeaderMenu ở canvas: nút icon -> panel
@@ -61,6 +62,7 @@ export function FileManagerMenu() {
           }}
           className={`bk-addmenu bk-headermenu ${open ? 'bk-addmenu--in' : 'bk-addmenu--out'} absolute right-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-2 shadow-[var(--bk-shadow)]`}
         >
+          <MenuBrandHeader />
           {/* ── Cài đặt giao diện ── */}
           <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
             {t('secInterface')}

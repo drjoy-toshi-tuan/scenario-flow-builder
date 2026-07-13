@@ -48,7 +48,7 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
         <header className="bk-ivr-modal-header">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
-              <Icon icon="lucide:layout-dashboard" width={17} height={17} />
+              <Icon icon="line-md:text-box" width={17} height={17} />
             </span>
             <span className="text-sm font-bold text-[var(--bk-text)]">{t('ivrProperty')}</span>
           </div>

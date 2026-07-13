@@ -456,6 +456,16 @@ export const FAILED_BRANCH_LABEL = '失敗';
 // Nhãn nhánh "ngoài đối tượng" của Clinical Department Classifier.
 export const NOT_COVERED_BRANCH_LABEL = '対象外';
 
+// ── Regex chuẩn cho các nhánh có TÊN cố định (để downstream/hệ thống biết) ─────
+// Hệ thống đánh giá điều kiện nhánh TỪ TRÊN xuống DƯỚI, nên:
+//   - FAILED  = nhóm kết quả lỗi / không có dữ liệu. Mặc định gồm 4 mã:
+//               TIMEOUT | ERROR | NO_RESULT | INVALID.
+//   - SUCCESS = nhánh catch-all NẰM CUỐI: các mã trên đã bị nhánh khác lấy hết nên
+//               để ^.*$ là gom trọn phần còn lại (không cần loại trừ tay).
+// Giữ ở dạng regex thô (không kèm ^ $ — chỉ thêm khi hiển thị).
+export const FAILED_REGEX = 'TIMEOUT|ERROR|NO_RESULT|INVALID';
+export const SUCCESS_REGEX = '.*';
+
 const NEXT_ONLY: BranchDescriptor[] = [{ id: 'default', name: '.*', label: NEXT_BRANCH_LABEL }];
 // FAILED + NEXT dùng chung cho interaction/openai/faq/transfer.
 const FAILED_NEXT: BranchDescriptor[] = [
@@ -499,12 +509,16 @@ export function catchAllEditable(type: NodeType, data: Record<string, unknown>):
   return type === 'nexus' || (type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_MRB);
 }
 
-// Bộ nhánh mặc định khi node logic chuyển sang module Clinic Day Classifier:
-//   ^NON_BUSINESS_DAY$ → 休診日, ^不明$ → 不明, catch-all → 診療日.
-export const CDC_DEFAULT_BRANCHES: readonly DataBranch[] = [
-  { id: CATCH_ALL_ID, value: '', label: '診療日' },
-  { id: 'b0', value: 'NON_BUSINESS_DAY', label: '休診日' },
-  { id: 'b1', value: '不明', label: '不明' },
+// Bộ nhánh CỐ ĐỊNH của module Clinic Day Classifier — value + label khoá cứng,
+// không thêm/xoá/sửa. Đánh giá TỪ TRÊN xuống:
+//   ^FAILED$ → 失敗 (FAILED_REGEX) · ^NON_BUSINESS_DAY$ → 休診日 · ^不明$ → 不明 ·
+//   ^PAST_DAY$ → 過去日 · catch-all ^.*$ → 診療日 (nằm cuối nên gom mọi kết quả còn lại).
+export const CDC_FIXED_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: SUCCESS_REGEX, label: '診療日' },
+  { id: 'b0', value: 'FAILED', label: FAILED_BRANCH_LABEL },
+  { id: 'b1', value: 'NON_BUSINESS_DAY', label: '休診日' },
+  { id: 'b2', value: '不明', label: '不明' },
+  { id: 'b3', value: 'PAST_DAY', label: '過去日' },
 ] as const;
 
 // Incoming Classifier: catch-all (その他) + 5 loại số gọi đến — bộ nhánh CỐ ĐỊNH,
@@ -545,6 +559,7 @@ export const INVALID_SUCCESS_FIXED_BRANCHES: readonly DataBranch[] = [
 // các module này thì data.branches bị THAY HẲN bằng bộ chuẩn (xem flowStore.setDraftField)
 // — không giữ nhánh của module trước (tránh DOCC mang nhầm nhánh của IC).
 export const MODULE_FIXED_BRANCHES: Record<string, readonly DataBranch[]> = {
+  [LOGIC_MODULE_CDC]: CDC_FIXED_BRANCHES,
   [LOGIC_MODULE_IC]: IC_FIXED_BRANCHES,
   [LOGIC_MODULE_DOCC]: DOCC_FIXED_BRANCHES,
   [LOGIC_MODULE_NULLCHECK]: NULL_CHECK_FIXED_BRANCHES,
@@ -602,10 +617,10 @@ export function fixedModuleBranches(
 }
 
 // Bộ nhánh mặc định theo module — seed khi đổi module ở panel NẾU node chưa có nhánh
-// tuỳ biến (khác bộ cố định ở trên: CDC seed xong người dùng vẫn sửa được).
-export const MODULE_DEFAULT_BRANCHES: Record<string, readonly DataBranch[]> = {
-  [LOGIC_MODULE_CDC]: CDC_DEFAULT_BRANCHES,
-};
+// tuỳ biến (khác bộ cố định ở trên: seed xong người dùng vẫn sửa được). Hiện chưa
+// module nào dùng (Clinic Day Classifier đã chuyển sang bộ nhánh CỐ ĐỊNH); giữ cơ
+// chế cho các module tương lai cần seed-nhưng-sửa-được.
+export const MODULE_DEFAULT_BRANCHES: Record<string, readonly DataBranch[]> = {};
 
 // Ép chuỗi nhập về định dạng HH:mm:ss (ô kind 'time'): chỉ giữ chữ số (tối đa 6),
 // tự chèn ':' sau mỗi cặp — gõ/dán gì cũng ra dạng 12:34:56 (có thể dở dang khi đang gõ).
