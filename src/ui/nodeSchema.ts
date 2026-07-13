@@ -258,9 +258,43 @@ function saveContextOn(data: Record<string, unknown>): boolean {
   return data.saveContext === 'yes';
 }
 
-// Interaction: chỉ hiện "Repeat Announce" khi bật "Repeat" (復唱).
-function repeatOn(data: Record<string, unknown>): boolean {
-  return data.repeat === 'yes';
+// Interaction: chỉ hiện "Re-confirm Announce" khi bật "Re-confirm" (復唱).
+function reconfirmOn(data: Record<string, unknown>): boolean {
+  return data.reconfirm === 'yes';
+}
+
+// ── Template (テンプレート) của node Interaction ──────────────────────────────
+// Chọn 1 mẫu -> tự set + KHOÁ các tham số bên dưới (không cho chỉnh sửa). Giá trị
+// '' (=－) nghĩa là không chọn template, mọi tham số sửa tự do như bình thường.
+export const TEMPLATE_PATIENT_NAME = 'tpl_PatientName';
+export const TEMPLATE_PATIENT_DOB = 'tpl_PatientDateOfBirth';
+export const TEMPLATE_PHONE_LANDLINE_MOBILE = 'tpl_PhoneNumber_landline_mobile';
+export const TEMPLATE_PHONE_MOBILE_ONLY = 'tpl_PhoneNumber_mobile_only';
+export const TEMPLATE_MEDICAL_CARD = 'tpl_MedicalCardNumber';
+
+const TEMPLATE_OPTIONS: FieldOption[] = [
+  { value: '', labelKey: 'tplNone' },
+  { value: TEMPLATE_PATIENT_NAME, labelKey: 'tplPatientName' },
+  { value: TEMPLATE_PATIENT_DOB, labelKey: 'tplPatientDob' },
+  { value: TEMPLATE_PHONE_LANDLINE_MOBILE, labelKey: 'tplPhoneLandlineMobile' },
+  { value: TEMPLATE_PHONE_MOBILE_ONLY, labelKey: 'tplPhoneMobileOnly' },
+  { value: TEMPLATE_MEDICAL_CARD, labelKey: 'tplMedicalCard' },
+];
+
+// Với mỗi template: các tham số bị ÉP giá trị + KHOÁ (không cho sửa ở panel).
+// key = tham số trong node.data; value = giá trị cố định theo template.
+export const TEMPLATE_LOCKS: Record<string, Record<string, string>> = {
+  [TEMPLATE_PATIENT_NAME]: { reconfirm: 'no', inputType: 'STT', voiceType: 'KANA_NAME' },
+  [TEMPLATE_PATIENT_DOB]: { voiceType: 'TEXT' },
+  [TEMPLATE_PHONE_LANDLINE_MOBILE]: { voiceType: 'PHONE_NUMBER' },
+  [TEMPLATE_PHONE_MOBILE_ONLY]: { voiceType: 'PHONE_NUMBER' },
+  [TEMPLATE_MEDICAL_CARD]: { voiceType: 'TEXT' },
+};
+
+// Bộ tham số bị khoá theo template đang chọn (rỗng nếu không chọn template).
+export function templateLocks(data: Record<string, unknown>): Record<string, string> {
+  const tpl = typeof data.template === 'string' ? data.template : '';
+  return TEMPLATE_LOCKS[tpl] ?? {};
 }
 
 // CDC/MRB: chỉ hiện Tên/Kiểu context khi bật "Lưu context" của module tương ứng.
@@ -283,10 +317,12 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
   ],
   announce: [{ key: 'text', labelKey: 'fAnnounce', kind: 'autoText' }],
   interaction: [
+    // Template (テンプレート): chọn mẫu -> tự set + khoá các tham số bên dưới.
+    { key: 'template', labelKey: 'fTemplate', kind: 'select', options: TEMPLATE_OPTIONS },
     { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
-    // Repeat (復唱): ngay dưới Announce; bật -> hiện Repeat Announce (復唱アナウンス).
-    { key: 'repeat', labelKey: 'fRepeat', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
-    { key: 'repeatAnnounce', labelKey: 'fRepeatAnnounce', kind: 'autoText', showIf: repeatOn },
+    // Re-confirm (復唱): ngay dưới Announce; bật -> hiện Re-confirm Announce (復唱アナウンス).
+    { key: 'reconfirm', labelKey: 'fReconfirm', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
+    { key: 'reconfirmAnnounce', labelKey: 'fReconfirmAnnounce', kind: 'autoText', showIf: reconfirmOn },
     { key: 'inputType', labelKey: 'fInputType', kind: 'select', options: INPUT_TYPE_OPTIONS, default: 'STT' },
     {
       key: 'voiceType',
@@ -319,7 +355,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'script', labelKey: 'fScript', kind: 'code', rows: 18, showIf: moduleIsScript, aiGenerate: 'script' },
 
     // ── Clinic Day Classifier ──
-    { key: 'module', labelKey: 'fRefModule', kind: 'searchSelect', optionsFrom: 'interactionNodes', showIf: moduleIsCdc },
+    // Module tham chiếu: nhận node Interaction + context (giống Module Result Binder).
+    { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCdc },
     {
       key: 'holidaySource',
       labelKey: 'fHolidaySource',

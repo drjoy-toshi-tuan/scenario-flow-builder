@@ -27,6 +27,10 @@ import {
   readClinicalDepartments,
   CATCH_ALL_ID,
   formatTimeInput,
+  templateLocks,
+  TEMPLATE_PATIENT_NAME,
+  TEMPLATE_PATIENT_DOB,
+  TEMPLATE_MEDICAL_CARD,
 } from '../ui/nodeSchema';
 import { parseFlowMeta, updateFlowMeta } from './flowMeta';
 
@@ -102,6 +106,60 @@ describe('fromYaml', () => {
   it('gom field lạ vào data', () => {
     const greet = ir.nodes.find((n) => n.id === 'greet');
     expect(greet?.data.text).toBe('ようこそ');
+  });
+});
+
+describe('migrate復唱: repeat -> reconfirm (file cũ)', () => {
+  const OLD = `
+flow:
+  name: "f"
+  start: ask
+  nodes:
+    - id: ask
+      type: interaction
+      announce: "お名前は？"
+      repeat: "yes"
+      repeatAnnounce: "〇〇でよろしいですか"
+      next: end
+    - id: end
+      type: hangup
+`;
+
+  it('fromYaml đổi repeat/repeatAnnounce sang reconfirm/reconfirmAnnounce', () => {
+    const ir = fromYaml(OLD);
+    const ask = ir.nodes.find((n) => n.id === 'ask')!;
+    expect(ask.data.reconfirm).toBe('yes');
+    expect(ask.data.reconfirmAnnounce).toBe('〇〇でよろしいですか');
+    expect(ask.data.repeat).toBeUndefined();
+    expect(ask.data.repeatAnnounce).toBeUndefined();
+  });
+
+  it('toYaml ghi lại bằng key mới reconfirm', () => {
+    const yaml = toYaml(fromYaml(OLD));
+    expect(yaml).toContain('reconfirm: yes');
+    expect(yaml).toContain('reconfirmAnnounce:');
+    expect(yaml).not.toMatch(/\brepeat:/);
+    expect(yaml).not.toContain('repeatAnnounce:');
+  });
+});
+
+describe('Template (Interaction) khoá tham số', () => {
+  it('không chọn template -> không khoá field nào', () => {
+    expect(templateLocks({})).toEqual({});
+    expect(templateLocks({ template: '' })).toEqual({});
+  });
+
+  it('氏名: khoá Re-confirm/Input Type/Voice Type theo mẫu', () => {
+    expect(templateLocks({ template: TEMPLATE_PATIENT_NAME })).toEqual({
+      reconfirm: 'no',
+      inputType: 'STT',
+      voiceType: 'KANA_NAME',
+    });
+  });
+
+  it('生年月日 & 診察券番号: khoá Voice Type = TEXT', () => {
+    expect(templateLocks({ template: TEMPLATE_PATIENT_DOB })).toEqual({ voiceType: 'TEXT' });
+    expect(templateLocks({ template: TEMPLATE_MEDICAL_CARD })).toEqual({ voiceType: 'TEXT' });
   });
 });
 

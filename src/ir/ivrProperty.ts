@@ -151,8 +151,8 @@ function announceLines(ir: FlowIR, token: string): string[] {
       lines.push(promptLine(name, str(node.data.text), token));
     } else if (node.type === 'interaction') {
       lines.push(promptLine(name, str(node.data.announce), token));
-      if (node.data.repeat === 'yes') {
-        lines.push(promptLine(`復唱_${name}`, str(node.data.repeatAnnounce), token));
+      if (node.data.reconfirm === 'yes') {
+        lines.push(promptLine(`復唱_${name}`, str(node.data.reconfirmAnnounce), token));
       }
       lines.push(promptLine(`リトライ_${name}`, str(node.data.retryAnnounce), token));
     } else if (node.type === 'openai') {

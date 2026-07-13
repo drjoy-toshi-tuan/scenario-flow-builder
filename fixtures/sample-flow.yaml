@@ -41,7 +41,7 @@ flow:
     - id: ask_name
       type: input
       announce: "続いて、受診される方のお名前を、フルネームでお話しください。"
-      repeat: "no"
+      reconfirm: "no"
       inputType: STT
       voiceType: KANA_NAME
       retryCount: 1
@@ -59,8 +59,8 @@ flow:
     - id: ask_dob
       type: input
       announce: "続いて、受診される方の生年月日をお話しください。"
-      repeat: "yes"
-      repeatAnnounce: "ご回答いただいた生年月日は〇〇でよろしいでしょうか。「はい」または「いいえ」でお答えください。"
+      reconfirm: "yes"
+      reconfirmAnnounce: "ご回答いただいた生年月日は〇〇でよろしいでしょうか。「はい」または「いいえ」でお答えください。"
       inputType: STT
       voiceType: DATETIME
       retryCount: 1

@@ -15,6 +15,7 @@ import {
   MODULE_DEFAULT_BRANCHES,
   MODULE_FIXED_BRANCHES,
   LOGIC_MODULE_CDEPT,
+  TEMPLATE_LOCKS,
   type ClinicalDepartment,
   type DataBranch,
 } from '../ui/nodeSchema';
@@ -780,6 +781,13 @@ export const useFlowStore = create<FlowState>((set, get) => {
       if (!draft) return;
       const node = ir?.nodes.find((n) => n.id === selectedNodeId);
       const data: Record<string, unknown> = { ...draft.data, [key]: value };
+      // Đổi Template của node Interaction -> ÉP + khoá các tham số theo mẫu đã chọn
+      // (Re-confirm / Input Type / Voice Type…). Chọn '－' (không template) thì không ép,
+      // các tham số mở khoá lại như bình thường.
+      if (node?.type === 'interaction' && key === 'template' && typeof value === 'string') {
+        const locks = TEMPLATE_LOCKS[value];
+        if (locks) Object.assign(data, locks);
+      }
       // Đổi module của node logic -> ĐẶT LẠI nhánh theo module mới. Trước đây các
       // module không có bộ nhánh riêng (Script/CMR/Module Result Binder) giữ nguyên
       // data.branches nên mang nhầm nhánh của module trước (vd Incoming Classifier).
