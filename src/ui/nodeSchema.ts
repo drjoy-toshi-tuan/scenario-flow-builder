@@ -140,15 +140,15 @@ export const LOGIC_MODULE_DOB_RECONFIRM = 'DOB Re-confirmation';
 // Script đứng đầu pulldown (module mặc định, dùng thường xuyên nhất).
 const MODULE_OPTIONS: FieldOption[] = [
   { value: LOGIC_MODULE_SCRIPT, label: LOGIC_MODULE_SCRIPT },
-  { value: LOGIC_MODULE_CDC, label: LOGIC_MODULE_CDC },
-  { value: LOGIC_MODULE_CMR, label: LOGIC_MODULE_CMR },
-  { value: LOGIC_MODULE_MRB, label: LOGIC_MODULE_MRB },
-  { value: LOGIC_MODULE_IC, label: LOGIC_MODULE_IC },
-  { value: LOGIC_MODULE_DOCC, label: LOGIC_MODULE_DOCC },
-  { value: LOGIC_MODULE_CDEPT, label: LOGIC_MODULE_CDEPT },
-  { value: LOGIC_MODULE_NULLCHECK, label: LOGIC_MODULE_NULLCHECK },
   { value: LOGIC_MODULE_PHONE_NORM, label: LOGIC_MODULE_PHONE_NORM },
   { value: LOGIC_MODULE_DOB_RECONFIRM, label: LOGIC_MODULE_DOB_RECONFIRM },
+  { value: LOGIC_MODULE_CDC, label: LOGIC_MODULE_CDC },
+  { value: LOGIC_MODULE_CDEPT, label: LOGIC_MODULE_CDEPT },
+  { value: LOGIC_MODULE_MRB, label: LOGIC_MODULE_MRB },
+  { value: LOGIC_MODULE_CMR, label: LOGIC_MODULE_CMR },
+  { value: LOGIC_MODULE_NULLCHECK, label: LOGIC_MODULE_NULLCHECK },
+  { value: LOGIC_MODULE_IC, label: LOGIC_MODULE_IC },
+  { value: LOGIC_MODULE_DOCC, label: LOGIC_MODULE_DOCC },
 ];
 
 // Module đang chọn của node logic (mặc định Script khi chưa chọn).
