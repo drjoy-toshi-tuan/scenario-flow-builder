@@ -100,9 +100,10 @@ interface FlowState {
   // duy nhất trong flow, rồi chọn node mới (mở panel). Không nhân bản node Start.
   duplicateNode: (id: string) => void;
 
-  // Clipboard node cho Ctrl+C / Ctrl+V. copyNodes chụp các node đang chọn; pasteNodes
-  // dán ra bản sao (id + tên mới, lệch vị trí). Sống trong store để giữ qua re-render.
-  clipboard: NodeClipboardItem[] | null;
+  // Clipboard node cho Ctrl+C / Ctrl+V. copyNodes chụp các node đang chọn (kèm dây
+  // nội bộ giữa chúng); pasteNodes dán ra bản sao (id + tên mới, lệch vị trí, giữ
+  // bố cục tương đối + dây nối bên trong). Sống trong store để giữ qua re-render.
+  clipboard: NodeClipboard | null;
   copyNodes: (ids: string[]) => void;
   pasteNodes: () => void;
 
@@ -180,12 +181,30 @@ function uniqueId(type: string, taken: Set<string>): string {
   return id;
 }
 
-// Ảnh chụp 1 node để copy/paste (Ctrl+C/V) — không giữ id (paste sinh id mới).
+// Ảnh chụp 1 node để copy/paste (Ctrl+C/V). Giữ refId = id gốc CHỈ để nối lại
+// dây nội bộ khi paste (paste vẫn sinh id mới, không dùng refId làm id).
 export interface NodeClipboardItem {
+  refId: string;
   type: NodeType;
   label: string;
   data: Record<string, unknown>;
   position: { x: number; y: number };
+}
+
+// Dây NỘI BỘ giữa các node được copy (cả 2 đầu đều nằm trong tập copy) — nối lại
+// khi paste, remap source/target theo id mới.
+export interface EdgeClipboardItem {
+  source: string; // refId node nguồn
+  target: string; // refId node đích
+  sourceHandle?: string;
+  condition?: string;
+  label?: string;
+}
+
+// Clipboard node: tập node + các dây nội bộ giữa chúng.
+export interface NodeClipboard {
+  nodes: NodeClipboardItem[];
+  edges: EdgeClipboardItem[];
 }
 
 // Slug id cho sub flow (suy từ tên, bảo đảm khác rỗng).
@@ -583,31 +602,48 @@ export const useFlowStore = create<FlowState>((set, get) => {
     copyNodes: (ids) => {
       const { ir } = get();
       if (!ir) return;
-      const items: NodeClipboardItem[] = ids
-        .map((id) => ir.nodes.find((n) => n.id === id))
-        .filter((n): n is FlowNode => !!n)
+      const idSet = new Set(ids);
+      const nodes: NodeClipboardItem[] = ir.nodes
+        .filter((n) => idSet.has(n.id))
         .map((n) => ({
+          refId: n.id,
           type: n.type,
           label: n.label,
           data: JSON.parse(JSON.stringify(n.data)) as Record<string, unknown>,
           position: { ...n.position },
         }));
-      if (items.length > 0) set({ clipboard: items });
+      if (nodes.length === 0) return;
+      // Chỉ giữ dây có CẢ 2 đầu nằm trong tập copy (dây nội bộ) — dây ra/vào node
+      // ngoài tập không mang theo (đích không được nhân bản).
+      const edges: EdgeClipboardItem[] = ir.edges
+        .filter((e) => idSet.has(e.source) && idSet.has(e.target))
+        .map((e) => {
+          const item: EdgeClipboardItem = { source: e.source, target: e.target };
+          if (e.sourceHandle) item.sourceHandle = e.sourceHandle;
+          if (e.condition) item.condition = e.condition;
+          if (e.label) item.label = e.label;
+          return item;
+        });
+      set({ clipboard: { nodes, edges } });
     },
 
     pasteNodes: () => {
       const { ir, clipboard } = get();
-      if (!ir || !clipboard || clipboard.length === 0) return;
+      if (!ir || !clipboard || clipboard.nodes.length === 0) return;
       const usedIds = new Set(ir.nodes.map((n) => n.id));
       const usedLabels = new Set(ir.nodes.map((n) => n.label));
+      // Map id gốc -> id mới để nối lại dây nội bộ sau khi tạo node.
+      const idMap = new Map<string, string>();
       const added: FlowNode[] = [];
-      for (const item of clipboard) {
+      for (const item of clipboard.nodes) {
         // Start duy nhất & chỉ ở main flow -> bỏ qua khi dán nếu đã có Start.
         if (item.type === 'start' && ir.nodes.some((n) => n.type === 'start')) continue;
         const id = uniqueId(item.type, usedIds);
         usedIds.add(id);
         const label = uniqueLabel(labelStem(item.label), usedLabels);
         usedLabels.add(label);
+        idMap.set(item.refId, id);
+        // Lệch đều +40 cho mọi node -> giữ nguyên bố cục tương đối khi dán nhiều node.
         added.push({
           id,
           type: item.type,
@@ -617,12 +653,30 @@ export const useFlowStore = create<FlowState>((set, get) => {
         });
       }
       if (added.length === 0) return;
+      // Tạo lại dây nội bộ với id mới (bỏ dây có đầu bị loại, vd node Start bị bỏ qua).
+      const usedEdgeIds = new Set(ir.edges.map((e) => e.id));
+      const newEdges: FlowEdge[] = [];
+      let seq = 0;
+      for (const e of clipboard.edges) {
+        const source = idMap.get(e.source);
+        const target = idMap.get(e.target);
+        if (!source || !target) continue;
+        let id = `${source}->${target}#p${seq++}`;
+        while (usedEdgeIds.has(id)) id = `${source}->${target}#p${seq++}`;
+        usedEdgeIds.add(id);
+        const edge: FlowEdge = { id, source, target };
+        if (e.sourceHandle) edge.sourceHandle = e.sourceHandle;
+        if (e.condition) edge.condition = e.condition;
+        if (e.label) edge.label = e.label;
+        newEdges.push(edge);
+      }
       set({
         ...snapshot(),
         ir: {
           ...ir,
           meta: { ...ir.meta, updatedAt: new Date().toISOString() },
           nodes: [...ir.nodes, ...added],
+          edges: [...ir.edges, ...newEdges],
         },
       });
     },

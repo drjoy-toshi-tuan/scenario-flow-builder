@@ -138,7 +138,7 @@ export function FlowCanvas() {
         e.preventDefault();
         copyNodes(ids);
       } else if (key === 'v') {
-        if (!useFlowStore.getState().clipboard?.length) return;
+        if (!useFlowStore.getState().clipboard?.nodes.length) return;
         e.preventDefault();
         pasteNodes();
       }
