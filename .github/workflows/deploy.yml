@@ -35,12 +35,12 @@ jobs:
       # môi trường github-pages, job build không đọc được) hoặc sai tên.
       - name: Kiểm tra biến build (không lộ giá trị)
         env:
-          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY || vars.VITE_OPENAI_API_KEY }}
+          VITE_AI_PROXY_URL: ${{ secrets.VITE_AI_PROXY_URL || vars.VITE_AI_PROXY_URL }}
         run: |
-          if [ -z "$VITE_OPENAI_API_KEY" ]; then
-            echo "::warning::VITE_OPENAI_API_KEY EMPTY ở job build — đặt ở Repository secret/variable (KHÔNG phải Environment secret) và đúng tên."
+          if [ -z "$VITE_AI_PROXY_URL" ]; then
+            echo "::warning::VITE_AI_PROXY_URL EMPTY ở job build — tính năng AI sẽ tắt. Đặt ở Repository secret/variable (KHÔNG phải Environment secret) và đúng tên."
           else
-            echo "VITE_OPENAI_API_KEY OK (length=${#VITE_OPENAI_API_KEY})"
+            echo "VITE_AI_PROXY_URL OK (length=${#VITE_AI_PROXY_URL})"
           fi
 
       - run: npm run build
@@ -48,10 +48,9 @@ jobs:
           # Client ID (không phải secret) — set ở Settings > Secrets and variables > Actions.
           # Chấp nhận cả tab "Secrets" LẪN tab "Variables" để tránh cấu hình nhầm chỗ.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || vars.VITE_GOOGLE_CLIENT_ID }}
-          # OpenAI API key cho tính năng "AIで生成・修正". Là secret nhưng SẼ nằm trong
-          # bundle tĩnh sau build (app không có backend) — chấp nhận cả tab "Secrets"
-          # LẪN "Variables" để tránh cấu hình nhầm chỗ.
-          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY || vars.VITE_OPENAI_API_KEY }}
+          # URL proxy AI (Cloudflare Worker) cho tính năng "AIで生成・修正". KHÔNG phải
+          # secret (chỉ là URL) — chấp nhận cả tab "Secrets" LẪN "Variables".
+          VITE_AI_PROXY_URL: ${{ secrets.VITE_AI_PROXY_URL || vars.VITE_AI_PROXY_URL }}
           # Model tuỳ chọn — bỏ trống thì dùng mặc định gpt-5.1 (xem src/ai/config.ts).
           VITE_OPENAI_MODEL: ${{ secrets.VITE_OPENAI_MODEL || vars.VITE_OPENAI_MODEL }}
 

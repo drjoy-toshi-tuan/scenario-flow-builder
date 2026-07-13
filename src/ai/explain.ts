@@ -1,6 +1,6 @@
 import { buildExplainMessages } from './context';
 import { chatComplete } from './openai';
-import { getOpenAiKey } from './config';
+import { isAiConfigured } from './config';
 import { useFlowStore } from '../store/flowStore';
 import type { Lang } from '../ui/i18n';
 
@@ -17,7 +17,7 @@ export async function explainScript(script: string, lang: Lang): Promise<string>
 // Chạy NỀN sau khi LƯU node (再生成 tự động để phần giải nghĩa luôn fresh):
 // thiếu key / script rỗng / lỗi mạng -> bỏ qua im lặng, không chặn việc lưu.
 export function refreshScriptExplanation(nodeId: string, script: string, lang: Lang): void {
-  if (!getOpenAiKey() || !script.trim()) return;
+  if (!isAiConfigured() || !script.trim()) return;
   void explainScript(script, lang)
     .then((text) => {
       useFlowStore.getState().setNodeData(nodeId, { scriptExplanation: text });

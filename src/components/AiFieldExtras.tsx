@@ -39,7 +39,10 @@ function InfoIcon({ size = 15 }: { size?: number }) {
 }
 
 function aiErrorKey(e: unknown): TKey {
-  if (e instanceof AiError && e.code === 'no-key') return 'aiErrNoKey';
+  if (e instanceof AiError) {
+    if (e.code === 'no-config') return 'aiErrNoKey';
+    if (e.code === 'no-auth' || e.code === 'unauthorized') return 'aiErrAuth';
+  }
   return 'aiErrCall';
 }
 

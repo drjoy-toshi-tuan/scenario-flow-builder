@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthContext, type AuthUser } from './context';
 import { GOOGLE_CLIENT_ID, SESSION_IDLE_TIMEOUT_MS } from './config';
-
-const STORAGE_KEY = 'brekeke-flow-builder.auth';
+import { AUTH_STORAGE_KEY as STORAGE_KEY } from './session';
 
 // Các sự kiện coi là "người dùng đang thao tác" — mỗi lần xảy ra thì gia hạn phiên.
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'] as const;

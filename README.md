@@ -6,7 +6,8 @@ of truth duy nhất; YAML chỉ là adapter import/export quanh IR.
 
 > App là **static site chạy trên GitHub Pages, không có backend**. Đăng nhập Google giới hạn
 > domain `drjoy.jp` (cổng UX + siết claim ở client). Chưa sinh `.bivr`, chưa có database/lưu server.
-> Có sẵn tính năng **AI sinh/sửa script & prompt** (OpenAI) gọi thẳng từ trình duyệt.
+> Có sẵn tính năng **AI sinh/sửa script & prompt** (OpenAI) — gọi qua **proxy** (Cloudflare Worker)
+> giữ key ở server, không lộ ra client (xem [`proxy/`](proxy/)).
 
 ![node types](https://img.shields.io/badge/nodes-11%20types-blue) ![i18n](https://img.shields.io/badge/i18n-VI%20%2F%20JA-orange) ![theme](https://img.shields.io/badge/theme-light%20%2F%20dark-lightgrey)
 
@@ -64,7 +65,7 @@ Sau khi đăng nhập, chọn/tải file từ màn **Quản lý file YAML** (xem
 > **Chế độ demo (mặc định khi chạy `npm run dev`):** nếu chưa set `VITE_GOOGLE_CLIENT_ID`, màn login
 > có nút **“Vào chế độ demo (bỏ qua đăng nhập)”** để xem UI ngay. **Bản build/deploy TẮT demo**
 > → luôn bắt đăng nhập Google (muốn bật demo trên bản build phải đặt `VITE_ALLOW_DEMO=true`).
-> (Vẫn cần GitHub token để đọc/ghi file YAML; cần `VITE_OPENAI_API_KEY` để dùng tính năng AI.)
+> (Vẫn cần GitHub token để đọc/ghi file YAML; cần `VITE_AI_PROXY_URL` để dùng tính năng AI.)
 
 Các lệnh khác:
 
@@ -84,8 +85,8 @@ Tạo `.env` / `.env.local` (xem [`.env.example`](.env.example)):
 | Biến | Bắt buộc | Ý nghĩa |
 |------|:--------:|---------|
 | `VITE_GOOGLE_CLIENT_ID` | ✅¹ | Google OAuth 2.0 Client ID (Web). **Không phải secret** — an toàn trong bundle SPA. |
-| `VITE_OPENAI_API_KEY` | – | API key OpenAI cho tính năng AI. ⚠ App không backend nên key **sẽ nằm trong bundle tĩnh** — chỉ dùng key nội bộ/hạn mức thấp. |
-| `VITE_OPENAI_MODEL` | – | Model OpenAI, mặc định `gpt-5.1` (xem [`src/ai/config.ts`](src/ai/config.ts)). |
+| `VITE_AI_PROXY_URL` | – | URL Cloudflare Worker proxy cho tính năng AI (giữ key OpenAI ở server). **Không phải secret.** Xem [`proxy/README.md`](proxy/README.md). |
+| `VITE_OPENAI_MODEL` | – | Model OpenAI client gửi kèm (proxy forward), mặc định `gpt-5.1` (xem [`src/ai/config.ts`](src/ai/config.ts)). |
 | `VITE_ALLOW_DEMO` | – | `true` để bật chế độ demo trên bản build (mặc định chỉ bật khi `npm run dev`). |
 | `VITE_SESSION_IDLE_MINUTES` | – | Thời hạn phiên theo cửa sổ idle trượt (phút), mặc định `720` (12 giờ). |
 | `VITE_GITHUB_OWNER` / `VITE_GITHUB_REPO` | – | Repo chứa YAML, mặc định `drjoy-toshi-tuan/scenario-flow-builder`. |
@@ -94,8 +95,8 @@ Tạo `.env` / `.env.local` (xem [`.env.example`](.env.example)):
 > ¹ Không có Client ID thì chỉ vào được chế độ demo (local). Bản deploy production **bắt buộc** có.
 > Client ID **không** dùng client secret cho SPA.
 
-> **OpenAI key** ngoài `VITE_OPENAI_API_KEY` còn có thể nhập tay lưu `localStorage` (`bk-openai-key`).
-> Thứ tự ưu tiên: env → localStorage → hardcoded (xem [`src/ai/config.ts`](src/ai/config.ts)).
+> **Key OpenAI không còn ở client.** Client gọi `VITE_AI_PROXY_URL` kèm ID token Google; proxy
+> (Cloudflare Worker) verify token rồi mới gắn key OpenAI (secret của Worker). Dựng proxy: [`proxy/README.md`](proxy/README.md).
 
 ---
 
@@ -115,10 +116,10 @@ Claude Code không làm được các bước này — bạn (Tuan) cần tự l
 ## Deploy GitHub Pages
 
 1. **Bật Pages:** repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. **Thêm Client ID & (tuỳ chọn) OpenAI key:** repo → **Settings → Secrets and variables → Actions**
+2. **Thêm Client ID & (tuỳ chọn) URL proxy AI:** repo → **Settings → Secrets and variables → Actions**
    - Vào tab **Secrets** (hoặc **Variables** đều được — workflow đọc cả hai) → **New**
    - `VITE_GOOGLE_CLIENT_ID` = Client ID ở trên.
-   - `VITE_OPENAI_API_KEY` (tuỳ chọn) = API key OpenAI để bật AI trên bản deploy.
+   - `VITE_AI_PROXY_URL` (tuỳ chọn) = URL Worker proxy để bật AI trên bản deploy (xem [`proxy/`](proxy/)).
    - ⚠️ Phải đặt ở **Repository** secret/variable (KHÔNG phải Environment secret của môi trường
      `github-pages` — job build không đọc được). Sau khi thêm phải **chạy lại deploy** (push `main`
      hoặc **Actions → Deploy → Run workflow**). Thiếu Client ID → màn login báo
@@ -131,9 +132,10 @@ Claude Code không làm được các bước này — bạn (Tuan) cần tự l
 
 ---
 
-## 🤖 Tính năng AI (OpenAI)
+## 🤖 Tính năng AI (OpenAI qua proxy)
 
-Gọi thẳng **OpenAI Chat Completions API** từ trình duyệt (không backend). Dùng ở 2 chỗ:
+Gọi **OpenAI Chat Completions** qua một **proxy** (Cloudflare Worker, xem [`proxy/`](proxy/)) — key OpenAI
+nằm ở server, client chỉ gửi kèm ID token Google để proxy xác thực. Dùng ở 2 chỗ:
 
 - **AIで生成・修正** — nút trong node **Logic** (sinh/sửa *script* JavaScript) và node **OpenAI**
   (sinh/sửa *prompt*). Modal dựng bối cảnh (`#Role` → `#Scenario Flow Context` → `#Question Context`
@@ -141,9 +143,11 @@ Gọi thẳng **OpenAI Chat Completions API** từ trình duyệt (không backen
 - **Giải thích script** — sau khi lưu node Logic, chạy nền để làm mới `data.scriptExplanation`
   (lưu theo file YAML, mở lại không cần gen lại).
 
-Cấu hình ở [`src/ai/config.ts`](src/ai/config.ts): model mặc định `gpt-5.1` (reasoning model nên client
-tự bỏ `temperature`). Không có key → nút AI vẫn hiện nhưng báo lỗi thiếu key khi bấm; giải thích nền
-bỏ qua im lặng. Có sẵn vài **sample module** JS trong [`src/ai/samples/`](src/ai/samples/) làm ngữ cảnh.
+Cấu hình ở [`src/ai/config.ts`](src/ai/config.ts): `VITE_AI_PROXY_URL` + model mặc định `gpt-5.1`
+(reasoning model nên client tự bỏ `temperature`). Chưa cấu hình proxy → nút AI vẫn hiện nhưng báo lỗi
+khi bấm; giải thích nền bỏ qua im lặng. ID token Google sống ~1 giờ: để tab lâu > 1 giờ rồi bấm AI có
+thể bị lỗi *"đăng nhập lại"* (proxy trả 401). Có sẵn vài **sample module** JS trong
+[`src/ai/samples/`](src/ai/samples/) làm ngữ cảnh.
 
 ---
 

@@ -110,6 +110,8 @@ export function LoginScreen() {
                     hd: claims.hd,
                     sub: claims.sub,
                     exp: claims.exp,
+                    // Giữ ID token thô để gọi AI proxy (Authorization: Bearer).
+                    credential: res.credential,
                   });
                 }}
                 onError={() => setError(t('loginGoogleError'))}

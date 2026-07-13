@@ -16,10 +16,10 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_ID: string;
   // 'true' để bật chế độ demo (bỏ qua đăng nhập) trên bản build. Mặc định tắt.
   readonly VITE_ALLOW_DEMO?: string;
-  // OpenAI API key cho tính năng AIで生成・修正 / giải thích code (tuỳ chọn — có thể
-  // nhập tay qua localStorage; xem src/ai/config.ts).
-  readonly VITE_OPENAI_API_KEY?: string;
-  // Model OpenAI (mặc định gpt-4.1). Vd 'gpt-4o', 'o4-mini'.
+  // URL proxy AI (Cloudflare Worker) cho tính năng AIで生成・修正 / giải thích code.
+  // BẮT BUỘC để bật AI. KHÔNG phải secret. Xem proxy/README.md + src/ai/config.ts.
+  readonly VITE_AI_PROXY_URL?: string;
+  // Model OpenAI (mặc định gpt-5.1). Vd 'gpt-4o', 'gpt-5-mini'.
   readonly VITE_OPENAI_MODEL?: string;
   // Kho GitHub chứa file YAML (tuỳ chọn — mặc định trỏ repo hiện tại).
   readonly VITE_GITHUB_OWNER?: string;

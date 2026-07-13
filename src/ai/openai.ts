@@ -1,8 +1,10 @@
-import { getOpenAiKey, OPENAI_API_URL, OPENAI_MODEL } from './config';
+import { AI_PROXY_URL, OPENAI_MODEL } from './config';
+import { getStoredIdToken } from '../auth/session';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Client OpenAI Chat Completions (thuần fetch — không thêm SDK). Trả về nội dung
-// message đầu tiên. Lỗi phân loại bằng AiError.code để UI ánh xạ i18n.
+// Client gọi AI qua PROXY (Cloudflare Worker) — key OpenAI nằm ở server, KHÔNG ở
+// client. Gửi kèm ID token Google (Authorization: Bearer) để proxy xác thực. Trả
+// về nội dung message đầu tiên. Lỗi phân loại bằng AiError.code để UI ánh xạ i18n.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
@@ -13,7 +15,7 @@ export interface ChatMessage {
 export class AiError extends Error {
   constructor(
     message: string,
-    public readonly code: 'no-key' | 'http' | 'network' | 'empty',
+    public readonly code: 'no-config' | 'no-auth' | 'unauthorized' | 'http' | 'network' | 'empty',
   ) {
     super(message);
     this.name = 'AiError';
@@ -28,24 +30,29 @@ function isReasoningModel(model: string): boolean {
 }
 
 export async function chatComplete(messages: ChatMessage[]): Promise<string> {
-  const key = getOpenAiKey();
-  if (!key) throw new AiError('OpenAI API key chưa được cấu hình.', 'no-key');
+  if (!AI_PROXY_URL) throw new AiError('AI proxy chưa được cấu hình.', 'no-config');
+  const idToken = getStoredIdToken();
+  if (!idToken) throw new AiError('Chưa đăng nhập — không thể gọi AI.', 'no-auth');
 
   const payload: Record<string, unknown> = { model: OPENAI_MODEL, messages };
   if (!isReasoningModel(OPENAI_MODEL)) payload.temperature = 0.2;
 
   let res: Response;
   try {
-    res = await fetch(OPENAI_API_URL, {
+    res = await fetch(AI_PROXY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${idToken}`,
       },
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new AiError('Không kết nối được OpenAI.', 'network');
+    throw new AiError('Không kết nối được AI proxy.', 'network');
+  }
+  // 401: proxy từ chối token (thường do ID token Google hết hạn ~1 giờ) — mời đăng nhập lại.
+  if (res.status === 401) {
+    throw new AiError('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để dùng AI.', 'unauthorized');
   }
   if (!res.ok) {
     let detail = '';
@@ -55,13 +62,14 @@ export async function chatComplete(messages: ChatMessage[]): Promise<string> {
     } catch {
       // ignore
     }
-    throw new AiError(detail || `OpenAI API lỗi (${res.status}).`, 'http');
+    throw new AiError(detail || `AI proxy lỗi (${res.status}).`, 'http');
   }
+  // Proxy forward nguyên response OpenAI Chat Completions.
   const body = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
   const content = body.choices?.[0]?.message?.content?.trim() ?? '';
-  if (!content) throw new AiError('OpenAI trả về nội dung rỗng.', 'empty');
+  if (!content) throw new AiError('AI trả về nội dung rỗng.', 'empty');
   return content;
 }
 
