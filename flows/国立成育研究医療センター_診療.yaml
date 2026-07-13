@@ -24,12 +24,12 @@ flow:
         x: 1092
         y: 352
       description: ""
-      repeat: yes
+      reconfirm: yes
       inputType: STT_DTMF
       voiceType: TEXT
       retryCount: "2"
       announce: はじめに、ご用件を次の4つのうち、いずれかでお話しください。 1番. 新規予約、2番. 予約変更、3番. 予約キャンセル、4番. その他お問い合わせ。プッシュボタンでも操作可能です。
-      repeatAnnounce: ご用件は、<%classification%>でよろしいでしょうか。
+      reconfirmAnnounce: ご用件は、<%classification%>でよろしいでしょうか。
       retryAnnounce: 申し訳ございません。ご回答いただいた内容が確認できませんでした。もう一度、ご用件をお話しください。プッシュボタンでも操作可能です。
       next: logic_1
       failed: announce_1

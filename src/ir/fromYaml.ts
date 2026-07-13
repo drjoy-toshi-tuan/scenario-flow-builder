@@ -140,6 +140,16 @@ function parseGraph(
     }
 
     const nodeType = coerceNodeType(raw.type);
+    // Migrate key復唱 của node interaction: repeat/repeatAnnounce -> reconfirm/reconfirmAnnounce
+    // (file cũ dùng tên "repeat" trước khi đổi thành "Re-confirm").
+    if (data.reconfirm == null && data.repeat !== undefined) {
+      data.reconfirm = data.repeat;
+      delete data.repeat;
+    }
+    if (data.reconfirmAnnounce == null && data.repeatAnnounce !== undefined) {
+      data.reconfirmAnnounce = data.repeatAnnounce;
+      delete data.repeatAnnounce;
+    }
     // Migrate key bộ chọn module của node logic: module -> moduleType (file cũ).
     if (
       nodeType === 'logic' &&

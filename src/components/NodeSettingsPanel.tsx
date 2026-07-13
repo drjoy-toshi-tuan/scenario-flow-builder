@@ -16,6 +16,7 @@ import {
   catchAllDisplay,
   logicModuleOf,
   formatTimeInput,
+  templateLocks,
   CATCH_ALL_ID,
   LOGIC_MODULE_SCRIPT,
   LOGIC_MODULE_CDC,
@@ -357,13 +358,15 @@ function GeneralTab({ label, nameError }: { label: string; nameError: TKey | nul
 function PropertyTab({ node, data }: { node: FlowNode; data: Record<string, unknown> }) {
   const t = useT();
   const fields = PROPERTY_FIELDS[node.type].filter((f) => !f.showIf || f.showIf(data));
+  // Interaction có Template -> các tham số bị mẫu ÉP giá trị + khoá (không cho sửa).
+  const locks = node.type === 'interaction' ? templateLocks(data) : {};
   if (fields.length === 0) {
     return <p className="text-sm text-[var(--bk-text-faint)]">{t('noPropertyNote')}</p>;
   }
   return (
     <div className="space-y-4">
       {fields.map((f) => (
-        <FieldControl key={f.key} node={node} field={f} data={data} />
+        <FieldControl key={f.key} node={node} field={f} data={data} lockedValue={locks[f.key]} />
       ))}
     </div>
   );
@@ -373,17 +376,23 @@ function FieldControl({
   node,
   field,
   data,
+  lockedValue,
 }: {
   node: FlowNode;
   field: PropertyField;
   data: Record<string, unknown>;
+  // Khác undefined -> tham số bị Template ÉP giá trị này + khoá (không cho sửa).
+  lockedValue?: string;
 }) {
   const t = useT();
   const setDraftField = useFlowStore((s) => s.setDraftField);
+  const locked = lockedValue !== undefined;
   const raw = data[field.key];
   // YAML có thể trả số (retryCount: 2) -> ép về chuỗi để hiển thị/sửa nhất quán.
-  const value =
-    typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : field.default ?? '';
+  // Tham số bị Template khoá: luôn hiển thị giá trị mẫu đã ép.
+  const value = locked
+    ? lockedValue
+    : typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : field.default ?? '';
   const set = (v: string) => setDraftField(field.key, v);
   const label = <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t(field.labelKey)}</span>;
 
@@ -472,7 +481,13 @@ function FieldControl({
       return (
         <label className="block">
           {label}
-          <select className={inputClass} value={value} onChange={(e) => set(e.target.value)}>
+          {/* Template khoá -> disabled, hiển thị giá trị mẫu đã ép, không cho đổi. */}
+          <select
+            className={`${inputClass} ${locked ? 'cursor-not-allowed opacity-70' : ''}`}
+            value={value}
+            disabled={locked}
+            onChange={locked ? undefined : (e) => set(e.target.value)}
+          >
             {field.options?.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.labelKey ? t(o.labelKey) : o.label}
@@ -492,12 +507,14 @@ function FieldControl({
                 <button
                   key={o.value}
                   type="button"
-                  onClick={() => set(o.value)}
+                  disabled={locked}
+                  onClick={locked ? undefined : () => set(o.value)}
                   className={[
                     'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition',
                     on
                       ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
                       : 'border-[var(--bk-border)] bg-[var(--bk-surface-2)] text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]',
+                    locked ? 'cursor-not-allowed opacity-70' : '',
                   ].join(' ')}
                 >
                   {o.labelKey ? t(o.labelKey) : o.label}
