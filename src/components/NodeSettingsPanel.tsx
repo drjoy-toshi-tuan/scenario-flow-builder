@@ -18,6 +18,7 @@ import {
   formatTimeInput,
   CATCH_ALL_ID,
   LOGIC_MODULE_SCRIPT,
+  LOGIC_MODULE_CDC,
   type PropertyField,
 } from '../ui/nodeSchema';
 import { Icon } from '../ui/icons';
@@ -897,11 +898,14 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
   const branches =
     pairMode || fixedModule ? effectiveBranches(node.type, data) : readBranches(data);
   const catchAllValue = catchAllDisplay(branches);
-  // catch-all luôn hiển thị trước, các nhánh khác theo sau.
-  const ordered = [
-    ...branches.filter((b) => b.id === CATCH_ALL_ID),
-    ...branches.filter((b) => b.id !== CATCH_ALL_ID),
-  ];
+  // Clinic Day Classifier: nhánh catch-all (診療日) để CUỐI cùng theo yêu cầu; các
+  // module/loại khác giữ catch-all ở trên đầu như cũ.
+  const catchAllLast = node.type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_CDC;
+  const catchAllBranch = branches.filter((b) => b.id === CATCH_ALL_ID);
+  const otherBranches = branches.filter((b) => b.id !== CATCH_ALL_ID);
+  const ordered = catchAllLast
+    ? [...otherBranches, ...catchAllBranch]
+    : [...catchAllBranch, ...otherBranches];
 
   return (
     <div className="space-y-3">
