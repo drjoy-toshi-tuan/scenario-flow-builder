@@ -106,8 +106,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     otFreeText: 'Free text',
     otDatetime: 'Ngày giờ',
     // ── Logic: Context Match Router ──
-    fNodeContext1: 'Node - Context 1',
-    fNodeContext2: 'Node - Context 2',
+    fNodeContext1: 'Tên Node / Tên Context 1',
+    fNodeContext2: 'Tên Node / Tên Context 2',
     fPairs: 'Pair',
     addPair: 'Thêm Pair',
     deletePair: 'Xoá Pair',
@@ -129,6 +129,9 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── searchSelect ──
     searchSelectPlaceholder: 'Chọn hoặc gõ để lọc…',
     searchSelectEmpty: 'Không có lựa chọn',
+    // Tiêu đề nhóm trong pulldown chọn node/context.
+    ogNodeGroup: 'Node',
+    ogContextGroup: 'Context',
     // ── Xác nhận đăng xuất / ngắt kết nối ──
     logoutConfirmTitle: 'Đăng xuất',
     logoutConfirmMessage: 'Bạn có chắc muốn đăng xuất không?',
@@ -200,8 +203,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     noDescription: 'Chưa có mô tả',
     edit: 'Sửa',
     delete: 'Xoá',
-    duplicate: 'Nhân bản',
-    duplicateNodeTitle: 'Nhân bản node (Ctrl+C / Ctrl+V)',
+    duplicate: 'Copy',
+    duplicateNodeTitle: 'Copy node (Ctrl+C / Ctrl+V)',
     editTitle: 'Chỉnh sửa',
     deleteNodeTitle: 'Xoá node',
     nodeNameRequired: 'Vui lòng nhập tên node.',
@@ -402,8 +405,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     otFreeText: 'フリーテキスト',
     otDatetime: '日時',
     // ── Logic: Context Match Router ──
-    fNodeContext1: 'Node - Context 1',
-    fNodeContext2: 'Node - Context 2',
+    fNodeContext1: '参照元モジュール名 / 変数名 1',
+    fNodeContext2: '参照元モジュール名 / 変数名 2',
     fPairs: 'ペア',
     addPair: 'ペアを追加',
     deletePair: 'ペアを削除',
@@ -425,6 +428,9 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── searchSelect ──
     searchSelectPlaceholder: '選択または入力で絞り込み…',
     searchSelectEmpty: '候補がありません',
+    // Tiêu đề nhóm trong pulldown chọn node/context.
+    ogNodeGroup: 'ノード',
+    ogContextGroup: 'コンテキスト',
     // ── Xác nhận đăng xuất / ngắt kết nối ──
     logoutConfirmTitle: 'ログアウト',
     logoutConfirmMessage: 'ログアウトしてもよろしいですか？',

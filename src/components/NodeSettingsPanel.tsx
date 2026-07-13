@@ -12,7 +12,7 @@ import {
   isPairBranchNode,
   fixedModuleBranches,
   catchAllEditable,
-  optionsForSource,
+  optionGroupsForSource,
   catchAllDisplay,
   logicModuleOf,
   formatTimeInput,
@@ -586,18 +586,22 @@ function SearchSelect({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Option lấy trên TÀI LIỆU ĐẦY ĐỦ (main flow + mọi sub flow) — không chỉ flow
-  // đang mở. `ir` trong deps để danh sách cập nhật theo mỗi thay đổi.
-  const options = useMemo(() => {
+  // đang mở. `ir` trong deps để danh sách cập nhật theo mỗi thay đổi. Nguồn
+  // 'nodeAndContexts' chia 2 nhóm Node / Context (mỗi nhóm có tiêu đề).
+  const groups = useMemo(() => {
     if (!field.optionsFrom) return [];
     const doc = useFlowStore.getState().assembleDoc();
-    return optionsForSource(field.optionsFrom, doc);
+    return optionGroupsForSource(field.optionsFrom, doc);
   }, [field.optionsFrom, ir]); // eslint-disable-line react-hooks/exhaustive-deps
   const query = value.trim().toLowerCase();
   // Đang gõ -> lọc theo chữ; giá trị khớp hẳn 1 option -> hiện đủ danh sách để đổi nhanh.
-  const filtered =
-    query && !options.some((o) => o.toLowerCase() === query)
-      ? options.filter((o) => o.toLowerCase().includes(query))
-      : options;
+  const exact = groups.some((g) => g.items.some((o) => o.toLowerCase() === query));
+  const visibleGroups = groups
+    .map((g) => ({
+      ...g,
+      items: query && !exact ? g.items.filter((o) => o.toLowerCase().includes(query)) : g.items,
+    }))
+    .filter((g) => g.items.length > 0);
 
   // Node Jump trỏ tới sub flow -> hiện logo Sub Flow (màu cau) cạnh mỗi lựa chọn
   // + trước giá trị đang chọn (đồng bộ với modal AI Generate).
@@ -629,31 +633,41 @@ function SearchSelect({
       />
       {open && (
         <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
-          {filtered.length === 0 ? (
+          {visibleGroups.length === 0 ? (
             <div className="px-2.5 py-2 text-xs text-[var(--bk-text-faint)]">{t('searchSelectEmpty')}</div>
           ) : (
-            filtered.map((o) => (
-              <button
-                key={o}
-                type="button"
-                // mousedown (trước blur) để click chọn không bị dropdown đóng "nuốt" mất.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(o);
-                  setOpen(false);
-                }}
-                className={[
-                  'flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-sm transition',
-                  o === value
-                    ? 'bg-[var(--bk-accent-soft)] font-medium text-[var(--bk-accent)]'
-                    : 'text-[var(--bk-text)] hover:bg-[var(--bk-surface-2)]',
-                ].join(' ')}
-                title={o}
-              >
-                {/* Logo Sub Flow bám sát text (chỉ ở pulldown chọn sub flow của Jump). */}
-                <span className="min-w-0 truncate">{o}</span>
-                {isSubflow && <FlowGlyph isMain={false} className="ml-1.5" />}
-              </button>
+            visibleGroups.map((g, gi) => (
+              <div key={g.labelKey ?? gi}>
+                {/* Tiêu đề nhóm (Node / Context) — style giống section header ở panel setting/flow. */}
+                {g.labelKey && (
+                  <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+                    {t(g.labelKey)}
+                  </div>
+                )}
+                {g.items.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    // mousedown (trước blur) để click chọn không bị dropdown đóng "nuốt" mất.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onChange(o);
+                      setOpen(false);
+                    }}
+                    className={[
+                      'flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-sm transition',
+                      o === value
+                        ? 'bg-[var(--bk-accent-soft)] font-medium text-[var(--bk-accent)]'
+                        : 'text-[var(--bk-text)] hover:bg-[var(--bk-surface-2)]',
+                    ].join(' ')}
+                    title={o}
+                  >
+                    {/* Logo Sub Flow bám sát text (chỉ ở pulldown chọn sub flow của Jump). */}
+                    <span className="min-w-0 truncate">{o}</span>
+                    {isSubflow && <FlowGlyph isMain={false} className="ml-1.5" />}
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>

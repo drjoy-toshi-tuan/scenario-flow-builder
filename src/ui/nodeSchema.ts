@@ -699,6 +699,27 @@ export function optionsForSource(source: OptionsSource, ir: FlowIR | null): stri
   }
 }
 
+// 1 nhóm option trong pulldown (có tiêu đề tuỳ chọn). Nguồn 'nodeAndContexts' chia
+// 2 nhóm Node / Context để pulldown hiển thị tiêu đề + mục con (giống panel setting).
+export interface OptionGroup {
+  labelKey?: TKey; // tiêu đề nhóm (bỏ trống -> không hiện tiêu đề, 1 nhóm phẳng)
+  items: string[];
+}
+
+export function optionGroupsForSource(source: OptionsSource, ir: FlowIR | null): OptionGroup[] {
+  switch (source) {
+    case 'interactionNodes':
+      return [{ items: [...new Set(interactionNodeNames(ir))] }];
+    case 'nodeAndContexts':
+      return [
+        { labelKey: 'ogNodeGroup', items: [...new Set(interactionNodeNames(ir))] },
+        { labelKey: 'ogContextGroup', items: [...new Set(savedContextNames(ir))] },
+      ];
+    case 'subflows':
+      return [{ items: [...new Set((ir?.subflows ?? []).map((s) => s.name))] }];
+  }
+}
+
 // Handle output (chấm nối dây ở đáy node) suy ra TỪ IR:
 //   - none      -> [] (không có output)
 //   - fixed     -> danh sách cố định theo schema
