@@ -1,0 +1,14 @@
+{
+  "name": "scenario-ai-proxy",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloudflare Worker proxy đứng trước OpenAI — verify Google ID token, giữ OPENAI_API_KEY ở server (không lộ client).",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "secret": "wrangler secret put OPENAI_API_KEY"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

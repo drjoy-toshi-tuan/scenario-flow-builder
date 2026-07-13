@@ -1,0 +1,13 @@
+name = "scenario-ai-proxy"
+main = "index.js"
+compatibility_date = "2025-06-01"
+
+# Các giá trị dưới là CÔNG KHAI (không phải secret) — an toàn để commit.
+# Secret duy nhất là OPENAI_API_KEY, nạp bằng: npx wrangler secret put OPENAI_API_KEY
+[vars]
+# Origin của GitHub Pages — CHỈ origin, KHÔNG kèm đường dẫn /repo/.
+ALLOWED_ORIGIN = "https://drjoy-toshi-tuan.github.io"
+# ⚠ THAY bằng đúng Google Client ID (giống VITE_GOOGLE_CLIENT_ID của app).
+GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+# Domain Workspace được phép đăng nhập.
+ALLOWED_DOMAIN = "drjoy.jp"
