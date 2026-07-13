@@ -1,4 +1,4 @@
-# AI電話 Flow Builder
+# Scenario Flow Builder
 
 Webapp visualize flow của hệ thống **AI電話** (Brekeke-based) dưới dạng sơ đồ node giống
 [n8n](https://n8n.io), đọc/ghi từ file YAML. **IR** (Intermediate Representation) là source
@@ -88,7 +88,7 @@ Tạo `.env` / `.env.local` (xem [`.env.example`](.env.example)):
 | `VITE_OPENAI_MODEL` | – | Model OpenAI, mặc định `gpt-5.1` (xem [`src/ai/config.ts`](src/ai/config.ts)). |
 | `VITE_ALLOW_DEMO` | – | `true` để bật chế độ demo trên bản build (mặc định chỉ bật khi `npm run dev`). |
 | `VITE_SESSION_IDLE_MINUTES` | – | Thời hạn phiên theo cửa sổ idle trượt (phút), mặc định `720` (12 giờ). |
-| `VITE_GITHUB_OWNER` / `VITE_GITHUB_REPO` | – | Repo chứa YAML, mặc định `drjoy-toshi-tuan/brekeke-flow-builder`. |
+| `VITE_GITHUB_OWNER` / `VITE_GITHUB_REPO` | – | Repo chứa YAML, mặc định `drjoy-toshi-tuan/scenario-flow-builder`. |
 | `VITE_FLOWS_BRANCH` / `VITE_FLOWS_DIR` | – | Nhánh & thư mục chứa YAML, mặc định `main` / `flows`. |
 
 > ¹ Không có Client ID thì chỉ vào được chế độ demo (local). Bản deploy production **bắt buộc** có.
@@ -125,9 +125,9 @@ Claude Code không làm được các bước này — bạn (Tuan) cần tự l
      *"Chưa cấu hình đăng nhập Google"*.
 3. **Push `main`** → workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) build & deploy
    (có bước log kiểm tra biến build không lộ giá trị, và tự thử lại deploy khi Pages lỗi tạm thời).
-4. URL: `https://drjoy-toshi-tuan.github.io/brekeke-flow-builder/`
+4. URL: `https://drjoy-toshi-tuan.github.io/scenario-flow-builder/`
 
-> `vite.config.ts` đã set `base: '/brekeke-flow-builder/'` khớp tên repo.
+> `vite.config.ts` đã set `base: '/scenario-flow-builder/'` khớp tên repo.
 
 ---
 
@@ -223,7 +223,7 @@ duyệt gọi thẳng **GitHub Contents API** bằng **fine-grained personal acc
 
 1. GitHub → **Settings → Developer settings → Fine-grained tokens →
    [Generate new token](https://github.com/settings/personal-access-tokens/new)**.
-2. **Resource owner** = `drjoy-toshi-tuan`; **Only select repositories** = `brekeke-flow-builder`.
+2. **Resource owner** = `drjoy-toshi-tuan`; **Only select repositories** = `scenario-flow-builder`.
 3. **Repository permissions → Contents: Read and write**.
 4. Dán token vào màn "Kết nối GitHub".
 

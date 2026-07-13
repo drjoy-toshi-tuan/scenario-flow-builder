@@ -1,6 +1,6 @@
 # flows/ — Kho file YAML flow
 
-Thư mục này chứa các file YAML flow của **AI電話 Flow Builder**:
+Thư mục này chứa các file YAML flow của **Scenario Flow Builder**:
 
 - File **có sẵn** (mẫu / đã tạo trước).
 - File người dùng **tải lên** qua màn "Quản lý file YAML".

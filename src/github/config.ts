@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const GITHUB_OWNER = import.meta.env.VITE_GITHUB_OWNER ?? 'drjoy-toshi-tuan';
-export const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO ?? 'brekeke-flow-builder';
+export const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO ?? 'scenario-flow-builder';
 // Nhánh để đọc/ghi file YAML. Mặc định 'main'.
 export const GITHUB_BRANCH = import.meta.env.VITE_FLOWS_BRANCH ?? 'main';
 // Thư mục chứa các file YAML (upload + tạo ra) trong repo.
