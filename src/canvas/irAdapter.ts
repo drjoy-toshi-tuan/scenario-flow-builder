@@ -59,9 +59,10 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
         label: n.label,
         nodeType: n.type,
         nodeData: n.data,
-        // Gắn sourceHandles khi node có >1 output để BaseNode chia đều các chấm;
-        // node 1 output dùng chấm mặc định (id 'default').
-        ...(handles.length > 1 ? { sourceHandles: handles } : {}),
+        // Gắn sourceHandles cho MỌI node có output (kể cả 1 nhánh) để BaseNode vừa
+        // chia đều các chấm vừa biết nhãn nhánh -> hover chấm hiện label, kể cả khi
+        // chưa nối dây. Node không có output (hangup) -> để trống.
+        ...(handles.length > 0 ? { sourceHandles: handles } : {}),
       } satisfies RFNodeData,
     };
   });

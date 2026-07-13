@@ -7,7 +7,7 @@ import { PROPERTY_FIELDS, type PropertyField } from '../../ui/nodeSchema';
 import { Icon } from '../../ui/icons';
 import { useFlowStore } from '../../store/flowStore';
 import { useT, type TKey } from '../../ui/i18n';
-import { HoverTip } from '../../components/HoverTip';
+import { HoverTip, useHoverLabel } from '../../components/HoverTip';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node card. Bố cục theo yêu cầu:
@@ -147,20 +147,19 @@ export function makeNode(nodeType: NodeType) {
 
         {showSource &&
           (handles && handles.length > 0 ? (
-            // Nhiều nhánh: chia đều dọc đáy node, đối xứng qua tâm.
+            // Chia đều các chấm dọc đáy node, đối xứng qua tâm (1 nhánh -> giữa 50%).
+            // Hover mỗi chấm hiện nhãn nhánh (label ở Branch Settings) kể cả khi chưa
+            // nối dây — lúc đó không có edge nào mang nhãn giúp phân biệt nhánh.
             handles.map((h, i) => (
-              <Handle
+              <SourceHandle
                 key={h.id}
                 id={h.id}
-                type="source"
-                position={Position.Bottom}
-                className="bk-handle"
-                title={h.label}
+                label={h.label}
                 style={{ left: `${((i + 1) / (handles.length + 1)) * 100}%` }}
               />
             ))
           ) : (
-            // 1 output: chấm mặc định id 'default' (khớp sourceHandle của edge `next`).
+            // Dự phòng: node có output nhưng chưa suy ra được nhánh -> chấm mặc định.
             <Handle id="default" type="source" position={Position.Bottom} className="bk-handle" />
           ))}
       </div>
@@ -168,6 +167,28 @@ export function makeNode(nodeType: NodeType) {
   }
 
   return TypedNode;
+}
+
+// Chấm output ở đáy node + tooltip nhãn nhánh khi hover. Tách riêng để mỗi chấm giữ
+// được ref/hook tooltip độc lập (hook không gọi được trong vòng lặp inline).
+function SourceHandle({ id, label, style }: { id: string; label?: string; style?: CSSProperties }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { onMouseEnter, onMouseLeave, tip } = useHoverLabel(ref, label ?? '');
+  return (
+    <>
+      <Handle
+        ref={ref}
+        id={id}
+        type="source"
+        position={Position.Bottom}
+        className="bk-handle"
+        style={style}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      />
+      {tip}
+    </>
+  );
 }
 
 // Mô tả là field do người dùng tự nhập (data.description). Không lấy text/prompt

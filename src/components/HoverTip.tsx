@@ -24,22 +24,16 @@ interface TipPos {
   below: boolean;
 }
 
-// Hook: gắn onMouseEnter/onMouseLeave vào phần tử ref; trả thêm `tip` (portal) để
-// render. Chỉ hiện tooltip khi phần tử thực sự bị cắt (tràn ngang hoặc dọc).
-export function useClipTip(ref: RefObject<HTMLElement | null>, content: string) {
+// Hook nền: quản lý vị trí + render portal tooltip. `show(rect, below)` mở tooltip
+// canh giữa theo phần tử; `hide()` đóng. Dùng chung cho useClipTip / useHoverLabel.
+function useFloatingTip(content: string) {
   const [pos, setPos] = useState<TipPos | null>(null);
 
-  const onMouseEnter = () => {
-    const el = ref.current;
-    if (!el || !content) return;
-    const clipped = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
-    if (!clipped) return;
-    const r = el.getBoundingClientRect();
-    const below = r.top < 90; // gần mép trên -> lật xuống dưới cho khỏi tràn màn hình
+  const show = (r: DOMRect, below: boolean) => {
     const cx = Math.min(Math.max(r.left + r.width / 2, 200), window.innerWidth - 200);
     setPos({ x: cx, y: below ? r.bottom : r.top, below });
   };
-  const onMouseLeave = () => setPos(null);
+  const hide = () => setPos(null);
 
   // Ẩn tooltip nếu cuộn/zoom (vị trí đã cũ) — an toàn cho trạng thái thoáng qua.
   useLayoutEffect(() => {
@@ -65,7 +59,40 @@ export function useClipTip(ref: RefObject<HTMLElement | null>, content: string) 
       document.body,
     );
 
-  return { onMouseEnter, onMouseLeave, tip };
+  return { show, hide, tip };
+}
+
+// Hook: gắn onMouseEnter/onMouseLeave vào phần tử ref; trả thêm `tip` (portal) để
+// render. Chỉ hiện tooltip khi phần tử thực sự bị cắt (tràn ngang hoặc dọc).
+export function useClipTip(ref: RefObject<HTMLElement | null>, content: string) {
+  const { show, hide, tip } = useFloatingTip(content);
+
+  const onMouseEnter = () => {
+    const el = ref.current;
+    if (!el || !content) return;
+    const clipped = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+    if (!clipped) return;
+    const r = el.getBoundingClientRect();
+    show(r, r.top < 90); // gần mép trên -> lật xuống dưới cho khỏi tràn màn hình
+  };
+
+  return { onMouseEnter, onMouseLeave: hide, tip };
+}
+
+// Hook: tooltip LUÔN hiện khi hover (không cần cắt chữ) — dùng cho nhãn nhánh trên
+// chấm output ở đáy node. Khi output CHƯA nối dây thì không có edge mang nhãn, nên
+// hover chấm là cách duy nhất xem nhánh này là nhánh nào (label ở Branch Settings).
+// Tooltip hiện phía DƯỚI vì chấm nằm ở đáy node.
+export function useHoverLabel(ref: RefObject<HTMLElement | null>, content: string) {
+  const { show, hide, tip } = useFloatingTip(content);
+
+  const onMouseEnter = () => {
+    const el = ref.current;
+    if (!el || !content) return;
+    show(el.getBoundingClientRect(), true);
+  };
+
+  return { onMouseEnter, onMouseLeave: hide, tip };
 }
 
 interface HoverTipProps {
