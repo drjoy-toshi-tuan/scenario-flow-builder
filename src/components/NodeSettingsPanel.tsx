@@ -7,6 +7,7 @@ import {
   BRANCH_SCHEMA,
   readBranches,
   readPairs,
+  readClinicalDepartments,
   effectiveBranches,
   isPairBranchNode,
   fixedModuleBranches,
@@ -411,6 +412,8 @@ function FieldControl({
       );
     case 'pairs':
       return <PairsEditor data={data} />;
+    case 'departments':
+      return <DepartmentsEditor data={data} />;
     case 'autoText':
       return (
         <label className="block">
@@ -723,6 +726,72 @@ function PairsEditor({ data }: { data: Record<string, unknown> }) {
       >
         <Icon icon="lucide:plus" width={16} height={16} />
         {t('addPair')}
+      </button>
+    </div>
+  );
+}
+
+// ── Departments (Clinical Department Classifier) ─────────────────────────────
+// Mỗi set = List khoa khám ("Khoa1;Khoa2;…") -> Tên output. Set 1 không xoá được;
+// các set sau thêm/xoá tự do. Nhánh (Branch Settings) sinh tự động từ Tên output
+// (value = label = output) — xem clinicalDepartmentBranches.
+function DepartmentsEditor({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
+  const setDraftDepartments = useFlowStore((s) => s.setDraftDepartments);
+  const items = readClinicalDepartments(data);
+
+  const update = (index: number, side: 'list' | 'output', v: string) => {
+    const next = items.map((d, i) => (i === index ? { ...d, [side]: v.replace(/[\r\n]+/g, ' ') } : d));
+    setDraftDepartments(next);
+  };
+  const add = () => setDraftDepartments([...items, { list: '', output: '' }]);
+  const remove = (index: number) => {
+    if (index === 0) return; // Set 1 cố định
+    setDraftDepartments(items.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="block space-y-3">
+      {items.map((d, i) => (
+        <div key={i} className="rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] p-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-[var(--bk-text-muted)]">{`${t('fClinicalDeptList')} ${i + 1}`}</span>
+            {i > 0 && (
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                title={t('deleteDepartment')}
+                aria-label={t('deleteDepartment')}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,#dc2626_12%,transparent)] hover:text-rose-500"
+              >
+                <Icon icon="lucide:trash-2" width={15} height={15} />
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            className={`${inputClass} font-mono`}
+            value={d.list}
+            placeholder={t('deptListPh')}
+            onChange={(e) => update(i, 'list', e.target.value)}
+          />
+          <span className="mt-2 block text-xs font-medium text-[var(--bk-text-muted)]">{`${t('fResultName')} ${i + 1}`}</span>
+          <input
+            type="text"
+            className={inputClass}
+            value={d.output}
+            placeholder={t('deptOutputPh')}
+            onChange={(e) => update(i, 'output', e.target.value)}
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--bk-border)] px-3 py-2 text-sm font-medium text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+      >
+        <Icon icon="lucide:plus" width={16} height={16} />
+        {t('addDepartment')}
       </button>
     </div>
   );

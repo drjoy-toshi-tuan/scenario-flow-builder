@@ -95,6 +95,8 @@ const LOGIC_MODULE_NAMES = new Set([
   'Module Result Binder',
   'Incoming Classifier',
   'Date Of Call Classifier',
+  'Clinical Department Classifier',
+  'Null Check',
 ]);
 
 function edgeId(source: string, target: string, suffix?: string): string {

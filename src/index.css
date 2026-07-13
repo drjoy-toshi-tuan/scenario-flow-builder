@@ -14,10 +14,10 @@
   /* Xanh lá "an toàn" (dịu, không gắt) — dùng cho nút Lưu (hành động xác nhận). */
   --bk-success: #16a34a;
   --bk-success-hover: #15803d;
-  /* Màu nhận diện flow: Main Flow = xanh lá, Sub Flow = màu cau (nâu). Dùng cho
-     logo M/S ở panel flow, modal AI, pulldown Jump, màn quản lý flow. */
+  /* Màu nhận diện flow: Main Flow = xanh lá, Sub Flow = cam sáng (đồng bộ tông cam
+     chủ đạo). Dùng cho logo M/S ở panel flow, modal AI, pulldown Jump, màn quản lý flow. */
   --bk-flow-main: #16a34a;
-  --bk-flow-sub: #8a5a2b;
+  --bk-flow-sub: #f97316;
   --bk-bg: #eef1f6;
   --bk-surface: #ffffff;
   --bk-surface-2: #f6f8fb;
@@ -39,7 +39,7 @@
   --bk-success-hover: #1c8e50;
   /* Sáng hơn cho nền tối (logo M/S vẫn rõ). */
   --bk-flow-main: #22c55e;
-  --bk-flow-sub: #c69a6d;
+  --bk-flow-sub: #fb923c;
   --bk-bg: #0f1117;
   --bk-surface: #1a1c23;
   --bk-surface-2: #22252e;

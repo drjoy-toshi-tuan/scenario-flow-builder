@@ -117,6 +117,13 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── Logic: Module Result Binder ──
     fMrbModule: 'Tên Node / Tên Context',
     fVariable: 'Tên biến',
+    // ── Logic: Clinical Department Classifier ──
+    fClinicalDeptList: 'List khoa khám',
+    fResultName: 'Tên output',
+    addDepartment: 'Thêm set',
+    deleteDepartment: 'Xoá set',
+    deptListPh: 'Khoa1;Khoa2;…',
+    deptOutputPh: 'Tên output',
     // ── Logic: Date Of Call Classifier ──
     fCompareTime: 'Mốc thời gian để so sánh',
     // ── searchSelect ──
@@ -406,6 +413,13 @@ const DICT: Record<Lang, Record<string, string>> = {
     // ── Logic: Module Result Binder ──
     fMrbModule: '参照元モジュール名 / 変数名',
     fVariable: '変数名',
+    // ── Logic: Clinical Department Classifier ──
+    fClinicalDeptList: '診療科リスト',
+    fResultName: 'アウトプット名',
+    addDepartment: 'セットを追加',
+    deleteDepartment: 'セットを削除',
+    deptListPh: '診療科1;診療科2;…',
+    deptOutputPh: 'アウトプット名',
     // ── Logic: Date Of Call Classifier ──
     fCompareTime: '比較時点',
     // ── searchSelect ──

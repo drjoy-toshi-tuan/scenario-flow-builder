@@ -17,6 +17,11 @@ import {
   MODULE_FIXED_BRANCHES,
   LOGIC_MODULE_IC,
   LOGIC_MODULE_DOCC,
+  LOGIC_MODULE_CDEPT,
+  LOGIC_MODULE_NULLCHECK,
+  NULL_CHECK_FIXED_BRANCHES,
+  clinicalDepartmentBranches,
+  readClinicalDepartments,
   CATCH_ALL_ID,
   formatTimeInput,
 } from '../ui/nodeSchema';
@@ -634,6 +639,170 @@ flow:
       { when: '時間後', to: 'a' },
       { when: '時間一致', to: 'b' },
       { when: '時間前', to: 'c' },
+    ]);
+  });
+});
+
+describe('logic module mới: Clinical Department Classifier', () => {
+  it('readClinicalDepartments: đọc các set từ key phẳng clinical_department_n / result_name_n', () => {
+    const data = {
+      clinical_department_1: '内科;外科',
+      result_name_1: 'GENERAL',
+      clinical_department_2: '小児科',
+      result_name_2: 'PED',
+    };
+    expect(readClinicalDepartments(data)).toEqual([
+      { list: '内科;外科', output: 'GENERAL' },
+      { list: '小児科', output: 'PED' },
+    ]);
+    // Chưa có set nào -> vẫn trả 1 set trống để panel hiển thị ô nhập.
+    expect(readClinicalDepartments({})).toEqual([{ list: '', output: '' }]);
+  });
+
+  it('clinicalDepartmentBranches: FAILED (default) + NOT_COVERED + mỗi output 1 nhánh', () => {
+    const data = {
+      moduleType: LOGIC_MODULE_CDEPT,
+      clinical_department_1: '内科;外科',
+      result_name_1: 'GENERAL',
+      clinical_department_2: '小児科',
+      result_name_2: 'PED',
+    };
+    expect(clinicalDepartmentBranches(data)).toEqual([
+      { id: CATCH_ALL_ID, value: 'FAILED', label: '失敗' },
+      { id: 'b0', value: 'NOT_COVERED', label: '対象外' },
+      { id: 'out0', value: 'GENERAL', label: 'GENERAL' },
+      { id: 'out1', value: 'PED', label: 'PED' },
+    ]);
+  });
+
+  it('effectiveBranches: value = label = output, không cho custom (bộ cố định động)', () => {
+    const data = {
+      moduleType: LOGIC_MODULE_CDEPT,
+      result_name_1: 'GENERAL',
+      result_name_2: 'PED',
+    };
+    expect(effectiveBranches('logic', data)).toEqual([
+      { id: CATCH_ALL_ID, value: 'FAILED', label: '失敗' },
+      { id: 'b0', value: 'NOT_COVERED', label: '対象外' },
+      { id: 'b1', value: 'GENERAL', label: 'GENERAL' },
+      { id: 'b2', value: 'PED', label: 'PED' },
+    ]);
+  });
+
+  it('CDEPT round-trip YAML: FAILED (default) + NOT_COVERED + output, giữ key phẳng', () => {
+    const CDEPT = `
+flow:
+  name: "f"
+  start: c
+  nodes:
+    - id: c
+      type: logic
+      moduleType: Clinical Department Classifier
+      module: menu
+      saveDepartment2DB: "no"
+      clinical_department_1: "内科;外科"
+      result_name_1: "GENERAL"
+      branches:
+        - when: "FAILED"
+          default: f
+          label: "失敗"
+        - when: "NOT_COVERED"
+          to: n
+          label: "対象外"
+        - when: "GENERAL"
+          to: g
+          label: "GENERAL"
+    - id: f
+      type: hangup
+    - id: n
+      type: hangup
+    - id: g
+      type: hangup
+`;
+    const ir = fromYaml(CDEPT);
+    const c = ir.nodes.find((n) => n.id === 'c')!;
+    expect(c.data.module).toBe('menu');
+    expect(c.data.clinical_department_1).toBe('内科;外科');
+    expect(c.data.result_name_1).toBe('GENERAL');
+    expect(effectiveBranches(c.type, c.data)).toEqual([
+      { id: 'default', value: 'FAILED', label: '失敗' },
+      { id: 'b1', value: 'NOT_COVERED', label: '対象外' },
+      { id: 'b2', value: 'GENERAL', label: 'GENERAL' },
+    ]);
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; clinical_department_1?: string; result_name_1?: string; branches?: Array<Record<string, string>> }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'c')!;
+    expect(out.clinical_department_1).toBe('内科;外科');
+    expect(out.result_name_1).toBe('GENERAL');
+    expect(out.branches).toEqual([
+      { when: 'FAILED', default: 'f', label: '失敗' },
+      { when: 'NOT_COVERED', to: 'n', label: '対象外' },
+      { when: 'GENERAL', to: 'g', label: 'GENERAL' },
+    ]);
+  });
+});
+
+describe('logic module mới: Null Check', () => {
+  it('bộ nhánh CỐ ĐỊNH: true(Null, catch-all trên cùng) + false(Not Null)', () => {
+    expect(NULL_CHECK_FIXED_BRANCHES).toEqual([
+      { id: CATCH_ALL_ID, value: 'true', label: 'Null' },
+      { id: 'b0', value: 'false', label: 'Not Null' },
+    ]);
+    expect(MODULE_FIXED_BRANCHES[LOGIC_MODULE_NULLCHECK]).toBe(NULL_CHECK_FIXED_BRANCHES);
+  });
+
+  it('effectiveBranches: khoá cứng value/label kể cả khi data còn sót nhánh module khác', () => {
+    const staleData = {
+      moduleType: LOGIC_MODULE_NULLCHECK,
+      branches: [
+        { id: CATCH_ALL_ID, value: '' },
+        { id: 'b0', value: '非通知', label: 'label tự đặt' },
+      ],
+    };
+    expect(effectiveBranches('logic', staleData)).toEqual([
+      { id: CATCH_ALL_ID, value: 'true', label: 'Null' },
+      { id: 'b0', value: 'false', label: 'Not Null' },
+    ]);
+  });
+
+  it('Null Check round-trip YAML: true (default) + false', () => {
+    const NC = `
+flow:
+  name: "f"
+  start: c
+  nodes:
+    - id: c
+      type: logic
+      moduleType: Null Check
+      key: patient_name
+      branches:
+        - when: "true"
+          default: y
+          label: "Null"
+        - when: "false"
+          to: n
+          label: "Not Null"
+    - id: y
+      type: hangup
+    - id: n
+      type: hangup
+`;
+    const ir = fromYaml(NC);
+    const c = ir.nodes.find((n) => n.id === 'c')!;
+    expect(c.data.key).toBe('patient_name');
+    expect(effectiveBranches(c.type, c.data)).toEqual([
+      { id: 'default', value: 'true', label: 'Null' },
+      { id: 'b1', value: 'false', label: 'Not Null' },
+    ]);
+    const parsed = parse(toYaml(ir)) as {
+      flow: { nodes: Array<{ id: string; key?: string; branches?: Array<Record<string, string>> }> };
+    };
+    const out = parsed.flow.nodes.find((n) => n.id === 'c')!;
+    expect(out.key).toBe('patient_name');
+    expect(out.branches).toEqual([
+      { when: 'true', default: 'y', label: 'Null' },
+      { when: 'false', to: 'n', label: 'Not Null' },
     ]);
   });
 });

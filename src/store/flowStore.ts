@@ -9,10 +9,13 @@ import {
   readBranches,
   effectiveBranches,
   catchAllEditable,
+  logicModuleOf,
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
   MODULE_DEFAULT_BRANCHES,
   MODULE_FIXED_BRANCHES,
+  LOGIC_MODULE_CDEPT,
+  type ClinicalDepartment,
   type DataBranch,
 } from '../ui/nodeSchema';
 import { DEFAULT_IVR_SETTINGS, formatDateTime, type IvrSettings } from '../ir/ivrProperty';
@@ -135,6 +138,8 @@ interface FlowState {
   // Ghi bản nháp: label / 1 field data / nhánh tự do (condition/script).
   setDraftLabel: (label: string) => void;
   setDraftField: (key: string, value: unknown) => void;
+  // Ghi cả danh sách set (List khoa khám -> Tên output) của Clinical Department Classifier.
+  setDraftDepartments: (list: ClinicalDepartment[]) => void;
   draftAddBranch: () => void;
   draftUpdateBranch: (branchId: string, value: string) => void;
   draftSetBranchLabel: (branchId: string, label: string) => void;
@@ -771,22 +776,55 @@ export const useFlowStore = create<FlowState>((set, get) => {
     },
 
     setDraftField: (key, value) => {
-      const { draft } = get();
+      const { draft, ir, selectedNodeId } = get();
       if (!draft) return;
+      const node = ir?.nodes.find((n) => n.id === selectedNodeId);
       const data: Record<string, unknown> = { ...draft.data, [key]: value };
-      if (key === 'moduleType' && typeof value === 'string') {
+      // Đổi module của node logic -> ĐẶT LẠI nhánh theo module mới. Trước đây các
+      // module không có bộ nhánh riêng (Script/CMR/Module Result Binder) giữ nguyên
+      // data.branches nên mang nhầm nhánh của module trước (vd Incoming Classifier).
+      if (node?.type === 'logic' && key === 'moduleType' && typeof value === 'string') {
         const fixed = MODULE_FIXED_BRANCHES[value];
         const defaults = MODULE_DEFAULT_BRANCHES[value];
         if (fixed) {
-          // Module nhánh CỐ ĐỊNH (Incoming Classifier / Date Of Call Classifier):
-          // THAY HẲN bằng bộ chuẩn — không giữ nhánh của module trước.
+          // Module nhánh CỐ ĐỊNH tĩnh (Incoming Classifier / Date Of Call Classifier /
+          // Null Check): THAY HẲN bằng bộ chuẩn.
           data.branches = fixed.map((b) => ({ ...b }));
         } else if (defaults) {
-          // Module có bộ nhánh mặc định sửa được (CDC): chỉ seed khi node chưa có
-          // nhánh tuỳ biến nào.
-          const hasCustom = readBranches(data).some((b) => b.id !== CATCH_ALL_ID);
-          if (!hasCustom) data.branches = defaults.map((b) => ({ ...b }));
+          // Module có bộ nhánh mặc định sửa được (Clinic Day Classifier): seed bộ mặc định.
+          data.branches = defaults.map((b) => ({ ...b }));
+        } else if (value !== LOGIC_MODULE_CDEPT) {
+          // Script / Context Match Router / Module Result Binder: về slate sạch (chỉ
+          // catch-all). CDEPT xử lý ở khối đồng bộ bên dưới.
+          data.branches = [{ id: CATCH_ALL_ID, value: '' }];
         }
+      }
+      // Clinical Department Classifier: nhánh SINH TỪ property (FAILED / NOT_COVERED +
+      // mỗi Tên output 1 nhánh) — đồng bộ data.branches mỗi lần đổi field để chấm nối,
+      // dây và YAML luôn khớp danh sách output hiện tại.
+      if (node?.type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_CDEPT) {
+        data.branches = effectiveBranches('logic', data).map((b) => ({ ...b }));
+      }
+      set({ draft: { ...draft, data } });
+    },
+
+    setDraftDepartments: (list) => {
+      const { draft, ir, selectedNodeId } = get();
+      if (!draft) return;
+      const node = ir?.nodes.find((n) => n.id === selectedNodeId);
+      // Ghi lại các set (List khoa khám -> Tên output) thành key phẳng liên tục từ 1;
+      // xoá sạch key cũ trước khi ghi để tránh sót set đã xoá.
+      const data: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(draft.data)) {
+        if (/^clinical_department_\d+$/.test(k) || /^result_name_\d+$/.test(k)) continue;
+        data[k] = v;
+      }
+      list.forEach((d, i) => {
+        data[`clinical_department_${i + 1}`] = d.list;
+        data[`result_name_${i + 1}`] = d.output;
+      });
+      if (node?.type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_CDEPT) {
+        data.branches = effectiveBranches('logic', data).map((b) => ({ ...b }));
       }
       set({ draft: { ...draft, data } });
     },

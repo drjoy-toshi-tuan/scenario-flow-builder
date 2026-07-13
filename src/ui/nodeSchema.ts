@@ -20,6 +20,7 @@ export type FieldKind =
   | 'select' // pull-down
   | 'searchSelect' // pull-down gõ để lọc; option lấy động từ flow (xem optionsFrom)
   | 'pairs' // danh sách Pair (2 ô text + dấu ×) của Context Match Router
+  | 'departments' // danh sách set (List khoa khám -> Tên output) của Clinical Department Classifier
   | 'time' // giờ HH:mm:ss — chỉ nhận chữ số, tự chèn ':' theo format
   | 'yesno'; // checkbox 2 lựa chọn あり / なし
 
@@ -123,6 +124,12 @@ export const LOGIC_MODULE_IC = 'Incoming Classifier';
 // Date Of Call Classifier: so thời điểm gọi với mốc HH:mm:ss (時間前/時間一致/時間後;
 // lỗi -> ERROR, đóng vai trò nhánh else giống FAILED).
 export const LOGIC_MODULE_DOCC = 'Date Of Call Classifier';
+// Clinical Department Classifier: phân loại khoa khám. Tham số gồm module tham chiếu,
+// cờ lưu context và các cặp (danh sách khoa -> tên output). Nhánh SINH TỪ output
+// (FAILED / NOT_COVERED + mỗi output 1 nhánh), khoá custom.
+export const LOGIC_MODULE_CDEPT = 'Clinical Department Classifier';
+// Null Check: kiểm tra biến/kết quả có rỗng không — 2 nhánh cố định true/false.
+export const LOGIC_MODULE_NULLCHECK = 'Null Check';
 
 // Bộ chọn module lưu ở data.moduleType ('module' là THAM SỐ của CDC/MRB — 参照元モジュール).
 // Script đứng đầu pulldown (module mặc định, dùng thường xuyên nhất).
@@ -133,6 +140,8 @@ const MODULE_OPTIONS: FieldOption[] = [
   { value: LOGIC_MODULE_MRB, label: LOGIC_MODULE_MRB },
   { value: LOGIC_MODULE_IC, label: LOGIC_MODULE_IC },
   { value: LOGIC_MODULE_DOCC, label: LOGIC_MODULE_DOCC },
+  { value: LOGIC_MODULE_CDEPT, label: LOGIC_MODULE_CDEPT },
+  { value: LOGIC_MODULE_NULLCHECK, label: LOGIC_MODULE_NULLCHECK },
 ];
 
 // Module đang chọn của node logic (mặc định Script khi chưa chọn).
@@ -149,6 +158,8 @@ const moduleIsCdc = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_M
 const moduleIsCmr = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_CMR;
 const moduleIsMrb = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_MRB;
 const moduleIsDocc = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_DOCC;
+const moduleIsCdept = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_CDEPT;
+const moduleIsNullCheck = (d: Record<string, unknown>) => logicModuleOf(d) === LOGIC_MODULE_NULLCHECK;
 
 // ── Clinic Day Classifier ──
 // Nguồn ngày lễ cố định (nội các Nhật公開) — hiển thị read-only, không cho sửa.
@@ -339,6 +350,17 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       default: 'TEXT',
       showIf: mrbSaveContextOn,
     },
+
+    // ── Clinical Department Classifier ──
+    // module tham chiếu: nhận node Interaction + context (giống Module Result Binder).
+    { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCdept },
+    { key: 'saveDepartment2DB', labelKey: 'fSaveContext', kind: 'yesno', options: YESNO_HAI_OPTIONS, default: 'no', showIf: moduleIsCdept },
+    // Danh sách set (List khoa khám -> Tên output). Nhánh sinh tự động từ Tên output.
+    { key: 'departments', labelKey: 'fClinicalDeptList', kind: 'departments', showIf: moduleIsCdept },
+
+    // ── Null Check ──
+    // key tham chiếu: nhận node Interaction + context (giống Module Result Binder).
+    { key: 'key', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsNullCheck },
   ],
   openai: [
     // Prompt đứng đầu, sau đó mới tới Retry Count / Retry Announce.
@@ -371,6 +393,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
 //   - Nhánh FAILED = handle 'failed' — VALUE giữ ^FAILED$.
 export const NEXT_BRANCH_LABEL = '次へ';
 export const FAILED_BRANCH_LABEL = '失敗';
+// Nhãn nhánh "ngoài đối tượng" của Clinical Department Classifier.
+export const NOT_COVERED_BRANCH_LABEL = '対象外';
 
 const NEXT_ONLY: BranchDescriptor[] = [{ id: 'default', name: '.*', label: NEXT_BRANCH_LABEL }];
 // FAILED + NEXT dùng chung cho interaction/openai/faq/transfer.
@@ -443,21 +467,69 @@ export const DOCC_FIXED_BRANCHES: readonly DataBranch[] = [
   { id: 'b2', value: '時間前', label: '時間前' },
 ] as const;
 
+// Null Check: 2 nhánh cố định — true (Null) là nhánh else (trên cùng), false (Not Null).
+// Value/label khoá cứng, không thêm/xoá/sửa.
+export const NULL_CHECK_FIXED_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: 'true', label: 'Null' },
+  { id: 'b0', value: 'false', label: 'Not Null' },
+] as const;
+
 // Module có bộ nhánh CỐ ĐỊNH: value + label khoá cứng, không thêm/xoá nhánh. Đổi sang
 // các module này thì data.branches bị THAY HẲN bằng bộ chuẩn (xem flowStore.setDraftField)
 // — không giữ nhánh của module trước (tránh DOCC mang nhầm nhánh của IC).
 export const MODULE_FIXED_BRANCHES: Record<string, readonly DataBranch[]> = {
   [LOGIC_MODULE_IC]: IC_FIXED_BRANCHES,
   [LOGIC_MODULE_DOCC]: DOCC_FIXED_BRANCHES,
+  [LOGIC_MODULE_NULLCHECK]: NULL_CHECK_FIXED_BRANCHES,
 };
 
-// Bộ nhánh cố định của node (null nếu node dùng nhánh tự do bình thường).
+// 1 set (List khoa khám -> Tên output) của Clinical Department Classifier.
+export interface ClinicalDepartment {
+  list: string; // "Khoa1;Khoa2;…"
+  output: string; // Tên output — cũng là value & label của nhánh tương ứng
+}
+
+// Đọc danh sách set từ các key phẳng clinical_department_1 / result_name_1, … (liên
+// tục từ 1). Luôn có ít nhất 1 set để panel hiển thị ô nhập.
+export function readClinicalDepartments(data: Record<string, unknown>): ClinicalDepartment[] {
+  const list: ClinicalDepartment[] = [];
+  for (let i = 1; ; i++) {
+    const dep = data[`clinical_department_${i}`];
+    const out = data[`result_name_${i}`];
+    if (dep === undefined && out === undefined) break;
+    list.push({
+      list: typeof dep === 'string' ? dep : '',
+      output: typeof out === 'string' ? out : '',
+    });
+  }
+  return list.length > 0 ? list : [{ list: '', output: '' }];
+}
+
+// Bộ nhánh SINH TỪ property của Clinical Department Classifier:
+//   FAILED (default, trên cùng) · NOT_COVERED · mỗi Tên output 1 nhánh (value = label = output).
+// id ở đây chỉ là mẫu — effectiveBranches sẽ gán lại id ổn định theo value.
+export function clinicalDepartmentBranches(data: Record<string, unknown>): readonly DataBranch[] {
+  const outputs = readClinicalDepartments(data)
+    .map((d) => d.output.trim())
+    .filter((v) => v.length > 0);
+  const list: DataBranch[] = [
+    { id: CATCH_ALL_ID, value: 'FAILED', label: FAILED_BRANCH_LABEL },
+    { id: 'b0', value: 'NOT_COVERED', label: NOT_COVERED_BRANCH_LABEL },
+  ];
+  outputs.forEach((name, i) => list.push({ id: `out${i}`, value: name, label: name }));
+  return list;
+}
+
+// Bộ nhánh cố định của node (null nếu node dùng nhánh tự do bình thường). Clinical
+// Department Classifier có bộ nhánh cố định nhưng ĐỘNG (sinh từ property).
 export function fixedModuleBranches(
   type: NodeType,
   data: Record<string, unknown>,
 ): readonly DataBranch[] | null {
   if (type !== 'logic') return null;
-  return MODULE_FIXED_BRANCHES[logicModuleOf(data)] ?? null;
+  const mod = logicModuleOf(data);
+  if (mod === LOGIC_MODULE_CDEPT) return clinicalDepartmentBranches(data);
+  return MODULE_FIXED_BRANCHES[mod] ?? null;
 }
 
 // Bộ nhánh mặc định theo module — seed khi đổi module ở panel NẾU node chưa có nhánh

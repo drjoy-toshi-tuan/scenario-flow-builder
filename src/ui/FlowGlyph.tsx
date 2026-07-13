@@ -3,7 +3,7 @@ import { Icon } from './icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Logo nhận diện flow dùng chung (đồng bộ mọi nơi): chữ M cho Main Flow (màu xanh
-// lá), chữ S cho Sub Flow (màu cau/nâu). Màu lấy từ token CSS --bk-flow-main /
+// lá), chữ S cho Sub Flow (màu cam sáng). Màu lấy từ token CSS --bk-flow-main /
 // --bk-flow-sub nên tự hợp cả light/dark mode.
 // ─────────────────────────────────────────────────────────────────────────────
 
