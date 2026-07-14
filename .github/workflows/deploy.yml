@@ -48,7 +48,7 @@ jobs:
           # Client ID (không phải secret) — set ở Settings > Secrets and variables > Actions.
           # Chấp nhận cả tab "Secrets" LẪN tab "Variables" để tránh cấu hình nhầm chỗ.
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || vars.VITE_GOOGLE_CLIENT_ID }}
-          # URL proxy AI (Cloudflare Worker) cho tính năng "AIで生成・修正". KHÔNG phải
+          # URL proxy AI (Vercel Function) cho tính năng "AIで生成・修正". KHÔNG phải
           # secret (chỉ là URL) — chấp nhận cả tab "Secrets" LẪN "Variables".
           VITE_AI_PROXY_URL: ${{ secrets.VITE_AI_PROXY_URL || vars.VITE_AI_PROXY_URL }}
           # Model tuỳ chọn — bỏ trống thì dùng mặc định gpt-5.1 (xem src/ai/config.ts).

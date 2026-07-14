@@ -2,7 +2,7 @@ import { AI_PROXY_URL, OPENAI_MODEL } from './config';
 import { getStoredIdToken } from '../auth/session';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Client gọi AI qua PROXY (Cloudflare Worker) — key OpenAI nằm ở server, KHÔNG ở
+// Client gọi AI qua PROXY serverless (Vercel) — key OpenAI nằm ở server, KHÔNG ở
 // client. Gửi kèm ID token Google (Authorization: Bearer) để proxy xác thực. Trả
 // về nội dung message đầu tiên. Lỗi phân loại bằng AiError.code để UI ánh xạ i18n.
 // ─────────────────────────────────────────────────────────────────────────────
