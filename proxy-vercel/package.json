@@ -1,0 +1,7 @@
+{
+  "name": "scenario-ai-proxy-vercel",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Vercel Serverless proxy đứng trước OpenAI — verify Google ID token, egress từ region hỗ trợ (mặc định US) để tránh lỗi vùng của Cloudflare."
+}
