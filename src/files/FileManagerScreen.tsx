@@ -427,7 +427,7 @@ export function FileManagerScreen() {
       {/* ── Top bar: tiêu đề + nút menu (giống canvas) ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
         {/* Thương hiệu (logo ếch nét + wordmark) đồng bộ với màn login. */}
-        <BrandLockup logoClass="h-8 w-8" textClass="text-lg" />
+        <BrandLockup logoClass="h-8 w-8" textClass="text-xl" />
         <FileManagerMenu />
       </header>
 
