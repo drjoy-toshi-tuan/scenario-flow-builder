@@ -6,11 +6,11 @@
 
 /* ──────────────────────────────────────────────────────────────────────────
    Design tokens — 1 nguồn màu duy nhất cho cả Light & Dark mode.
-   Brand accent: cam (#ff7a1a) dùng cho chrome của app; node giữ màu theo loại.
+   Brand accent: cam (#ff8c30) dùng cho chrome của app; node giữ màu theo loại.
    ────────────────────────────────────────────────────────────────────────── */
 :root {
-  --bk-accent: #ff7a1a;
-  --bk-accent-soft: rgba(255, 122, 26, 0.14);
+  --bk-accent: #ff8c30;
+  --bk-accent-soft: rgba(255, 140, 48, 0.14);
   /* Xanh lá "an toàn" (dịu, không gắt) — dùng cho nút Lưu (hành động xác nhận). */
   --bk-success: #16a34a;
   --bk-success-hover: #15803d;
@@ -33,7 +33,7 @@
 
 .dark {
   --bk-accent: #ff8c30;
-  --bk-accent-soft: rgba(255, 122, 26, 0.18);
+  --bk-accent-soft: rgba(255, 140, 48, 0.18);
   /* Sáng hơn 1 chút để đủ tương phản trên nền tối. */
   --bk-success: #22a55e;
   --bk-success-hover: #1c8e50;
