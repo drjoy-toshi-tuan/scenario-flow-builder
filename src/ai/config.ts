@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Cấu hình client cho tính năng AI ("AIで生成・修正" + giải thích code).
 //
-// Client KHÔNG còn giữ API key OpenAI. Mọi lời gọi đi qua một PROXY (Cloudflare
-// Worker) giữ key ở phía server và verify ID token Google trước khi forward sang
-// OpenAI. Xem proxy/README.md để dựng proxy.
+// Client KHÔNG còn giữ API key OpenAI. Mọi lời gọi đi qua một PROXY serverless
+// (Vercel Function) giữ key ở phía server và verify ID token Google trước khi
+// forward sang OpenAI. Xem proxy-vercel/README.md để dựng proxy.
 //
 //   - VITE_AI_PROXY_URL: URL của Worker proxy (BẮT BUỘC để bật AI). KHÔNG phải
 //     secret — an toàn để công khai trong bundle.

@@ -6,8 +6,8 @@ of truth duy nhất; YAML chỉ là adapter import/export quanh IR.
 
 > App là **static site chạy trên GitHub Pages, không có backend**. Đăng nhập Google giới hạn
 > domain `drjoy.jp` (cổng UX + siết claim ở client). Chưa sinh `.bivr`, chưa có database/lưu server.
-> Có sẵn tính năng **AI sinh/sửa script & prompt** (OpenAI) — gọi qua **proxy** (Cloudflare Worker)
-> giữ key ở server, không lộ ra client (xem [`proxy/`](proxy/)).
+> Có sẵn tính năng **AI sinh/sửa script & prompt** (OpenAI) — gọi qua **proxy** (Vercel Function)
+> giữ key ở server, không lộ ra client (xem [`proxy-vercel/`](proxy-vercel/)).
 
 ![node types](https://img.shields.io/badge/nodes-11%20types-blue) ![i18n](https://img.shields.io/badge/i18n-VI%20%2F%20JA-orange) ![theme](https://img.shields.io/badge/theme-light%20%2F%20dark-lightgrey)
 
@@ -85,7 +85,7 @@ Tạo `.env` / `.env.local` (xem [`.env.example`](.env.example)):
 | Biến | Bắt buộc | Ý nghĩa |
 |------|:--------:|---------|
 | `VITE_GOOGLE_CLIENT_ID` | ✅¹ | Google OAuth 2.0 Client ID (Web). **Không phải secret** — an toàn trong bundle SPA. |
-| `VITE_AI_PROXY_URL` | – | URL Cloudflare Worker proxy cho tính năng AI (giữ key OpenAI ở server). **Không phải secret.** Xem [`proxy/README.md`](proxy/README.md). |
+| `VITE_AI_PROXY_URL` | – | URL proxy AI (Vercel Function, giữ key OpenAI ở server), có đuôi `/api/chat`. **Không phải secret.** Xem [`proxy-vercel/README.md`](proxy-vercel/README.md). |
 | `VITE_OPENAI_MODEL` | – | Model OpenAI client gửi kèm (proxy forward), mặc định `gpt-5.1` (xem [`src/ai/config.ts`](src/ai/config.ts)). |
 | `VITE_ALLOW_DEMO` | – | `true` để bật chế độ demo trên bản build (mặc định chỉ bật khi `npm run dev`). |
 | `VITE_SESSION_IDLE_MINUTES` | – | Thời hạn phiên theo cửa sổ idle trượt (phút), mặc định `720` (12 giờ). |
@@ -96,7 +96,7 @@ Tạo `.env` / `.env.local` (xem [`.env.example`](.env.example)):
 > Client ID **không** dùng client secret cho SPA.
 
 > **Key OpenAI không còn ở client.** Client gọi `VITE_AI_PROXY_URL` kèm ID token Google; proxy
-> (Cloudflare Worker) verify token rồi mới gắn key OpenAI (secret của Worker). Dựng proxy: [`proxy/README.md`](proxy/README.md).
+> (Vercel Function) verify token rồi mới gắn key OpenAI (env của Vercel). Dựng proxy: [`proxy-vercel/README.md`](proxy-vercel/README.md).
 
 ---
 
@@ -119,7 +119,7 @@ Claude Code không làm được các bước này — bạn (Tuan) cần tự l
 2. **Thêm Client ID & (tuỳ chọn) URL proxy AI:** repo → **Settings → Secrets and variables → Actions**
    - Vào tab **Secrets** (hoặc **Variables** đều được — workflow đọc cả hai) → **New**
    - `VITE_GOOGLE_CLIENT_ID` = Client ID ở trên.
-   - `VITE_AI_PROXY_URL` (tuỳ chọn) = URL Worker proxy để bật AI trên bản deploy (xem [`proxy/`](proxy/)).
+   - `VITE_AI_PROXY_URL` (tuỳ chọn) = URL proxy để bật AI trên bản deploy, vd `https://…vercel.app/api/chat` (xem [`proxy-vercel/`](proxy-vercel/)).
    - ⚠️ Phải đặt ở **Repository** secret/variable (KHÔNG phải Environment secret của môi trường
      `github-pages` — job build không đọc được). Sau khi thêm phải **chạy lại deploy** (push `main`
      hoặc **Actions → Deploy → Run workflow**). Thiếu Client ID → màn login báo
@@ -134,7 +134,7 @@ Claude Code không làm được các bước này — bạn (Tuan) cần tự l
 
 ## 🤖 Tính năng AI (OpenAI qua proxy)
 
-Gọi **OpenAI Chat Completions** qua một **proxy** (Cloudflare Worker, xem [`proxy/`](proxy/)) — key OpenAI
+Gọi **OpenAI Chat Completions** qua một **proxy** (Vercel Function, xem [`proxy-vercel/`](proxy-vercel/)) — key OpenAI
 nằm ở server, client chỉ gửi kèm ID token Google để proxy xác thực. Dùng ở 2 chỗ:
 
 - **AIで生成・修正** — nút trong node **Logic** (sinh/sửa *script* JavaScript) và node **OpenAI**
