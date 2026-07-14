@@ -1,7 +1,8 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import { buildIvrProperty, type IvrSettings } from '../ir/ivrProperty';
 import { Icon } from '../ui/icons';
+import { AiTalkLogo } from '../ui/AiTalkLogo';
 import { useT, type TKey } from '../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ interface OptionDef {
   value: string;
   labelKey: TKey;
   icon: string;
+  iconNode?: ReactNode; // logo SVG tuỳ biến (thay cho icon Iconify) nếu có
   color: string; // màu accent khi chọn
 }
 
@@ -35,7 +37,13 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
   ];
   const ttsOptions: OptionDef[] = [
     { value: 'amivoice', labelKey: 'ivrTtsAmivoice', icon: 'mingcute:voice-fill', color: 'var(--bk-accent)' },
-    { value: 'aitalk', labelKey: 'ivrTtsAiTalk', icon: 'mingcute:chat-1-ai-fill', color: 'var(--bk-accent)' },
+    {
+      value: 'aitalk',
+      labelKey: 'ivrTtsAiTalk',
+      icon: 'mingcute:chat-1-ai-fill',
+      iconNode: <AiTalkLogo width={16} height={16} />,
+      color: 'var(--bk-accent)',
+    },
   ];
   const sttOptions: OptionDef[] = [
     { value: 'amivoice', labelKey: 'ivrSttAmivoice', icon: 'mingcute:voice-fill', color: 'var(--bk-accent)' },
@@ -200,7 +208,7 @@ function ConfigColumn({
             className={`bk-ivr-opt ${on ? 'bk-ivr-opt--on' : ''}`}
             style={{ '--optc': o.color } as CSSProperties}
           >
-            <Icon icon={o.icon} width={16} height={16} />
+            {o.iconNode ?? <Icon icon={o.icon} width={16} height={16} />}
             <span>{t(o.labelKey)}</span>
           </button>
         );
