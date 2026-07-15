@@ -38,7 +38,7 @@ export function LoginScreen() {
     <div className="relative flex h-full flex-col bg-[var(--bk-bg)]">
       {/* ── Top bar: thương hiệu + menu giao diện — đồng bộ hệt màn Quản lý file ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
-        <BrandLockup logoClass="h-8 w-8" textClass="text-lg" />
+        <BrandLockup logoClass="h-8 w-8" textClass="text-xl" />
         <InterfaceMenu />
       </header>
 
