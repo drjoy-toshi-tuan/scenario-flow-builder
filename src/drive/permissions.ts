@@ -1,12 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Phân quyền app (owner / admin / user) — mô hình HYBRID:
+// Phân quyền app (owner / admin / user) — TOÀN BỘ lưu trên Drive:
 //
-// - Danh sách ADMIN nằm TRÊN REPO (config/permissions.json — chỉ ai có quyền
-//   push/token Contents write mới sửa được). Xem github/permissions.ts.
-// - File này lo phần còn lại: NHẬT KÝ TRUY CẬP `access-log.json` ở folder gốc
-//   kho Drive — mỗi lần vào màn quản lý, app tự upsert email + thời điểm của
-//   người dùng (ai cũng có quyền Editor kho Drive nên ghi được). Đây là nguồn
-//   danh sách để owner chọn người phân quyền trong modal 権限管理.
+// - File `access-log.json` trong DRIVE_LOG_FOLDER giữ CẢ danh sách admin lẫn
+//   nhật ký truy cập: mỗi lần vào màn quản lý, app tự upsert email + thời điểm
+//   của người dùng; owner gạt quyền Admin/User trong modal 権限管理 sẽ ghi đè
+//   field `admins` của cùng file này.
 // - Chỉ owner/admin mới thấy nút Xoá trên màn quản lý flow. App là static site
 //   không backend nên đây là cổng UX, không phải hàng rào bảo mật tuyệt đối.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,7 +14,7 @@ import { findChildFile, getFileText, createJsonFile, updateFileContent } from '.
 // Tài khoản owner của app (cố định theo yêu cầu vận hành).
 export const OWNER_EMAIL = 'tuan.nguyen4@drjoy.jp';
 
-// Tên file nhật ký truy cập trong folder gốc kho Drive.
+// Folder + tên file phân quyền/nhật ký truy cập trên Drive.
 const DRIVE_LOG_FOLDER = '18BNSBl_wMneoUdwYevmtnAoHbDdAlqn6';
 const ACCESS_LOG_FILE = 'access-log.json';
 
@@ -28,58 +26,68 @@ export interface PermMember {
   lastAccessAt: string; // ISO 8601 — UI tự format theo múi giờ máy
 }
 
-// Góc nhìn gộp cho UI (modal 権限管理): admins từ repo + members từ Drive.
+// Dữ liệu cho UI (modal 権限管理) — đọc/ghi nguyên khối từ access-log.json.
 export interface PermissionsData {
   admins: string[];
   members: PermMember[];
 }
 
-export interface AccessLog {
+export interface AccessLog extends PermissionsData {
   fileId: string;
-  members: PermMember[];
 }
 
 const normEmail = (e: string) => e.trim().toLowerCase();
 
 // Parse an toàn: file bị sửa tay/hỏng -> coi như rỗng thay vì crash màn quản lý.
-function parseMembers(text: string): PermMember[] {
+function parseLog(text: string): PermissionsData {
   try {
-    const raw = JSON.parse(text) as { members?: unknown };
-    return Array.isArray(raw.members)
-      ? raw.members.filter(
-          (m): m is PermMember =>
-            !!m && typeof m === 'object' && typeof (m as PermMember).email === 'string',
-        )
-      : [];
+    const raw = JSON.parse(text) as { admins?: unknown; members?: unknown };
+    return {
+      admins: Array.isArray(raw.admins)
+        ? raw.admins.filter((x): x is string => typeof x === 'string')
+        : [],
+      members: Array.isArray(raw.members)
+        ? raw.members.filter(
+            (m): m is PermMember =>
+              !!m && typeof m === 'object' && typeof (m as PermMember).email === 'string',
+          )
+        : [],
+    };
   } catch {
-    return [];
+    return { admins: [], members: [] };
   }
 }
 
-export function resolveRole(email: string | undefined, data: Pick<PermissionsData, 'admins'> | null): PermRole {
+export function resolveRole(
+  email: string | undefined,
+  data: Pick<PermissionsData, 'admins'> | null,
+): PermRole {
   if (!email) return 'user';
   const e = normEmail(email);
   if (e === OWNER_EMAIL) return 'owner';
   return data?.admins.some((a) => normEmail(a) === e) ? 'admin' : 'user';
 }
 
-// Đọc nhật ký truy cập; chưa có thì tạo file rỗng để các lần ghi sau chỉ cần PATCH.
+const serialize = (data: PermissionsData) =>
+  JSON.stringify({ admins: data.admins, members: data.members }, null, 2);
+
+// Đọc file phân quyền; chưa có thì tạo file rỗng để các lần ghi sau chỉ cần PATCH.
 export async function loadAccessLog(token: string): Promise<AccessLog> {
   const existing = await findChildFile(token, DRIVE_LOG_FOLDER, ACCESS_LOG_FILE);
   if (existing) {
-    return { fileId: existing.id, members: parseMembers(await getFileText(token, existing.id)) };
+    return { fileId: existing.id, ...parseLog(await getFileText(token, existing.id)) };
   }
   const created = await createJsonFile(
     token,
     DRIVE_LOG_FOLDER,
     ACCESS_LOG_FILE,
-    JSON.stringify({ members: [] }, null, 2),
+    serialize({ admins: [], members: [] }),
   );
-  return { fileId: created.id, members: [] };
+  return { fileId: created.id, admins: [], members: [] };
 }
 
 // Ghi nhận "tài khoản này vừa truy cập app": upsert vào members + cập nhật
-// lastAccessAt, rồi lưu lại. Trả về bản mới nhất để UI dùng luôn.
+// lastAccessAt, rồi lưu lại (giữ nguyên admins). Trả về bản mới nhất để UI dùng luôn.
 export async function recordAccess(
   token: string,
   user: { email: string; name?: string },
@@ -88,11 +96,16 @@ export async function recordAccess(
   const email = normEmail(user.email);
   const rest = log.members.filter((m) => normEmail(m.email) !== email);
   const members = [...rest, { email, name: user.name ?? '', lastAccessAt: new Date().toISOString() }];
-  await updateFileContent(
-    token,
-    log.fileId,
-    JSON.stringify({ members }, null, 2),
-    'application/json',
-  );
-  return { fileId: log.fileId, members };
+  const next: AccessLog = { ...log, members };
+  await updateFileContent(token, log.fileId, serialize(next), 'application/json');
+  return next;
+}
+
+// Owner gạt quyền Admin/User -> ghi đè danh sách admin. Đọc lại file ngay trước
+// khi ghi để không đè mất lượt truy cập vừa được người khác upsert.
+export async function saveAdmins(token: string, admins: string[]): Promise<AccessLog> {
+  const log = await loadAccessLog(token);
+  const next: AccessLog = { ...log, admins };
+  await updateFileContent(token, log.fileId, serialize(next), 'application/json');
+  return next;
 }

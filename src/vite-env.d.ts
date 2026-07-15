@@ -21,11 +21,8 @@ interface ImportMetaEnv {
   readonly VITE_AI_PROXY_URL?: string;
   // Model OpenAI (mặc định gpt-5.1). Vd 'gpt-4o', 'gpt-5-mini'.
   readonly VITE_OPENAI_MODEL?: string;
-  // Kho GitHub chứa file YAML (tuỳ chọn — mặc định trỏ repo hiện tại).
-  readonly VITE_GITHUB_OWNER?: string;
-  readonly VITE_GITHUB_REPO?: string;
-  readonly VITE_FLOWS_BRANCH?: string;
-  readonly VITE_FLOWS_DIR?: string;
+  // Folder gốc kho flow trên Google Drive (tuỳ chọn — có mặc định trong drive/config.ts).
+  readonly VITE_DRIVE_ROOT_FOLDER_ID?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;

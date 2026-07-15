@@ -4,7 +4,7 @@ import { APP_VERSION } from '../ui/appVersion';
 // ─────────────────────────────────────────────────────────────────────────────
 // Đầu panel menu (dropdown): thương hiệu (logo ếch + wordmark "Brekeke Flow
 // Builder") + dòng phiên bản nhỏ bên dưới. Dùng chung cho 4 màn (login, canvas,
-// quản lý flow, kết nối GitHub) để nhận diện đồng bộ với header các màn. Cỡ gọn
+// quản lý flow, kết nối Drive) để nhận diện đồng bộ với header các màn. Cỡ gọn
 // cho vừa bề rộng panel (w-72).
 // ─────────────────────────────────────────────────────────────────────────────
 export function MenuBrandHeader() {

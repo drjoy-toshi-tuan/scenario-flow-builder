@@ -1074,6 +1074,10 @@ body {
   user-select: none;
   height: 32px;
 }
+.bk-slide:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
 .bk-slide-thumb {
   position: absolute;
   top: 3px;

@@ -6,7 +6,7 @@ import { gdErrorKey } from '../drive/errors';
 // Panel "Kết nối Google Drive" — hiện khi chưa có access token Drive trong phiên.
 // Chỉ 1 nút bấm (popup consent chỉ hiện LẦN ĐẦU mỗi tài khoản; về sau popup tự
 // đóng ngay). Cần user gesture để mở popup nên không tự bật lúc mount.
-// Mirror bố cục GithubConnectPanel để đồng bộ thị giác.
+// Panel kết nối Google Drive (màn chờ trước khi có access token).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function DriveConnectPanel({

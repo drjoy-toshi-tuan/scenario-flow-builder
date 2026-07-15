@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { useGithubToken } from '../github/token';
 import { useTheme } from '../ui/theme';
 import { useLang, useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
@@ -10,8 +9,8 @@ import { MenuToggleIcon } from '../components/MenuToggleIcon';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Menu dọc cho màn Quản lý file (giống HeaderMenu ở canvas: nút icon -> panel
-// đóng/mở có animation). Gom: cài đặt giao diện (ngôn ngữ, theme), kết nối GitHub
-// (tên đăng nhập + ngắt kết nối), và tài khoản (đăng xuất).
+// đóng/mở có animation). Gom: cài đặt giao diện (ngôn ngữ, theme), quản lý quyền
+// (chỉ owner), và tài khoản (đăng xuất).
 // KHÔNG có mục "Cài đặt flow" vì màn này chưa mở flow nào.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,9 +22,8 @@ export function FileManagerMenu({
 } = {}) {
   const [open, setOpen] = useState(false);
   const [render, setRender] = useState(false);
-  // Xác nhận trước khi đăng xuất / ngắt kết nối GitHub (tránh bấm nhầm 1 click).
+  // Xác nhận trước khi đăng xuất (tránh bấm nhầm 1 click).
   const [confirmLogout, setConfirmLogout] = useState(false);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (open) setRender(true);
@@ -41,7 +39,6 @@ export function FileManagerMenu({
   }, [open]);
 
   const { user, signOut } = useAuth();
-  const { login, disconnect } = useGithubToken();
   const { theme, setTheme } = useTheme();
   const { lang, setLang } = useLang();
   const t = useT();
@@ -113,34 +110,9 @@ export function FileManagerMenu({
                   onManagePermissions();
                 }}
               >
-                <Icon icon="lucide:key-round" width={16} height={16} className="text-[var(--bk-accent)]" />
+                <Icon icon="app:key-draw" width={16} height={16} className="text-[var(--bk-accent)]" />
                 <span>{t('pmMenu')}</span>
               </button>
-            </>
-          )}
-
-          {/* ── GitHub ── */}
-          {login && (
-            <>
-              <div className="bk-menu-sep" />
-              <div className="bk-menu-row">
-                <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--bk-text-muted)]">
-                  <Icon icon="mdi:github" width={14} height={14} />
-                  <span className="truncate" title={t('fmConnectedAs', { login })}>{login}</span>
-                </span>
-                {/* Nút bấm hẳn hoi (không phải text) + hỏi xác nhận trước khi ngắt. */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmDisconnect(true);
-                    setOpen(false);
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg border border-[var(--bk-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--bk-text-muted)] transition hover:border-rose-400 hover:text-rose-500"
-                >
-                  <Icon icon="line-md:cog-off-loop" width={14} height={14} />
-                  <span>{t('fmDisconnect')}</span>
-                </button>
-              </div>
             </>
           )}
 
@@ -176,22 +148,6 @@ export function FileManagerMenu({
           confirmLabel={t('logout')}
           onCancel={() => setConfirmLogout(false)}
           onConfirm={signOut}
-          cancelLabel={t('btnCancel')}
-        />
-      )}
-
-      {/* Modal xác nhận ngắt kết nối GitHub. */}
-      {confirmDisconnect && (
-        <ConfirmModal
-          icon="line-md:cog-off-loop"
-          title={t('disconnectConfirmTitle')}
-          message={t('disconnectConfirmMessage')}
-          confirmLabel={t('fmDisconnect')}
-          onCancel={() => setConfirmDisconnect(false)}
-          onConfirm={() => {
-            disconnect();
-            setConfirmDisconnect(false);
-          }}
           cancelLabel={t('btnCancel')}
         />
       )}

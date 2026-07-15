@@ -1,5 +1,6 @@
 import { useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
+import { SlideToggle } from '../components/SlideToggle';
 import { OWNER_EMAIL, resolveRole, type PermissionsData } from '../drive/permissions';
 import { formatDateTime } from '../ir/ivrProperty';
 
@@ -18,7 +19,7 @@ export function PermissionsModal({
 }: {
   data: PermissionsData;
   busy: boolean;
-  // Lỗi khi đổi quyền (vd chưa kết nối GitHub) — hiện ngay trong modal.
+  // Lỗi khi đổi quyền (vd token Drive hết hạn) — hiện ngay trong modal.
   error?: string | null;
   // makeAdmin=true -> cấp Admin; false -> về User. Không truyền -> chỉ xem (mock).
   onChangeRole?: (email: string, makeAdmin: boolean) => void;
@@ -55,13 +56,12 @@ export function PermissionsModal({
       <div className="bk-modal" style={{ maxWidth: 520 }}>
         <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
-            <Icon icon="lucide:key-round" width={15} height={15} />
+            <Icon icon="app:key-draw" width={15} height={15} />
           </span>
           {t('pmTitle')}
         </div>
-        <p className="mb-3 text-xs leading-relaxed text-[var(--bk-text-muted)]">{t('pmDesc')}</p>
 
-        <div className="mb-4 max-h-[50vh] overflow-auto rounded-xl border border-[var(--bk-border)]">
+        <div className="mb-4 mt-3 max-h-[50vh] overflow-auto rounded-xl border border-[var(--bk-border)]">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
@@ -90,29 +90,19 @@ export function PermissionsModal({
                       {role === 'owner' ? (
                         roleBadge(t('pmRoleOwner'), 'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]')
                       ) : (
-                        // Gạt 2 nấc Admin/User — chỉ owner mở được modal này nên
+                        // Toggle trượt Admin/User (2 bên cân bằng — cùng kiểu với
+                        // toggle Theme/Ngôn ngữ). Chỉ owner mở được modal này nên
                         // không cần kiểm tra thêm quyền ở đây.
-                        <span className="inline-flex overflow-hidden rounded-full border border-[var(--bk-border)]">
-                          {(['admin', 'user'] as const).map((r) => (
-                            <button
-                              key={r}
-                              type="button"
-                              disabled={busy || !onChangeRole}
-                              onClick={() => {
-                                if (role !== r) onChangeRole?.(m.email, r === 'admin');
-                              }}
-                              className={`px-2.5 py-1 text-[11px] font-semibold transition disabled:pointer-events-none disabled:opacity-50 ${
-                                role === r
-                                  ? r === 'admin'
-                                    ? 'bg-[var(--bk-accent)] text-white'
-                                    : 'bg-[var(--bk-surface-2)] text-[var(--bk-text)]'
-                                  : 'text-[var(--bk-text-faint)] hover:text-[var(--bk-text)]'
-                              }`}
-                            >
-                              {t(r === 'admin' ? 'pmRoleAdmin' : 'pmRoleUser')}
-                            </button>
-                          ))}
-                        </span>
+                        <SlideToggle
+                          value={role}
+                          options={[
+                            { key: 'admin', label: t('pmRoleAdmin') },
+                            { key: 'user', label: t('pmRoleUser') },
+                          ]}
+                          onChange={(r) => onChangeRole?.(m.email, r === 'admin')}
+                          disabled={busy || !onChangeRole}
+                          ariaLabel={`${t('pmColRole')}: ${m.email}`}
+                        />
                       )}
                     </td>
                   </tr>

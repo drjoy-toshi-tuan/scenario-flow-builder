@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileManagerMenu } from './FileManagerMenu';
 import { DriveConnectPanel } from './DriveConnectPanel';
-import { buildBlankFlow, FlowStructureBadge, isValidFlowYaml } from './FileManagerScreen';
+import { buildBlankFlow, FlowStructureBadge, isValidFlowYaml } from './flowShared';
 import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { BrandLockup } from '../ui/BrandLockup';
@@ -28,12 +28,10 @@ import {
   loadAccessLog,
   recordAccess,
   resolveRole,
+  saveAdmins,
   type PermMember,
   type PermissionsData,
 } from '../drive/permissions';
-import { fetchAdmins, saveAdmins } from '../github/permissions';
-import { useGithubToken } from '../github/token';
-import { ghErrorKey } from '../github/errors';
 import { PermissionsModal } from './PermissionsModal';
 import { HoverLabelButton } from '../components/HoverTip';
 import { gdErrorKey } from '../drive/errors';
@@ -66,6 +64,8 @@ export interface VersionNode {
   // Số Sub Flow của bản này (đọc từ nội dung YAML — lazy khi vào tầng flow,
   // vì mỗi version có thể khác nhau). undefined = chưa đọc xong.
   subflowCount?: number;
+  // Ghi chú tự do của BẢN NÀY (description của file version trên Drive).
+  note?: string;
 }
 
 export interface ScenarioNode {
@@ -74,8 +74,6 @@ export interface ScenarioNode {
   createdAt?: string; // createdTime của folder シナリオ (作成日時)
   appliedV: number | null; // version đang chạy trên hệ thống AI電話 (null = chưa deploy)
   versions: VersionNode[]; // sắp DESC theo v (mới nhất trước)
-  // Ghi chú tự do của kịch bản (description của folder シナリオ trên Drive).
-  note?: string;
 }
 
 export interface FacilityNode {
@@ -102,8 +100,8 @@ interface DriveActions {
   onDelete?: (target: DeleteTarget) => void;
   onCreateFlow?: (facility: string, scenario: string) => void;
   onImport?: (facility: string, scenario: string, content: string) => void;
-  // Lưu ghi chú của kịch bản (ghi vào description folder シナリオ; rỗng = xoá ghi chú).
-  onSaveNote?: (scenarioId: string, note: string) => void;
+  // Lưu ghi chú của 1 VERSION (ghi vào description file version; rỗng = xoá ghi chú).
+  onSaveNote?: (versionFileId: string, note: string) => void;
   // Đọc subflowCount cho các version của 1 kịch bản (gọi khi vào tầng flow).
   onLoadVersionDetails?: (facilityId: string, scenarioId: string) => void;
 }
@@ -182,10 +180,9 @@ const MOCK_FACILITIES: FacilityNode[] = [
         name: '診療予約',
         createdAt: '2026-07-02 14:00',
         appliedV: 2,
-        note: 'V2 đang chạy thật trên tổng đài. Trước khi deploy bản mới cần xác nhận lại giờ tiếp nhận với bệnh viện.',
         versions: [
-          { fileId: 'm1', v: 3, createdAt: '2026-07-14 18:22', updatedAt: '2026-07-15 10:05', author: 'Tuan Nguyen', subflowCount: 3 },
-          { fileId: 'm2', v: 2, createdAt: '2026-07-10 09:41', updatedAt: '2026-07-12 14:20', author: 'Tuan Nguyen', subflowCount: 2 },
+          { fileId: 'm1', v: 3, createdAt: '2026-07-14 18:22', updatedAt: '2026-07-15 10:05', author: 'Tuan Nguyen', subflowCount: 3, note: 'Đang chỉnh lại nhánh xác nhận ngày sinh — CHƯA deploy bản này.' },
+          { fileId: 'm2', v: 2, createdAt: '2026-07-10 09:41', updatedAt: '2026-07-12 14:20', author: 'Tuan Nguyen', subflowCount: 2, note: 'V2 đang chạy thật trên tổng đài. Trước khi deploy bản mới cần xác nhận lại giờ tiếp nhận với bệnh viện.' },
           { fileId: 'm3', v: 1, createdAt: '2026-07-02 14:05', updatedAt: '2026-07-02 14:05', author: '田中 花子', subflowCount: 0 },
         ],
       },
@@ -331,6 +328,7 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
       createdAt: fmtTime(f.createdTime),
       updatedAt: fmtTime(f.modifiedTime),
       author: f.lastModifyingUser?.displayName ?? '',
+      note: f.description?.trim() ? f.description : undefined,
     };
     versByParent.set(parent, [...(versByParent.get(parent) ?? []), node]);
   }
@@ -346,7 +344,6 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
       createdAt: fmtTime(s.createdTime),
       appliedV: Number.isFinite(applied) && applied > 0 ? applied : null,
       versions: (versByParent.get(s.id) ?? []).sort((a, b) => b.v - a.v),
-      note: s.description?.trim() ? s.description : undefined,
     };
     scenByParent.set(parent, [...(scenByParent.get(parent) ?? []), node]);
   }
@@ -373,14 +370,11 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
   const [listErrorKey, setListErrorKey] = useState<TKey | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  // Phân quyền HYBRID: danh sách admin đọc từ REPO (config/permissions.json —
-  // chỉ ai có quyền push mới sửa được); nhật ký truy cập ghi trên Drive.
+  // Phân quyền lưu TRÊN DRIVE (access-log.json): admins + nhật ký truy cập cùng file.
   const [admins, setAdmins] = useState<string[]>([]);
   const [members, setMembers] = useState<PermMember[]>([]);
   // Lỗi khi đổi quyền (hiện trong modal 権限管理, không dùng banner chung vì bị modal che).
   const [permError, setPermError] = useState<string | null>(null);
-  // GitHub token đã lưu (localStorage) — cần để GHI danh sách admin lên repo.
-  const ghToken = useGithubToken((s) => s.token);
   // Owner nhận diện qua email cố định nên KHÔNG phụ thuộc file quyền đọc được hay chưa.
   const role = resolveRole(user?.email, { admins });
 
@@ -439,9 +433,9 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     void load();
   }, [load]);
 
-  // Ghi nhận "tài khoản này vừa truy cập app" vào access-log.json trên Drive
-  // (nguồn danh sách cho owner phân quyền) + đọc danh sách admin từ repo. Lỗi ở
-  // đây KHÔNG chặn màn hình: role rơi về mặc định (owner vẫn nhận diện qua email).
+  // Ghi nhận "tài khoản này vừa truy cập app" vào access-log.json trên Drive —
+  // file này cũng là nguồn danh sách admin. Lỗi ở đây KHÔNG chặn màn hình:
+  // role rơi về mặc định (owner vẫn nhận diện qua email).
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -449,14 +443,13 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
         const log = user?.email
           ? await recordAccess(token, { email: user.email, name: user.name })
           : await loadAccessLog(token);
-        if (!cancelled) setMembers(log.members);
+        if (!cancelled) {
+          setMembers(log.members);
+          setAdmins(log.admins);
+        }
       } catch {
         // bỏ qua — phân quyền là tiện ích, không phải điều kiện dùng app
       }
-    })();
-    void (async () => {
-      const list = await fetchAdmins(); // không ném lỗi — trả [] khi có sự cố
-      if (!cancelled) setAdmins(list);
     })();
     return () => {
       cancelled = true;
@@ -465,13 +458,13 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Lưu ghi chú kịch bản = PATCH description của folder シナリオ (rỗng = xoá ghi chú).
-  const saveNote = async (scenarioId: string, note: string) => {
+  // Lưu ghi chú của 1 version = PATCH description của file version (rỗng = xoá ghi chú).
+  const saveNote = async (versionFileId: string, note: string) => {
     if (busy) return;
     setBusy(true);
     setActionError(null);
     try {
-      await updateItemDescription(token, scenarioId, note);
+      await updateItemDescription(token, versionFileId, note);
       showToast(t('dmNoteSaved'));
       await load();
     } catch (e) {
@@ -481,26 +474,23 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     }
   };
 
-  // Owner cấp/thu quyền Admin cho 1 email trong modal 権限管理 — commit lên repo
-  // (config/permissions.json) bằng GitHub token đã lưu.
+  // Owner cấp/thu quyền Admin cho 1 email trong modal 権限管理 — ghi vào
+  // access-log.json trên Drive bằng chính access token Drive đang dùng.
   const changeRole = async (email: string, makeAdmin: boolean) => {
     if (busy) return;
-    if (!ghToken) {
-      // Chưa kết nối GitHub -> không ghi được lên repo; nhắc ngay trong modal.
-      setPermError(t('pmNeedGithub'));
-      return;
-    }
     setBusy(true);
     setPermError(null);
     try {
       const e = email.trim().toLowerCase();
       const next = admins.filter((a) => a.trim().toLowerCase() !== e);
       if (makeAdmin) next.push(e);
-      await saveAdmins(ghToken, next);
-      setAdmins(next);
+      const log = await saveAdmins(token, next);
+      setAdmins(log.admins);
+      setMembers(log.members);
       showToast(t('pmSaved'));
     } catch (err) {
-      setPermError(t(ghErrorKey(err)));
+      if (handledAsExpired(err)) return;
+      setPermError(t(gdErrorKey(err)));
     } finally {
       setBusy(false);
     }
@@ -566,10 +556,8 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
       const text = await getFileText(token, ver.fileId);
       await loadYaml(text);
       openFile({
-        storage: 'drive',
         path: `${f.name}/${s.name}`,
         name: versionFileName(s.name, ver.v),
-        sha: null,
         driveFileId: ver.fileId,
         driveFolderId: s.id,
         version: ver.v,
@@ -652,10 +640,8 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
       const file = await createYamlFile(token, scen.id, versionFileName(scenario, maxV + 1), content);
       await loadYaml(content);
       openFile({
-        storage: 'drive',
         path: `${facility}/${scenario}`,
         name: file.name,
-        sha: null,
         driveFileId: file.id,
         driveFolderId: scen.id,
         version: maxV + 1,
@@ -706,7 +692,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
         onDelete: (target) => void remove(target),
         onCreateFlow: (facility, scenario) => void createFlow(facility, scenario),
         onImport: (facility, scenario, content) => void importFlow(facility, scenario, content),
-        onSaveNote: (scenarioId, note) => void saveNote(scenarioId, note),
+        onSaveNote: (versionFileId, note) => void saveNote(versionFileId, note),
         onLoadVersionDetails: (facilityId, scenarioId) => void loadVersionDetails(facilityId, scenarioId),
       }}
       canDelete={role !== 'user'}
@@ -811,8 +797,8 @@ function DriveInner({
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ kind: 'facility' | 'scenario'; id: string; name: string } | null>(null);
   const [renameName, setRenameName] = useState('');
-  // Modal ghi chú kịch bản (màn flow) + modal 権限管理 (chỉ owner).
-  const [noteOpen, setNoteOpen] = useState(false);
+  // Modal ghi chú theo VERSION (mở từ nút trên dòng ở màn flow) + modal 権限管理 (chỉ owner).
+  const [noteTarget, setNoteTarget] = useState<VersionNode | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [showPermissions, setShowPermissions] = useState(false);
 
@@ -941,19 +927,19 @@ function DriveInner({
     actions.onCreateFlow?.(fac, scen);
   };
 
-  // Mở modal ghi chú của kịch bản đang xem (màn flow) — prefill nội dung hiện có.
-  const openNoteModal = () => {
-    if (!scenario) return;
-    setNoteDraft(scenario.note ?? '');
-    setNoteOpen(true);
+  // Mở modal ghi chú của 1 version — prefill nội dung hiện có.
+  const openNoteModal = (ver: VersionNode) => {
+    setNoteDraft(ver.note ?? '');
+    setNoteTarget(ver);
   };
 
   const handleSaveNote = () => {
-    if (!scenario) return;
+    if (!noteTarget) return;
     const note = noteDraft.trim();
-    setNoteOpen(false);
+    const target = noteTarget;
+    setNoteTarget(null);
     // Nội dung không đổi -> khỏi gọi API.
-    if (note !== (scenario.note ?? '')) actions.onSaveNote?.(scenario.id, note);
+    if (note !== (target.note ?? '')) actions.onSaveNote?.(target.fileId, note);
   };
 
   const toggleSort = (key: string) =>
@@ -1169,29 +1155,6 @@ function DriveInner({
               <Icon icon="line-md:upload-loop" width={17} height={17} />
               {t('dmImport')}
             </button>
-            {/* Ghi chú kịch bản — CHỈ ở màn flow (tầng バージョン). Hover = xem nhanh
-                nội dung ghi chú (tooltip); click = mở modal sửa. Đã có ghi chú thì
-                icon đổi sang clipboard-list màu cam. */}
-            {level === 3 && scenario && (
-              <HoverLabelButton
-                label={scenario.note ?? ''}
-                disabled={busy || (!mock && !actions.onSaveNote)}
-                onClick={openNoteModal}
-                className={`flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-60 ${
-                  scenario.note
-                    ? 'border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-400'
-                    : 'border-[var(--bk-border)] bg-[var(--bk-surface)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]'
-                }`}
-              >
-                <Icon
-                  key={scenario.note ? 'has-note' : 'no-note'}
-                  icon={scenario.note ? 'line-md:clipboard-list' : 'line-md:clipboard-plus'}
-                  width={17}
-                  height={17}
-                />
-                {t('dmNote')}
-              </HoverLabelButton>
-            )}
             <button
               type="button"
               onClick={() => actions.onRefresh?.()}
@@ -1500,7 +1463,8 @@ function DriveInner({
                       {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       {renderSortTh('author', 'colAuthor')}
-                      <th className={`${th} w-[88px]`} aria-hidden />
+                      {/* Rộng hơn 2 tầng trên: dòng version có thêm nút Ghi chú (3 nút) */}
+                      <th className={`${th} w-[124px]`} aria-hidden />
                     </tr>
                   </thead>
                   <tbody>
@@ -1549,6 +1513,22 @@ function DriveInner({
                           <td className={`${cell} text-[var(--bk-text-muted)]`}>{ver.author}</td>
                           <td className={cell} onClick={(e) => e.stopPropagation()}>
                             <div className={rowActions}>
+                              {/* Ghi chú CỦA BẢN NÀY: hover = xem nhanh nội dung
+                                  (tooltip); click = mở modal sửa. Đã có ghi chú thì
+                                  icon đổi sang bong bóng có dòng chữ. */}
+                              <HoverLabelButton
+                                label={ver.note ?? t('dmNote')}
+                                onClick={() => openNoteModal(ver)}
+                                disabled={busy || (!mock && !actions.onSaveNote)}
+                                className={`${rowBtn} hover:text-sky-500`}
+                              >
+                                <Icon
+                                  key={`${iconKey(ver.fileId)}-${ver.note ? 'memo' : 'empty'}`}
+                                  icon={ver.note ? 'app:chat-round-text' : 'line-md:chat-round'}
+                                  width={17}
+                                  height={17}
+                                />
+                              </HoverLabelButton>
                               {/* Duplicate = tạo V{max+1} với nội dung bản này. */}
                               <HoverLabelButton
                                 label={t('fmDuplicate')}
@@ -1838,17 +1818,19 @@ function DriveInner({
         </div>
       )}
 
-      {/* Modal: ghi chú kịch bản (màn flow). Click ngoài không đóng — chỉ Hủy/Lưu. */}
-      {noteOpen && scenario && (
+      {/* Modal: ghi chú của 1 version. Click ngoài không đóng — chỉ Hủy/Lưu. */}
+      {noteTarget && scenario && (
         <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true">
           <div className="bk-modal">
             <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                <Icon icon="line-md:clipboard-list" width={15} height={15} />
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[color-mix(in_srgb,#0ea5e9_14%,transparent)] text-sky-500">
+                <Icon icon="app:chat-round-text" width={15} height={15} />
               </span>
               {t('dmNoteTitle')}
             </div>
-            <p className="mb-3 truncate text-xs text-[var(--bk-text-muted)]">{scenario.name}</p>
+            <p className="mb-3 truncate text-xs text-[var(--bk-text-muted)]">
+              {versionFileName(scenario.name, noteTarget.v)}
+            </p>
 
             <textarea
               autoFocus
@@ -1862,7 +1844,7 @@ function DriveInner({
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setNoteOpen(false)}
+                onClick={() => setNoteTarget(null)}
                 className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
               >
                 {t('btnCancel')}

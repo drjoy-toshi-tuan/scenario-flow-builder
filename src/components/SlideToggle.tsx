@@ -17,9 +17,10 @@ interface SlideToggleProps {
   onChange: (key: string) => void;
   title?: string;
   ariaLabel?: string;
+  disabled?: boolean;
 }
 
-export function SlideToggle({ value, options, onChange, title, ariaLabel }: SlideToggleProps) {
+export function SlideToggle({ value, options, onChange, title, ariaLabel, disabled }: SlideToggleProps) {
   const [left, right] = options;
   const isRight = value === right.key;
 
@@ -30,6 +31,7 @@ export function SlideToggle({ value, options, onChange, title, ariaLabel }: Slid
       aria-checked={isRight}
       aria-label={ariaLabel}
       title={title}
+      disabled={disabled}
       onClick={() => onChange(isRight ? left.key : right.key)}
       className="bk-slide"
     >
