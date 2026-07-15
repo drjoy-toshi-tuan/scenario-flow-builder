@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileManagerMenu } from './FileManagerMenu';
 import { DriveConnectPanel } from './DriveConnectPanel';
-import { buildBlankFlow } from './FileManagerScreen';
+import { buildBlankFlow, FlowStructureBadge, isValidFlowYaml } from './FileManagerScreen';
 import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { BrandLockup } from '../ui/BrandLockup';
@@ -24,6 +24,7 @@ import {
 } from '../drive/api';
 import { gdErrorKey } from '../drive/errors';
 import { DRIVE_ROOT_FOLDER_ID, parseVersionFromName, versionFileName } from '../drive/config';
+import { parseFlowMeta, updateFlowMeta } from '../ir/flowMeta';
 import { formatDateTime } from '../ir/ivrProperty';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,8 +35,12 @@ import { formatDateTime } from '../ir/ivrProperty';
 //   load cả cây bằng ~3 request (list con theo lô), mở/tạo/khôi phục/xoá thật.
 // - Không có (demo dev)  -> hiện MOCK DATA để review UI (badge プレビュー).
 //
-// Cột 適用中 đọc từ appProperties.appliedVersion trên folder シナリオ — phần chờ
-// cho phase deploy (bot Selenium sẽ ghi giá trị này sau khi deploy thành công).
+// Điều hướng: click BẤT KỲ chỗ nào trên dòng (trừ cụm nút thao tác) — tầng 病院
+// vào danh sách kịch bản, tầng シナリオ vào danh sách phiên bản, tầng バージョン
+// mở file lên canvas. Không còn nút "Mở" riêng.
+//
+// Cột デプロイ状況 đọc từ appProperties.appliedVersion trên folder シナリオ — phần
+// chờ cho phase deploy (bot Selenium sẽ ghi giá trị này sau khi deploy thành công).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface VersionNode {
@@ -49,13 +54,16 @@ export interface VersionNode {
 export interface ScenarioNode {
   id: string;
   name: string;
-  appliedV: number | null; // version đang 適用 trên hệ thống AI電話 (null = chưa)
+  createdAt?: string; // createdTime của folder シナリオ (作成日時)
+  appliedV: number | null; // version đang chạy trên hệ thống AI電話 (null = chưa deploy)
   versions: VersionNode[]; // sắp DESC theo v (mới nhất trước)
+  subflowCount?: number; // số Sub Flow của bản mới nhất (đọc từ nội dung YAML)
 }
 
 export interface FacilityNode {
   id: string;
   name: string;
+  createdAt?: string; // createdTime của folder 病院 (作成日時)
   scenarios: ScenarioNode[];
 }
 
@@ -69,11 +77,12 @@ interface DeleteTarget {
 // Các hành động màn hình gọi ra ngoài — bản mock không truyền -> nút bị disable.
 interface DriveActions {
   onRefresh?: () => void;
-  onOpenLatest?: (f: FacilityNode, s: ScenarioNode) => void;
   onOpenVersion?: (f: FacilityNode, s: ScenarioNode, v: VersionNode) => void;
   onRestore?: (f: FacilityNode, s: ScenarioNode, v: VersionNode) => void;
+  onDuplicate?: (f: FacilityNode, s: ScenarioNode, v: VersionNode) => void;
   onDelete?: (target: DeleteTarget) => void;
   onCreateFlow?: (facility: string, scenario: string) => void;
+  onImport?: (facility: string, scenario: string, content: string) => void;
 }
 
 // ── Helpers dẫn xuất ──
@@ -89,6 +98,9 @@ const normalizeSearch = (s: string) => s.normalize('NFKC').toLowerCase().trim();
 
 // Các mức số dòng mỗi trang (đồng bộ FileManagerScreen).
 const PAGE_SIZES = [20, 50] as const;
+
+// Giá trị select "tạo mới" trong modal import (không đụng id thật của Drive).
+const NEW_OPTION = '__new__';
 
 // ── Sort dùng chung cho cả 3 tầng ──
 type SortDir = 'asc' | 'desc';
@@ -135,11 +147,14 @@ const MOCK_FACILITIES: FacilityNode[] = [
   {
     id: 'f1',
     name: '国立成育医療研究センター',
+    createdAt: '2026-07-01 09:00',
     scenarios: [
       {
         id: 's1',
         name: '診療予約',
+        createdAt: '2026-07-02 14:00',
         appliedV: 2,
+        subflowCount: 3,
         versions: [
           { fileId: 'm1', v: 3, createdAt: '2026-07-14 18:22', updatedAt: '2026-07-15 10:05', author: 'Tuan Nguyen' },
           { fileId: 'm2', v: 2, createdAt: '2026-07-10 09:41', updatedAt: '2026-07-12 14:20', author: 'Tuan Nguyen' },
@@ -149,7 +164,9 @@ const MOCK_FACILITIES: FacilityNode[] = [
       {
         id: 's2',
         name: '予約変更・キャンセル',
+        createdAt: '2026-07-08 11:20',
         appliedV: 1,
+        subflowCount: 1,
         versions: [
           { fileId: 'm4', v: 1, createdAt: '2026-07-08 11:30', updatedAt: '2026-07-08 11:30', author: '田中 花子' },
         ],
@@ -157,7 +174,9 @@ const MOCK_FACILITIES: FacilityNode[] = [
       {
         id: 's3',
         name: '休診日案内',
+        createdAt: '2026-07-12 16:40',
         appliedV: null,
+        subflowCount: 0,
         versions: [
           { fileId: 'm5', v: 2, createdAt: '2026-07-15 08:12', updatedAt: '2026-07-15 08:12', author: 'Tuan Nguyen' },
           { fileId: 'm6', v: 1, createdAt: '2026-07-12 16:48', updatedAt: '2026-07-13 09:02', author: '佐藤 健' },
@@ -168,12 +187,15 @@ const MOCK_FACILITIES: FacilityNode[] = [
   {
     id: 'f2',
     name: '聖路加国際病院',
+    createdAt: '2026-05-02 10:15',
     scenarios: [
-      { id: 's4', name: '診療予約', appliedV: 22, versions: MANY_VERSIONS },
+      { id: 's4', name: '診療予約', createdAt: '2026-05-04 09:00', appliedV: 22, subflowCount: 5, versions: MANY_VERSIONS },
       {
         id: 's5',
         name: '検査結果案内',
+        createdAt: '2026-07-11 17:00',
         appliedV: null,
+        subflowCount: 2,
         versions: [
           { fileId: 'm7', v: 1, createdAt: '2026-07-11 17:19', updatedAt: '2026-07-11 17:19', author: '田中 花子' },
         ],
@@ -183,11 +205,14 @@ const MOCK_FACILITIES: FacilityNode[] = [
   {
     id: 'f3',
     name: '東京慈恵会医科大学附属病院',
+    createdAt: '2026-06-20 08:45',
     scenarios: [
       {
         id: 's6',
         name: '診療時間案内',
+        createdAt: '2026-07-06 10:30',
         appliedV: 1,
+        subflowCount: 0,
         versions: [
           { fileId: 'm8', v: 2, createdAt: '2026-07-14 19:55', updatedAt: '2026-07-14 19:55', author: '田中 花子' },
           { fileId: 'm9', v: 1, createdAt: '2026-07-06 10:33', updatedAt: '2026-07-07 15:41', author: '田中 花子' },
@@ -195,7 +220,7 @@ const MOCK_FACILITIES: FacilityNode[] = [
       },
     ],
   },
-  { id: 'f4', name: '大阪母子医療センター', scenarios: [] },
+  { id: 'f4', name: '大阪母子医療センター', createdAt: '2026-07-10 13:05', scenarios: [] },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -239,6 +264,11 @@ function DriveReal() {
 // Đổi RFC3339 của Drive -> 'yyyy-MM-dd HH:mm' (múi giờ máy người dùng).
 const fmtTime = (rfc3339: string) => formatDateTime(new Date(rfc3339));
 
+// Cache số Sub Flow theo `fileId:updatedAt` (nội dung đổi -> modifiedTime đổi ->
+// key đổi). Nhờ vậy Làm mới không phải tải lại nội dung file không đổi — cùng
+// pattern với metaCache của FileManagerScreen. Sống ở cấp module để giữ qua mount.
+const subflowCountCache = new Map<string, number>();
+
 // Ghép 3 danh sách phẳng (folder 施設 / folder シナリオ / file version) thành cây.
 function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): FacilityNode[] {
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
@@ -267,6 +297,7 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
     const node: ScenarioNode = {
       id: s.id,
       name: s.name,
+      createdAt: fmtTime(s.createdTime),
       appliedV: Number.isFinite(applied) && applied > 0 ? applied : null,
       versions: (versByParent.get(s.id) ?? []).sort((a, b) => b.v - a.v),
     };
@@ -274,7 +305,12 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
   }
 
   return fac
-    .map((f) => ({ id: f.id, name: f.name, scenarios: (scenByParent.get(f.id) ?? []).sort(byName) }))
+    .map((f) => ({
+      id: f.id,
+      name: f.name,
+      createdAt: fmtTime(f.createdTime),
+      scenarios: (scenByParent.get(f.id) ?? []).sort(byName),
+    }))
     .sort(byName);
 }
 
@@ -312,7 +348,39 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
       const files = scenFolders.length
         ? await listChildren(token, scenFolders.map((x) => x.id))
         : [];
-      setFacilities(buildTree(facFolders, scenFolders, files));
+      const tree = buildTree(facFolders, scenFolders, files);
+
+      // Đếm Sub Flow của bản mới nhất mỗi kịch bản (song song, có cache) — hiện
+      // badge Main/Sub cạnh tên kịch bản. Lỗi đọc 1 file không chặn cả danh sách.
+      const alive = new Set<string>();
+      await Promise.all(
+        tree.flatMap((f) =>
+          f.scenarios.map(async (s) => {
+            const latest = latestVersionOf(s);
+            if (!latest) return;
+            const key = `${latest.fileId}:${latest.updatedAt}`;
+            alive.add(key);
+            const cached = subflowCountCache.get(key);
+            if (cached !== undefined) {
+              s.subflowCount = cached;
+              return;
+            }
+            try {
+              const count = parseFlowMeta(await getFileText(token, latest.fileId)).subflowCount ?? 0;
+              subflowCountCache.set(key, count);
+              s.subflowCount = count;
+            } catch {
+              // bỏ qua — badge hiện 0
+            }
+          }),
+        ),
+      );
+      // Dọn cache: chỉ giữ key còn trong danh sách hiện tại (tránh phình vô hạn).
+      for (const key of subflowCountCache.keys()) {
+        if (!alive.has(key)) subflowCountCache.delete(key);
+      }
+
+      setFacilities(tree);
     } catch (e) {
       if (!handledAsExpired(e)) setListErrorKey(gdErrorKey(e));
     } finally {
@@ -350,8 +418,13 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     }
   };
 
-  // Khôi phục bản cũ = tạo version MỚI (V{max+1}) với nội dung bản đó — không sửa lịch sử.
-  const restore = async (_f: FacilityNode, s: ScenarioNode, ver: VersionNode) => {
+  // Tạo version MỚI (V{max+1}) từ nội dung 1 bản có sẵn — dùng chung cho Khôi phục
+  // (bản cũ) và Duplicate (bản bất kỳ, kể cả mới nhất). Không sửa lịch sử.
+  const copyAsNewVersion = async (
+    s: ScenarioNode,
+    ver: VersionNode,
+    toastKey: 'dmRestored' | 'dmDuplicated',
+  ) => {
     if (busy) return;
     setBusy(true);
     setActionError(null);
@@ -359,7 +432,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
       const text = await getFileText(token, ver.fileId);
       const nextV = latestOf(s) + 1;
       await createYamlFile(token, s.id, versionFileName(s.name, nextV), text);
-      showToast(t('dmRestored', { n: nextV }));
+      showToast(t(toastKey, { n: nextV }));
       await load();
     } catch (e) {
       if (!handledAsExpired(e)) setActionError(t(gdErrorKey(e)));
@@ -419,6 +492,29 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     }
   };
 
+  // Import file YAML vào folder bệnh viện/kịch bản đã chọn (tạo mới nếu chưa có),
+  // ghi thành V{max+1} (V1 với kịch bản mới). Đồng bộ metadata facility/name theo
+  // đích đến để danh sách hiển thị nhất quán với cây folder.
+  const importFlow = async (facility: string, scenario: string, content: string) => {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      const fac = await ensureFolder(token, DRIVE_ROOT_FOLDER_ID, facility);
+      const scen = await ensureFolder(token, fac.id, scenario);
+      const existing = await listChildren(token, [scen.id]);
+      const maxV = existing.reduce((m, x) => Math.max(m, parseVersionFromName(x.name) ?? 0), 0);
+      const next = updateFlowMeta(content, { facility, name: scenario });
+      await createYamlFile(token, scen.id, versionFileName(scenario, maxV + 1), next);
+      showToast(t('dmImported', { n: maxV + 1 }));
+      await load();
+    } catch (e) {
+      if (!handledAsExpired(e)) setActionError(t(gdErrorKey(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <DriveInner
       facilities={facilities}
@@ -429,14 +525,12 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
       actionError={actionError}
       actions={{
         onRefresh: () => void load(),
-        onOpenLatest: (f, s) => {
-          const latest = latestVersionOf(s);
-          if (latest) void openVersion(f, s, latest);
-        },
         onOpenVersion: (f, s, v) => void openVersion(f, s, v),
-        onRestore: (f, s, v) => void restore(f, s, v),
+        onRestore: (_f, s, v) => void copyAsNewVersion(s, v, 'dmRestored'),
+        onDuplicate: (_f, s, v) => void copyAsNewVersion(s, v, 'dmDuplicated'),
         onDelete: (target) => void remove(target),
         onCreateFlow: (facility, scenario) => void createFlow(facility, scenario),
+        onImport: (facility, scenario, content) => void importFlow(facility, scenario, content),
       }}
     />
   );
@@ -444,7 +538,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phần trình bày dùng chung (real + mock): drill-down, sort, tìm kiếm, phân trang,
-// modal tạo mới / xác nhận xoá.
+// modal tạo mới / import / xác nhận xoá.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DriveInner({
@@ -473,11 +567,14 @@ function DriveInner({
   const scenario = facility?.scenarios.find((s) => s.id === path.scenarioId) ?? null;
   const level: 1 | 2 | 3 = scenario ? 3 : facility ? 2 : 1;
 
-  // Tìm kiếm + sort + phân trang áp cho tầng hiện tại; đổi tầng thì reset.
+  // Tìm kiếm (ẩn sau nút kính lúp — đồng bộ FileManagerScreen) + sort + phân trang
+  // áp cho tầng hiện tại; đổi tầng thì reset từ khoá.
+  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortState>(null);
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setQuery('');
     setSort(null);
@@ -487,12 +584,86 @@ function DriveInner({
     setPage(1);
   }, [query, sort, pageSize]);
 
+  // Mở ô tìm kiếm -> focus; đóng -> xoá từ khoá (đồng bộ FileManagerScreen).
+  const toggleSearch = () => {
+    setSearchOpen((open) => {
+      if (open) setQuery('');
+      return !open;
+    });
+  };
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
   // Modal tạo flow mới / xác nhận xoá.
   const [showNew, setShowNew] = useState(false);
   const [newFacility, setNewFacility] = useState('');
   const [newScenario, setNewScenario] = useState('');
   const [createErrorKey, setCreateErrorKey] = useState<TKey | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+
+  // ── Import: đọc file YAML -> modal chọn/tạo folder bệnh viện + kịch bản ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importContent, setImportContent] = useState<string | null>(null); // != null -> modal mở
+  const [impFacSel, setImpFacSel] = useState<string>(NEW_OPTION); // id folder hoặc NEW_OPTION
+  const [impFacName, setImpFacName] = useState('');
+  const [impScenSel, setImpScenSel] = useState<string>(NEW_OPTION);
+  const [impScenName, setImpScenName] = useState('');
+  const [importErrorKey, setImportErrorKey] = useState<TKey | null>(null);
+  // Lỗi file không hợp lệ (hiện ở banner chung với lỗi hành động).
+  const [uploadErrorKey, setUploadErrorKey] = useState<TKey | null>(null);
+
+  const impFacility = impFacSel === NEW_OPTION ? null : facilities.find((f) => f.id === impFacSel) ?? null;
+
+  const handleImportFile = async (fileList: FileList | null) => {
+    const file = fileList?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = ''; // cho phép chọn lại cùng file
+    if (!file) return;
+    setUploadErrorKey(null);
+    let content: string;
+    try {
+      content = await file.text();
+    } catch {
+      setUploadErrorKey('fmUploadInvalid');
+      return;
+    }
+    if (!isValidFlowYaml(content)) {
+      setUploadErrorKey('fmUploadInvalid');
+      return;
+    }
+    // Prefill: đang đứng trong bệnh viện/kịch bản -> chọn sẵn; ngoài ra thử khớp
+    // metadata trong file với folder có sẵn; không khớp -> chế độ "tạo mới".
+    const meta = parseFlowMeta(content);
+    const metaFac = facilities.find((f) => f.name === meta.facility) ?? null;
+    const fac = facility ?? metaFac;
+    setImpFacSel(fac?.id ?? NEW_OPTION);
+    setImpFacName(meta.facility ?? '');
+    const metaScen = fac?.scenarios.find((s) => s.name === meta.name) ?? null;
+    const scen = scenario ?? metaScen;
+    setImpScenSel(scen?.id ?? NEW_OPTION);
+    setImpScenName(meta.name ?? '');
+    setImportErrorKey(null);
+    setImportContent(content);
+  };
+
+  const handleImportConfirm = () => {
+    const fac = impFacSel === NEW_OPTION ? impFacName.trim() : impFacility?.name ?? '';
+    const scen =
+      impScenSel === NEW_OPTION
+        ? impScenName.trim()
+        : impFacility?.scenarios.find((s) => s.id === impScenSel)?.name ?? '';
+    if (!fac) {
+      setImportErrorKey('fmFacilityRequired');
+      return;
+    }
+    if (!scen) {
+      setImportErrorKey('fmScenarioRequired');
+      return;
+    }
+    const content = importContent;
+    setImportContent(null);
+    if (content) actions.onImport?.(fac, scen, content);
+  };
 
   const openNewModal = () => {
     setCreateErrorKey(null);
@@ -554,6 +725,9 @@ function DriveInner({
 
   const iconBtn =
     'flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-accent-soft)] hover:text-[var(--bk-accent)] disabled:pointer-events-none disabled:opacity-40';
+  // Style input/select trong modal (dùng lại nhiều chỗ).
+  const fieldCls =
+    'w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]';
 
   // ── Dữ liệu từng tầng sau lọc + sort ──
   const q = normalizeSearch(query);
@@ -562,13 +736,19 @@ function DriveInner({
     let rows = facilities;
     if (q) rows = rows.filter((f) => normalizeSearch(f.name).includes(q));
     if (!sort) return rows;
-    return [...rows].sort((a, b) =>
-      compareCells(
-        sort.key === 'count' ? a.scenarios.length : sort.key === 'updatedAt' ? facilityUpdatedAt(a) : a.name,
-        sort.key === 'count' ? b.scenarios.length : sort.key === 'updatedAt' ? facilityUpdatedAt(b) : b.name,
-        sort.dir,
-      ),
-    );
+    const val = (f: FacilityNode): string | number | undefined => {
+      switch (sort.key) {
+        case 'count':
+          return f.scenarios.length;
+        case 'createdAt':
+          return f.createdAt;
+        case 'updatedAt':
+          return facilityUpdatedAt(f);
+        default:
+          return f.name;
+      }
+    };
+    return [...rows].sort((a, b) => compareCells(val(a), val(b), sort.dir));
   }, [facilities, q, sort]);
 
   const scenarioRows = useMemo(() => {
@@ -584,6 +764,8 @@ function DriveInner({
           return latestOf(s) || undefined;
         case 'applied':
           return s.appliedV ?? undefined;
+        case 'createdAt':
+          return s.createdAt;
         case 'updatedAt':
           return latestVersionOf(s)?.updatedAt;
         case 'author':
@@ -693,7 +875,7 @@ function DriveInner({
             )}
           </nav>
 
-          {/* ── Thanh hành động: Tạo mới / Làm mới / Tìm kiếm / Phân trang ── */}
+          {/* ── Thanh hành động: Tạo mới / Import / Làm mới / Tìm kiếm / Phân trang ── */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -703,6 +885,16 @@ function DriveInner({
             >
               <Icon icon="line-md:plus" width={17} height={17} />
               {t('fmNew')}
+            </button>
+            {/* Import file YAML -> modal chọn/tạo folder bệnh viện + kịch bản */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy || (!mock && !actions.onImport)}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--bk-accent)] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
+            >
+              <Icon icon="line-md:upload-loop" width={17} height={17} />
+              {t('dmImport')}
             </button>
             <button
               type="button"
@@ -714,19 +906,54 @@ function DriveInner({
             >
               <Icon icon="lucide:refresh-cw" width={18} height={18} className={loading ? 'animate-spin' : ''} />
             </button>
-            {/* Ô tìm kiếm (áp cho tầng đang xem) */}
-            <div className="relative ml-0.5 min-w-[200px] max-w-sm flex-1">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--bk-text-faint)]">
-                <Icon icon="line-md:search" width={15} height={15} />
-              </span>
+            {/* Nút tìm kiếm (kính lúp) — bấm mới hiện ô nhập (đồng bộ FileManagerScreen) */}
+            <button
+              type="button"
+              onClick={toggleSearch}
+              title={t('fmSearch')}
+              aria-label={t('fmSearch')}
+              aria-pressed={searchOpen}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${
+                searchOpen
+                  ? 'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
+                  : 'text-[var(--bk-text-muted)] hover:text-[var(--bk-accent)]'
+              }`}
+            >
+              <Icon icon="line-md:search" width={18} height={18} />
+            </button>
+
+            {/* Ô tìm kiếm: trượt ra khi bật, Escape để đóng */}
+            <div
+              className={`relative flex items-center overflow-hidden transition-[flex-grow,opacity,margin] duration-300 ease-out ${
+                searchOpen ? 'ml-0.5 min-w-[160px] flex-1 opacity-100' : 'ml-0 w-0 flex-none opacity-0'
+              }`}
+            >
               <input
+                ref={searchInputRef}
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') toggleSearch();
+                }}
                 placeholder={t('fmSearch')}
                 aria-label={t('fmSearch')}
-                className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] py-2 pl-9 pr-3 text-sm text-[var(--bk-text)] outline-none transition focus:border-[var(--bk-accent)] focus:ring-2 focus:ring-[var(--bk-accent-soft)]"
+                className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] py-2 pl-3 pr-8 text-sm text-[var(--bk-text)] outline-none transition focus:border-[var(--bk-accent)] focus:ring-2 focus:ring-[var(--bk-accent-soft)]"
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  title={t('fmSearchClear')}
+                  aria-label={t('fmSearchClear')}
+                  className="absolute right-1.5 flex h-6 w-6 items-center justify-center rounded-md text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+                >
+                  <Icon icon="lucide:x" width={14} height={14} />
+                </button>
+              )}
             </div>
 
             {/* ── Phần trang: số kết quả · số dòng mỗi trang · điều hướng ── */}
@@ -785,10 +1012,21 @@ function DriveInner({
             </div>
           </div>
 
-          {(actionError || listErrorKey) && (
+          {/* Input file ẩn cho Import */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".yaml,.yml,text/yaml,application/x-yaml"
+            className="hidden"
+            onChange={(e) => void handleImportFile(e.target.files)}
+          />
+
+          {(actionError || listErrorKey || uploadErrorKey) && (
             <div className="mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
               <Icon icon="lucide:triangle-alert" className="mt-0.5 shrink-0" />
-              <span>{actionError ?? (listErrorKey ? t(listErrorKey) : null)}</span>
+              <span>
+                {actionError ?? (listErrorKey ? t(listErrorKey) : uploadErrorKey ? t(uploadErrorKey) : null)}
+              </span>
             </div>
           )}
 
@@ -801,46 +1039,43 @@ function DriveInner({
               </div>
             ) : level === 1 ? (
               facilityRows.length === 0 ? (
-                <EmptyState icon="lucide:folder" text={q ? t('fmNoResults') : t('dmEmptyFacilities')} />
+                <EmptyState icon="line-md:folder" text={q ? t('fmNoResults') : t('dmEmptyFacilities')} />
               ) : (
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-[var(--bk-border)]">
                       {renderSortTh('name', 'colFacility', 'w-[380px] min-w-[300px]')}
                       {renderSortTh('count', 'colScenarioCount')}
+                      {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       <th className={`${th} text-right`}>{t('colActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageSlice(facilityRows).map((f) => (
-                      <tr key={f.id} className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]">
+                      // Click bất kỳ chỗ nào trên dòng (trừ cột thao tác) = vào danh sách kịch bản.
+                      <tr
+                        key={f.id}
+                        onClick={() => {
+                          if (!busy) setPath({ facilityId: f.id });
+                        }}
+                        className="cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
+                      >
                         <td className={cell}>
-                          <button
-                            type="button"
-                            onClick={() => setPath({ facilityId: f.id })}
-                            disabled={busy}
-                            className="flex min-w-0 items-center gap-2 text-left font-medium text-[var(--bk-text)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
-                          >
-                            <Icon icon="lucide:folder" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
+                          <span className="flex min-w-0 items-center gap-2 font-medium text-[var(--bk-text)]">
+                            <Icon icon="line-md:folder" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
                             <span className="truncate">{f.name}</span>
-                          </button>
+                          </span>
                         </td>
                         <td className={`${cell} text-[var(--bk-text-muted)]`}>{f.scenarios.length}</td>
                         <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>
+                          {f.createdAt ?? '—'}
+                        </td>
+                        <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>
                           {facilityUpdatedAt(f) ?? '—'}
                         </td>
-                        <td className={cell}>
+                        <td className={`${cell} cursor-default`} onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setPath({ facilityId: f.id })}
-                              disabled={busy}
-                              className={`${iconBtn} text-[var(--bk-accent)]`}
-                              title={t('fmOpen')}
-                            >
-                              <Icon icon="lucide:folder-open" width={17} height={17} />
-                            </button>
                             <button
                               type="button"
                               onClick={() => setDeleteTarget({ kind: 'facility', id: f.id, label: f.name })}
@@ -859,7 +1094,7 @@ function DriveInner({
               )
             ) : level === 2 && facility ? (
               scenarioRows.length === 0 ? (
-                <EmptyState icon="lucide:folder" text={q ? t('fmNoResults') : t('dmEmptyScenarios')} />
+                <EmptyState icon="line-md:file-document" text={q ? t('fmNoResults') : t('dmEmptyScenarios')} />
               ) : (
                 <table className="w-full border-collapse">
                   <thead>
@@ -867,6 +1102,7 @@ function DriveInner({
                       {renderSortTh('name', 'colScenario', 'w-[300px] min-w-[240px]')}
                       {renderSortTh('latest', 'colLatestVersion')}
                       {renderSortTh('applied', 'colAppliedVersion')}
+                      {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       {renderSortTh('author', 'colAuthor')}
                       <th className={`${th} text-right`}>{t('colActions')}</th>
@@ -876,26 +1112,29 @@ function DriveInner({
                     {pageSlice(scenarioRows).map((s) => {
                       const latest = latestOf(s);
                       const lv = latestVersionOf(s);
-                      const goHistory = () => setPath({ facilityId: facility.id, scenarioId: s.id });
                       return (
-                        <tr key={s.id} className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]">
+                        // Kịch bản hoạt động như folder: click dòng = vào màn quản lý phiên bản.
+                        <tr
+                          key={s.id}
+                          onClick={() => {
+                            if (!busy) setPath({ facilityId: facility.id, scenarioId: s.id });
+                          }}
+                          className="cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
+                        >
                           <td className={cell}>
-                            {/* Bản thật: click = mở bản mới nhất trên canvas. Mock: vào tầng version. */}
-                            <button
-                              type="button"
-                              onClick={() => (actions.onOpenLatest ? actions.onOpenLatest(facility, s) : goHistory())}
-                              disabled={busy}
-                              className="flex min-w-0 items-center gap-2 text-left font-medium text-[var(--bk-text)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
-                              title={t('dmOpenLatest')}
-                            >
-                              <Icon icon="lucide:file-text" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
-                              <span className="truncate">{s.name}</span>
-                            </button>
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex min-w-0 items-center gap-2 font-medium text-[var(--bk-text)]">
+                                <Icon icon="line-md:file-document" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
+                                <span className="truncate">{s.name}</span>
+                              </span>
+                              {/* Cấu trúc flow của bản mới nhất: Main Flow | Sub Flow · số lượng. */}
+                              <FlowStructureBadge subflowCount={s.subflowCount ?? 0} />
+                            </div>
                           </td>
                           <td className={`${cell} font-semibold`}>{latest ? `V${latest}` : '—'}</td>
                           <td className={cell}>
                             {s.appliedV == null ? (
-                              <span className="text-[var(--bk-text-faint)]">— {t('dmNotApplied')}</span>
+                              <span className="text-[var(--bk-text-faint)]">—</span>
                             ) : (
                               <span
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -903,29 +1142,18 @@ function DriveInner({
                                     ? 'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#16a34a]'
                                     : 'bg-amber-100 text-amber-700'
                                 }`}
-                                title={s.appliedV === latest ? t('dmAppliedBadge') : t('dmNotApplied')}
+                                title={t('dmAppliedBadge')}
                               >
                                 <Icon icon="lucide:circle-check" width={12} height={12} />
                                 V{s.appliedV}
                               </span>
                             )}
                           </td>
+                          <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{s.createdAt ?? '—'}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{lv?.updatedAt ?? '—'}</td>
                           <td className={`${cell} text-[var(--bk-text-muted)]`}>{lv?.author ?? '—'}</td>
-                          <td className={cell}>
+                          <td className={`${cell} cursor-default`} onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => actions.onOpenLatest?.(facility, s)}
-                                disabled={busy || !actions.onOpenLatest || !lv}
-                                className={`${iconBtn} text-[var(--bk-accent)]`}
-                                title={t('dmOpenLatest')}
-                              >
-                                <Icon icon="fluent:open-16-filled" width={18} height={18} />
-                              </button>
-                              <button type="button" onClick={goHistory} disabled={busy} className={iconBtn} title={t('dmHistory')}>
-                                <Icon icon="lucide:history" width={16} height={16} />
-                              </button>
                               <button
                                 type="button"
                                 onClick={() => setDeleteTarget({ kind: 'scenario', id: s.id, label: s.name })}
@@ -945,7 +1173,7 @@ function DriveInner({
               )
             ) : level === 3 && facility && scenario ? (
               versionRows.length === 0 ? (
-                <EmptyState icon="lucide:file-text" text={q ? t('fmNoResults') : t('dmEmptyVersions')} />
+                <EmptyState icon="line-md:file-document" text={q ? t('fmNoResults') : t('dmEmptyVersions')} />
               ) : (
                 <table className="w-full border-collapse">
                   <thead>
@@ -962,19 +1190,21 @@ function DriveInner({
                       const isLatest = ver.v === latestOf(scenario);
                       const isApplied = scenario.appliedV === ver.v;
                       return (
-                        <tr key={ver.fileId} className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]">
+                        // Click bất kỳ chỗ nào trên dòng (trừ cột thao tác) = mở bản này lên canvas.
+                        <tr
+                          key={ver.fileId}
+                          onClick={() => {
+                            if (!busy) actions.onOpenVersion?.(facility, scenario, ver);
+                          }}
+                          title={t('fmOpen')}
+                          className="cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
+                        >
                           <td className={cell}>
                             <div className="flex items-center gap-2.5">
-                              <button
-                                type="button"
-                                onClick={() => actions.onOpenVersion?.(facility, scenario, ver)}
-                                disabled={busy || (!mock && !actions.onOpenVersion)}
-                                className="flex min-w-0 items-center gap-2 text-left font-semibold text-[var(--bk-text)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
-                                title={t('fmOpen')}
-                              >
-                                <Icon icon="lucide:file-text" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
+                              <span className="flex min-w-0 items-center gap-2 font-semibold text-[var(--bk-text)]">
+                                <Icon icon="line-md:file-document" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
                                 <span>V{ver.v}</span>
-                              </button>
+                              </span>
                               <span className="truncate text-xs text-[var(--bk-text-faint)]">
                                 {versionFileName(scenario.name, ver.v)}
                               </span>
@@ -986,7 +1216,7 @@ function DriveInner({
                               )}
                               {isLatest && (
                                 <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--bk-accent)] px-2 py-0.5 text-[11px] font-semibold text-[var(--bk-accent)]">
-                                  最新
+                                  {t('dmLatestBadge')}
                                 </span>
                               )}
                             </div>
@@ -994,16 +1224,17 @@ function DriveInner({
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.createdAt}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.updatedAt}</td>
                           <td className={`${cell} text-[var(--bk-text-muted)]`}>{ver.author}</td>
-                          <td className={cell}>
+                          <td className={`${cell} cursor-default`} onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
+                              {/* Duplicate = tạo V{max+1} với nội dung bản này. */}
                               <button
                                 type="button"
-                                onClick={() => actions.onOpenVersion?.(facility, scenario, ver)}
-                                disabled={busy || (!mock && !actions.onOpenVersion)}
-                                className={`${iconBtn} text-[var(--bk-accent)]`}
-                                title={t('fmOpen')}
+                                onClick={() => actions.onDuplicate?.(facility, scenario, ver)}
+                                disabled={busy || (!mock && !actions.onDuplicate)}
+                                className={iconBtn}
+                                title={t('dmDuplicate')}
                               >
-                                <Icon icon="fluent:open-16-filled" width={18} height={18} />
+                                <Icon icon="lucide:copy" width={16} height={16} />
                               </button>
                               {/* Khôi phục = tạo V{N+1} với nội dung bản này (không sửa lịch sử). */}
                               {!isLatest && (
@@ -1071,7 +1302,7 @@ function DriveInner({
               value={newFacility}
               onChange={(e) => setNewFacility(e.target.value)}
               placeholder={t('fmFacilityPlaceholder')}
-              className="mb-3 w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
+              className={`mb-3 ${fieldCls}`}
             />
 
             <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
@@ -1084,7 +1315,7 @@ function DriveInner({
                 if (e.key === 'Enter') handleCreate();
               }}
               placeholder={t('fmScenarioPlaceholder')}
-              className="mb-4 w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
+              className={`mb-4 ${fieldCls}`}
             />
 
             {createErrorKey && <div className="mb-3 text-xs text-rose-500">{t(createErrorKey)}</div>}
@@ -1103,6 +1334,95 @@ function DriveInner({
                 className="rounded-lg bg-[var(--bk-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
               >
                 {t('fmCreate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: import — chọn folder bệnh viện + kịch bản có sẵn hoặc tạo mới bằng cách gõ tên */}
+      {importContent != null && (
+        <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true" onClick={() => setImportContent(null)}>
+          <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
+                <Icon icon="line-md:upload-loop" width={15} height={15} />
+              </span>
+              {t('dmImportTitle')}
+            </div>
+
+            <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+              {t('dmImportFacilityLabel')}
+            </label>
+            <select
+              value={impFacSel}
+              onChange={(e) => {
+                setImpFacSel(e.target.value);
+                // Đổi bệnh viện -> danh sách kịch bản đổi theo, về chế độ "tạo mới".
+                setImpScenSel(NEW_OPTION);
+              }}
+              className={`${impFacSel === NEW_OPTION ? 'mb-2' : 'mb-3'} cursor-pointer ${fieldCls}`}
+            >
+              {facilities.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+              <option value={NEW_OPTION}>{t('dmImportCreateNew')}</option>
+            </select>
+            {impFacSel === NEW_OPTION && (
+              <input
+                autoFocus
+                value={impFacName}
+                onChange={(e) => setImpFacName(e.target.value)}
+                placeholder={t('fmFacilityPlaceholder')}
+                className={`mb-3 ${fieldCls}`}
+              />
+            )}
+
+            <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+              {t('dmImportScenarioLabel')}
+            </label>
+            <select
+              value={impScenSel}
+              onChange={(e) => setImpScenSel(e.target.value)}
+              className={`${impScenSel === NEW_OPTION ? 'mb-2' : 'mb-4'} cursor-pointer ${fieldCls}`}
+            >
+              {(impFacility?.scenarios ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              <option value={NEW_OPTION}>{t('dmImportCreateNew')}</option>
+            </select>
+            {impScenSel === NEW_OPTION && (
+              <input
+                value={impScenName}
+                onChange={(e) => setImpScenName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleImportConfirm();
+                }}
+                placeholder={t('fmScenarioPlaceholder')}
+                className={`mb-4 ${fieldCls}`}
+              />
+            )}
+
+            {importErrorKey && <div className="mb-3 text-xs text-rose-500">{t(importErrorKey)}</div>}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setImportContent(null)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('btnCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleImportConfirm}
+                className="rounded-lg bg-[var(--bk-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                {t('dmImport')}
               </button>
             </div>
           </div>

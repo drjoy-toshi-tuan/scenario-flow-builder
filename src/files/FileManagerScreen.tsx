@@ -95,7 +95,8 @@ export function buildBlankFlow(o: { facility: string; name: string; author: stri
 }
 
 // Kiểm tra YAML có phải flow đọc được không (không ném lỗi khi vào canvas).
-function isValidFlowYaml(text: string): boolean {
+// Export để màn quản lý Drive dùng chung khi import file.
+export function isValidFlowYaml(text: string): boolean {
   try {
     return Array.isArray(fromYaml(text).nodes);
   } catch {
@@ -105,7 +106,8 @@ function isValidFlowYaml(text: string): boolean {
 
 // Cấu trúc flow cạnh tên kịch bản: logo Main Flow (luôn 1) | logo Sub Flow · số
 // lượng sub flow. Main & Sub ngăn cách bằng dấu gạch đứng. Dùng logo đồng bộ toàn app.
-function FlowStructureBadge({ subflowCount }: { subflowCount: number }) {
+// Export để màn quản lý Drive (DriveManagerScreen) dùng chung.
+export function FlowStructureBadge({ subflowCount }: { subflowCount: number }) {
   const t = useT();
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--bk-text-muted)]">
@@ -729,20 +731,17 @@ export function FileManagerScreen() {
                   {pageRows.map((file) => (
                     <tr
                       key={file.path}
-                      className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
+                      onClick={() => void handleOpen(file)}
+                      title={t('fmOpen')}
+                      className="cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
                     >
                       <td className={`${cell} text-[var(--bk-text-muted)]`}>{file.meta.facility ?? '—'}</td>
                       <td className={cell}>
                         <div className="flex items-center gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => void handleOpen(file)}
-                            disabled={busy}
-                            className="flex min-w-0 items-center gap-2 text-left font-medium text-[var(--bk-text)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
-                          >
-                            <Icon icon="lucide:file-text" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
+                          <span className="flex min-w-0 items-center gap-2 text-left font-medium text-[var(--bk-text)]">
+                            <Icon icon="line-md:file-document" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
                             <span className="truncate">{file.meta.name ?? stripExt(file.name)}</span>
-                          </button>
+                          </span>
                           {/* Cấu trúc flow: Main Flow (luôn có 1) | Sub Flow · số lượng. */}
                           <FlowStructureBadge subflowCount={file.meta.subflowCount ?? 0} />
                         </div>
@@ -754,17 +753,9 @@ export function FileManagerScreen() {
                         {file.meta.updatedAt ?? '—'}
                       </td>
                       <td className={`${cell} text-[var(--bk-text-muted)]`}>{file.meta.author ?? '—'}</td>
-                      <td className={cell}>
+                      {/* Cột thao tác: chặn nổi bọt để click nút không mở dòng. */}
+                      <td className={`${cell} cursor-default`} onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => void handleOpen(file)}
-                            disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-accent)] transition hover:bg-[var(--bk-accent-soft)] disabled:opacity-60"
-                            title={t('fmOpen')}
-                          >
-                            <Icon icon="fluent:open-16-filled" width={18} height={18} />
-                          </button>
                           <button
                             type="button"
                             onClick={() => openRenameModal(file)}
