@@ -16,6 +16,7 @@ import {
   getFileText,
   createYamlFile,
   ensureFolder,
+  renameItem,
   trashItem,
   isFolder,
   isYamlName,
@@ -81,6 +82,8 @@ interface DriveActions {
   onRefresh?: () => void;
   onOpenVersion?: (f: FacilityNode, s: ScenarioNode, v: VersionNode) => void;
   onDuplicate?: (f: FacilityNode, s: ScenarioNode, v: VersionNode) => void;
+  // Đổi tên folder 病院/シナリオ (chỉ tên folder, không đụng nội dung bên trong).
+  onRename?: (id: string, name: string) => void;
   onDelete?: (target: DeleteTarget) => void;
   onCreateFlow?: (facility: string, scenario: string) => void;
   onImport?: (facility: string, scenario: string, content: string) => void;
@@ -479,6 +482,22 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     }
   };
 
+  // Đổi tên folder 病院/シナリオ. File version bên trong giữ nguyên (không đổi tên
+  // hàng loạt); version mới tạo sau đó sẽ theo tên mới.
+  const rename = async (id: string, name: string) => {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await renameItem(token, id, name);
+      await load();
+    } catch (e) {
+      if (!handledAsExpired(e)) setActionError(t(gdErrorKey(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Xoá (đã xác nhận ở modal) = đưa vào Thùng rác Drive (khôi phục được ~30 ngày).
   const remove = async (target: DeleteTarget) => {
     if (busy) return;
@@ -565,6 +584,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
         onRefresh: () => void load(),
         onOpenVersion: (f, s, v) => void openVersion(f, s, v),
         onDuplicate: (_f, s, v) => void duplicateVersion(s, v),
+        onRename: (id, name) => void rename(id, name),
         onDelete: (target) => void remove(target),
         onCreateFlow: (facility, scenario) => void createFlow(facility, scenario),
         onImport: (facility, scenario, content) => void importFlow(facility, scenario, content),
@@ -642,12 +662,38 @@ function DriveInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facility, scenario]);
 
-  // Modal tạo flow mới / xác nhận xoá.
+  // Modal tạo flow mới / xác nhận xoá / đổi tên folder.
   const [showNew, setShowNew] = useState(false);
   const [newFacility, setNewFacility] = useState('');
   const [newScenario, setNewScenario] = useState('');
   const [createErrorKey, setCreateErrorKey] = useState<TKey | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ kind: 'facility' | 'scenario'; id: string; name: string } | null>(null);
+  const [renameName, setRenameName] = useState('');
+
+  // Dòng đang hover — dùng làm `key` cho icon line-md trong cụm nút để REMOUNT
+  // khi nút hiện ra (animation SMIL của line-md chỉ chạy 1 lần lúc <svg> mount).
+  const [hoverRow, setHoverRow] = useState<string | null>(null);
+  const rowHoverProps = (id: string) => ({
+    onMouseEnter: () => setHoverRow(id),
+    onMouseLeave: () => setHoverRow((cur) => (cur === id ? null : cur)),
+  });
+  const iconKey = (id: string) => (hoverRow === id ? 'play' : 'idle');
+
+  const openRenameModal = (kind: 'facility' | 'scenario', id: string, name: string) => {
+    setRenameTarget({ kind, id, name });
+    setRenameName(name);
+  };
+
+  const handleRename = () => {
+    if (!renameTarget) return;
+    const name = renameName.trim();
+    if (!name) return;
+    const target = renameTarget;
+    setRenameTarget(null);
+    // Tên không đổi -> khỏi gọi API.
+    if (name !== target.name) actions.onRename?.(target.id, name);
+  };
 
   // ── Import: đọc file YAML -> modal chọn/tạo folder bệnh viện + kịch bản ──
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1115,6 +1161,7 @@ function DriveInner({
                       // Nút thao tác nổi ở mép phải, chỉ hiện khi hover.
                       <tr
                         key={f.id}
+                        {...rowHoverProps(f.id)}
                         onClick={() => {
                           if (!busy) setPath({ facilityId: f.id });
                         }}
@@ -1135,6 +1182,16 @@ function DriveInner({
                         </td>
                         <td className={cell} onClick={(e) => e.stopPropagation()}>
                           <div className={rowActions}>
+                            {/* Sửa = đổi tên folder bệnh viện */}
+                            <button
+                              type="button"
+                              onClick={() => openRenameModal('facility', f.id, f.name)}
+                              disabled={busy || (!mock && !actions.onRename)}
+                              className={`${rowBtn} hover:text-[#f97316]`}
+                              title={t('fmRename')}
+                            >
+                              <Icon key={iconKey(f.id)} icon="line-md:edit-twotone" width={17} height={17} />
+                            </button>
                             <button
                               type="button"
                               onClick={() => setDeleteTarget({ kind: 'facility', id: f.id, label: f.name })}
@@ -1142,7 +1199,7 @@ function DriveInner({
                               className={`${rowBtn} hover:text-rose-500`}
                               title={t('fmDeleteTitle')}
                             >
-                              <Icon icon="line-md:trash" width={17} height={17} />
+                              <Icon key={iconKey(f.id)} icon="line-md:trash" width={17} height={17} />
                             </button>
                           </div>
                         </td>
@@ -1175,6 +1232,7 @@ function DriveInner({
                         // Kịch bản hoạt động như folder: click dòng = vào màn quản lý phiên bản.
                         <tr
                           key={s.id}
+                          {...rowHoverProps(s.id)}
                           onClick={() => {
                             if (!busy) setPath({ facilityId: facility.id, scenarioId: s.id });
                           }}
@@ -1209,6 +1267,16 @@ function DriveInner({
                           <td className={`${cell} text-[var(--bk-text-muted)]`}>{lv?.author ?? '—'}</td>
                           <td className={cell} onClick={(e) => e.stopPropagation()}>
                             <div className={rowActions}>
+                              {/* Sửa = đổi tên folder kịch bản */}
+                              <button
+                                type="button"
+                                onClick={() => openRenameModal('scenario', s.id, s.name)}
+                                disabled={busy || (!mock && !actions.onRename)}
+                                className={`${rowBtn} hover:text-[#f97316]`}
+                                title={t('fmRename')}
+                              >
+                                <Icon key={iconKey(s.id)} icon="line-md:edit-twotone" width={17} height={17} />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setDeleteTarget({ kind: 'scenario', id: s.id, label: s.name })}
@@ -1216,7 +1284,7 @@ function DriveInner({
                                 className={`${rowBtn} hover:text-rose-500`}
                                 title={t('fmDeleteTitle')}
                               >
-                                <Icon icon="line-md:trash" width={17} height={17} />
+                                <Icon key={iconKey(s.id)} icon="line-md:trash" width={17} height={17} />
                               </button>
                             </div>
                           </td>
@@ -1248,6 +1316,7 @@ function DriveInner({
                         // Click bất kỳ chỗ nào trên dòng (trừ cột thao tác) = mở bản này lên canvas.
                         <tr
                           key={ver.fileId}
+                          {...rowHoverProps(ver.fileId)}
                           onClick={() => {
                             if (!busy) actions.onOpenVersion?.(facility, scenario, ver);
                           }}
@@ -1293,7 +1362,7 @@ function DriveInner({
                                 className={`${rowBtn} hover:text-[#22c55e]`}
                                 title={t('dmDuplicate')}
                               >
-                                <Icon icon="line-md:duplicate" width={17} height={17} />
+                                <Icon key={iconKey(ver.fileId)} icon="line-md:duplicate" width={17} height={17} />
                               </button>
                               <button
                                 type="button"
@@ -1308,7 +1377,7 @@ function DriveInner({
                                 className={`${rowBtn} hover:text-rose-500`}
                                 title={t('fmDeleteTitle')}
                               >
-                                <Icon icon="line-md:trash" width={17} height={17} />
+                                <Icon key={iconKey(ver.fileId)} icon="line-md:trash" width={17} height={17} />
                               </button>
                             </div>
                           </td>
@@ -1461,6 +1530,52 @@ function DriveInner({
                 className="rounded-lg bg-[var(--bk-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
               >
                 {t('dmImport')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: đổi tên folder bệnh viện / kịch bản (chỉ tên folder) */}
+      {renameTarget && (
+        <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true" onClick={() => setRenameTarget(null)}>
+          <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
+                <Icon icon="line-md:edit-twotone" width={15} height={15} />
+              </span>
+              {t('fmRename')}
+            </div>
+
+            <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+              {t(renameTarget.kind === 'facility' ? 'colFacility' : 'colScenario')}
+            </label>
+            <input
+              autoFocus
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename();
+              }}
+              placeholder={t(renameTarget.kind === 'facility' ? 'fmFacilityPlaceholder' : 'fmScenarioPlaceholder')}
+              className={`mb-4 ${FIELD_CLS}`}
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRenameTarget(null)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('btnCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleRename}
+                disabled={!renameName.trim()}
+                className="rounded-lg bg-[var(--bk-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                {t('btnSave')}
               </button>
             </div>
           </div>

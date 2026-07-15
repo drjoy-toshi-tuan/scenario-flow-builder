@@ -208,6 +208,18 @@ export async function updateYamlContent(token: string, fileId: string, content: 
   );
 }
 
+// Đổi TÊN file/folder (giữ nguyên id, nội dung, cây con) — dùng cho nút Sửa tên
+// folder 病院/シナリオ trên màn quản lý.
+export async function renameItem(token: string, id: string, name: string): Promise<void> {
+  await ensureOk(
+    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(id)}?${ALL_DRIVES}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  );
+}
+
 // Đưa file/folder vào Thùng rác (khôi phục được ~30 ngày; folder trash cả cây con).
 export async function trashItem(token: string, id: string): Promise<void> {
   await ensureOk(

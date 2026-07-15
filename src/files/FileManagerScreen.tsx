@@ -167,6 +167,10 @@ export function FileManagerScreen() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Dòng đang hover — dùng làm `key` cho icon line-md trong cụm nút để REMOUNT
+  // khi nút hiện ra (animation SMIL của line-md chỉ chạy 1 lần lúc <svg> mount).
+  const [hoverRow, setHoverRow] = useState<string | null>(null);
+
   // ── Tìm kiếm + phân trang ──
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -732,6 +736,8 @@ export function FileManagerScreen() {
                   {pageRows.map((file) => (
                     <tr
                       key={file.path}
+                      onMouseEnter={() => setHoverRow(file.path)}
+                      onMouseLeave={() => setHoverRow((cur) => (cur === file.path ? null : cur))}
                       onClick={() => void handleOpen(file)}
                       title={t('fmOpen')}
                       className="group cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
@@ -763,10 +769,10 @@ export function FileManagerScreen() {
                             type="button"
                             onClick={() => openRenameModal(file)}
                             disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-[var(--bk-accent)] disabled:pointer-events-none disabled:opacity-40"
+                            className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-[#f97316] disabled:pointer-events-none disabled:opacity-40"
                             title={t('fmRename')}
                           >
-                            <Icon icon="lucide:pencil" width={16} height={16} />
+                            <Icon key={hoverRow === file.path ? 'play' : 'idle'} icon="line-md:edit-twotone" width={17} height={17} />
                           </button>
                           <button
                             type="button"
@@ -775,7 +781,7 @@ export function FileManagerScreen() {
                             className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-[#22c55e] disabled:pointer-events-none disabled:opacity-40"
                             title={t('fmDuplicate')}
                           >
-                            <Icon icon="line-md:duplicate" width={17} height={17} />
+                            <Icon key={hoverRow === file.path ? 'play' : 'idle'} icon="line-md:duplicate" width={17} height={17} />
                           </button>
                           <button
                             type="button"
@@ -784,7 +790,7 @@ export function FileManagerScreen() {
                             className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-rose-500 disabled:pointer-events-none disabled:opacity-40"
                             title={t('fmDeleteTitle')}
                           >
-                            <Icon icon="line-md:trash" width={17} height={17} />
+                            <Icon key={hoverRow === file.path ? 'play' : 'idle'} icon="line-md:trash" width={17} height={17} />
                           </button>
                         </div>
                       </td>
