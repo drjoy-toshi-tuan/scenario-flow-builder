@@ -13,8 +13,12 @@ import {
   effectiveBranches,
   optionsForSource,
   BRANCH_SCHEMA,
+  PROPERTY_FIELDS,
   SAVE_MODULE_FLAG,
   MODULE_FIXED_BRANCHES,
+  CDC_FIXED_BRANCHES,
+  LOGIC_MODULE_CDC,
+  LOGIC_MODULE_SCRIPT,
   LOGIC_MODULE_IC,
   LOGIC_MODULE_DOCC,
   LOGIC_MODULE_CDEPT,
@@ -1285,5 +1289,126 @@ flow:
       'flow:\n  name: "y"\n  nodes: []\n  subflows:\n    - name: a\n      nodes: []\n    - name: b\n      nodes: []\n',
     );
     expect(withSubs.subflowCount).toBe(2);
+  });
+});
+
+describe('tách node Logic: classifier / normalization (+ migrate file cũ)', () => {
+  const LEGACY = `
+flow:
+  name: "split"
+  start: a
+  nodes:
+    - id: a
+      type: logic
+      moduleType: Clinic Day Classifier
+      next: b
+    - id: b
+      type: logic
+      module: Incoming Classifier
+      next: c
+    - id: c
+      type: logic
+      moduleType: Phone Normalization
+      next: d
+    - id: d
+      type: logic
+      script: "return 1;"
+`;
+
+  it('fromYaml: node logic cũ mang module phân loại/chuẩn hoá -> type mới; Script ở lại logic', () => {
+    const ir = fromYaml(LEGACY);
+    const byId = new Map(ir.nodes.map((n) => [n.id, n]));
+    expect(byId.get('a')!.type).toBe('classifier');
+    // Tên module cũ được đổi: Clinic Day Classifier -> Clinic Days Classifier.
+    expect(byId.get('a')!.data.moduleType).toBe(LOGIC_MODULE_CDC);
+    // Key bộ chọn cũ `module` -> `moduleType` rồi mới xét loại node.
+    expect(byId.get('b')!.type).toBe('classifier');
+    expect(byId.get('b')!.data.moduleType).toBe(LOGIC_MODULE_IC);
+    expect(byId.get('b')!.data.module).toBeUndefined();
+    expect(byId.get('c')!.type).toBe('normalization');
+    expect(byId.get('c')!.data.moduleType).toBe(LOGIC_MODULE_PHONE_NORM);
+    expect(byId.get('d')!.type).toBe('logic');
+  });
+
+  it('toYaml ghi type mới + tên module mới; mở lại giữ nguyên (round-trip)', () => {
+    const out = toYaml(fromYaml(LEGACY));
+    const raw = parse(out) as {
+      flow: { nodes: { id: string; type: string; moduleType?: string }[] };
+    };
+    const byId = new Map(raw.flow.nodes.map((n) => [n.id, n]));
+    expect(byId.get('a')!.type).toBe('classifier');
+    expect(byId.get('a')!.moduleType).toBe(LOGIC_MODULE_CDC);
+    expect(byId.get('c')!.type).toBe('normalization');
+    expect(byId.get('d')!.type).toBe('logic');
+    // Round-trip lần 2: không đổi gì thêm.
+    const again = fromYaml(out);
+    expect(again.nodes.find((n) => n.id === 'a')!.type).toBe('classifier');
+    expect(again.nodes.find((n) => n.id === 'c')!.type).toBe('normalization');
+  });
+
+  it('classifier/normalization thiếu moduleType (file viết tay) -> seed module mặc định', () => {
+    const ir = fromYaml(
+      'flow:\n  name: "x"\n  nodes:\n    - id: a\n      type: classifier\n    - id: b\n      type: normalization\n',
+    );
+    expect(ir.nodes.find((n) => n.id === 'a')!.data.moduleType).toBe(LOGIC_MODULE_CDC);
+    expect(ir.nodes.find((n) => n.id === 'b')!.data.moduleType).toBe(LOGIC_MODULE_PHONE_NORM);
+  });
+
+  it('defaultDataFor: classifier seed CDC + bộ nhánh cố định; normalization seed INVALID/SUCCESS; logic giữ Script + catch-all', () => {
+    const cls = defaultDataFor('classifier');
+    expect(cls.moduleType).toBe(LOGIC_MODULE_CDC);
+    expect(cls.branches).toEqual(CDC_FIXED_BRANCHES.map((b) => ({ ...b })));
+    const norm = defaultDataFor('normalization');
+    expect(norm.moduleType).toBe(LOGIC_MODULE_PHONE_NORM);
+    expect(norm.branches).toEqual(INVALID_SUCCESS_FIXED_BRANCHES.map((b) => ({ ...b })));
+    const logic = defaultDataFor('logic');
+    expect(logic.moduleType).toBe(LOGIC_MODULE_SCRIPT);
+    expect(logic.branches).toEqual([{ id: CATCH_ALL_ID, value: '' }]);
+  });
+
+  it('effectiveBranches hoạt động với type mới (bộ nhánh cố định theo module)', () => {
+    expect(effectiveBranches('classifier', { moduleType: LOGIC_MODULE_IC }).map((b) => b.value)).toEqual([
+      '',
+      '非通知',
+      '海外',
+      'WebRTC',
+      '固定',
+      '携帯',
+    ]);
+    expect(effectiveBranches('normalization', { moduleType: LOGIC_MODULE_DOB_RECONFIRM }).map((b) => b.value)).toEqual([
+      'INVALID',
+      'SUCCESS',
+    ]);
+  });
+});
+
+describe('node Start: Get Header + startData round-trip', () => {
+  it('defaultDataFor(start): getHeader mặc định yes và đứng TRÊN acceptanceTime', () => {
+    const data = defaultDataFor('start');
+    expect(data.getHeader).toBe('yes');
+    expect(data.acceptanceTime).toBe('yes');
+    const keys = PROPERTY_FIELDS.start.map((f) => f.key);
+    expect(keys.indexOf('getHeader')).toBeGreaterThanOrEqual(0);
+    expect(keys.indexOf('getHeader')).toBeLessThan(keys.indexOf('acceptanceTime'));
+  });
+
+  it('toYaml ghi flow.startData; fromYaml đọc lại vào node start (round-trip)', () => {
+    const ir = fromYaml(SAMPLE);
+    const start = ir.nodes.find((n) => n.id === SYNTHETIC_START_ID)!;
+    start.data = { getHeader: 'no', acceptanceTime: 'yes' };
+    const out = toYaml(ir);
+    const raw = parse(out) as { flow: { startData?: Record<string, unknown> } };
+    expect(raw.flow.startData).toEqual({ getHeader: 'no', acceptanceTime: 'yes' });
+    const again = fromYaml(out);
+    expect(again.nodes.find((n) => n.id === SYNTHETIC_START_ID)!.data).toEqual({
+      getHeader: 'no',
+      acceptanceTime: 'yes',
+    });
+  });
+
+  it('start không có tham số -> KHÔNG rải field startData rỗng', () => {
+    const out = toYaml(fromYaml(SAMPLE));
+    const raw = parse(out) as { flow: Record<string, unknown> };
+    expect('startData' in raw.flow).toBe(false);
   });
 });

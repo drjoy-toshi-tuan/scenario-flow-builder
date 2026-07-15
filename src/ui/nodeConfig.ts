@@ -19,11 +19,16 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   interaction: { icon: 'mingcute:voice-fill', typeLabel: 'Interaction', color: '#0ea5e9' },
   nexus: { icon: 'lucide:git-fork', typeLabel: 'Nexus', color: '#f59e0b' },
   logic: { icon: 'mingcute:command-line', typeLabel: 'Logic', color: '#22c55e' },
+  // Classifier: các module phân loại tách từ node Logic — tone cam sáng.
+  classifier: { icon: 'mingcute:classify-2-fill', typeLabel: 'Classifier', color: '#fb7c25' },
+  // Normalization: các module chuẩn hoá tách từ node Logic — tone vàng sáng
+  // (đậm hơn nexus 1 nấc để giữ contrast trên theme light).
+  normalization: { icon: 'lucide:equal-approximately', typeLabel: 'Normalization', color: '#d9b806' },
   openai: { icon: 'proicons:openai', typeLabel: 'OpenAI', color: '#d946ef' },
   faq: { icon: 'lucide:messages-square', typeLabel: 'FAQ', color: '#6366f1' },
   transfer: { icon: 'lucide:phone-forwarded', typeLabel: 'Transfer', color: '#06b6d4' },
   save: { icon: 'mingcute:save-2-fill', typeLabel: 'Save', color: '#de5f1b' },
-  jump: { icon: 'fluent:flow-32-regular', typeLabel: 'Jump', color: '#d10887' },
+  jump: { icon: 'app:jump-flow', typeLabel: 'Jump', color: '#d10887' },
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
 };
 
@@ -35,6 +40,8 @@ export const ADDABLE_NODE_TYPES: readonly NodeType[] = [
   'interaction',
   'nexus',
   'logic',
+  'classifier',
+  'normalization',
   'openai',
   'faq',
   'transfer',

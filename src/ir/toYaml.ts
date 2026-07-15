@@ -68,13 +68,17 @@ function readDataBranches(data: Record<string, unknown>): Map<string, BranchInfo
 function serializeGraph(
   irNodes: FlowIR['nodes'],
   irEdges: FlowEdge[],
-): { start?: string; startPosition?: Pos; nodes: OutNode[] } {
+): { start?: string; startPosition?: Pos; startData?: Record<string, unknown>; nodes: OutNode[] } {
   // Điểm bắt đầu = target của edge đi ra từ node 'start' tổng hợp (nếu có).
   const startEdge = irEdges.find((e) => e.source === SYNTHETIC_START_ID);
   const start = startEdge?.target;
   // Toạ độ node Start tổng hợp lưu riêng (flow.startPosition) vì nó không là node YAML.
   const startNode = irNodes.find((n) => n.id === SYNTHETIC_START_ID);
   const startPosition = startNode ? roundPos(startNode.position) : undefined;
+  // Tham số node Start (Get Header / Acceptance Time / Context Setting) cũng lưu
+  // riêng (flow.startData) — không có field này là mất setting khi round-trip.
+  const startEntries = Object.entries(startNode?.data ?? {}).filter(([k]) => k !== 'branches');
+  const startData = startEntries.length > 0 ? Object.fromEntries(startEntries) : undefined;
 
   const outNodes: OutNode[] = [];
 
@@ -140,7 +144,12 @@ function serializeGraph(
     outNodes.push(out);
   }
 
-  return { ...(start ? { start } : {}), ...(startPosition ? { startPosition } : {}), nodes: outNodes };
+  return {
+    ...(start ? { start } : {}),
+    ...(startPosition ? { startPosition } : {}),
+    ...(startData ? { startData } : {}),
+    nodes: outNodes,
+  };
 }
 
 export function toYaml(ir: FlowIR): string {
@@ -162,6 +171,7 @@ export function toYaml(ir: FlowIR): string {
       ...(ir.meta.updatedAt ? { updatedAt: ir.meta.updatedAt } : {}),
       ...(main.start ? { start: main.start } : {}),
       ...(main.startPosition ? { startPosition: main.startPosition } : {}),
+      ...(main.startData ? { startData: main.startData } : {}),
       nodes: main.nodes,
       ...(subflows.length > 0 ? { subflows } : {}),
     },

@@ -7,6 +7,7 @@ import {
   NODE_TYPES,
   LEGACY_TYPE_ALIASES,
   EDITABLE_BRANCH_TYPES,
+  MODULE_NODE_TYPES,
   SYNTHETIC_START_ID,
 } from './types';
 
@@ -60,6 +61,7 @@ interface RawFlowFile {
     name?: string;
     start?: string;
     startPosition?: RawPos; // toạ độ node Start tổng hợp
+    startData?: Record<string, unknown>; // tham số node Start (Get Header / Acceptance Time / Context Setting)
     facility?: string;
     author?: string;
     createdAt?: string;
@@ -85,21 +87,34 @@ function coerceNodeType(raw: string): NodeType {
   return (NODE_TYPES as readonly string[]).includes(raw) ? (raw as NodeType) : 'announce';
 }
 
-// Các giá trị hợp lệ của bộ chọn Module trong node logic. File cũ lưu bộ chọn này
-// ở key `module`; nay `module` là THAM SỐ của Clinic Day Classifier / Module Result
-// Binder (参照元モジュール) nên bộ chọn chuyển sang key `moduleType`.
-const LOGIC_MODULE_NAMES = new Set([
-  'Script',
-  'Clinic Day Classifier',
-  'Context Match Router',
-  'Module Result Binder',
-  'Incoming Classifier',
-  'Date Of Call Classifier',
-  'Clinical Department Classifier',
-  'Null Check',
-  'Phone Normalization',
-  'DOB Re-confirmation',
-]);
+// Loại node "chọn module" (data.moduleType) và module thuộc về loại nào — node Logic
+// cũ được TÁCH 3 (logic / classifier / normalization) nên file cũ `type: logic` mang
+// module phân loại/chuẩn hoá sẽ được migrate sang type mới khi import.
+// GIỮ ĐỒNG BỘ với danh sách module trong src/ui/nodeSchema.ts (ir/ không được import ui/).
+const MODULE_NODE_BY_NAME: Record<string, NodeType> = {
+  'Script': 'logic',
+  'Module Result Binder': 'logic',
+  'Context Match Router': 'logic',
+  'Null Check': 'logic',
+  'Clinic Days Classifier': 'classifier',
+  'Clinical Department Classifier': 'classifier',
+  'Incoming Classifier': 'classifier',
+  'Date Of Call Classifier': 'classifier',
+  'Phone Normalization': 'normalization',
+  'DOB Re-confirmation': 'normalization',
+};
+
+// Tên module cũ -> tên mới (file cũ vẫn mở được; export sẽ ghi tên mới).
+const LEGACY_MODULE_ALIASES: Record<string, string> = {
+  'Clinic Day Classifier': 'Clinic Days Classifier',
+};
+
+// Module mặc định khi node chọn module thiếu moduleType (mirror DEFAULT_MODULE_BY_TYPE
+// bên nodeSchema — logic để trống vì Script là fallback lịch sử, khỏi rải field thừa).
+const DEFAULT_MODULE_BY_TYPE: Partial<Record<NodeType, string>> = {
+  classifier: 'Clinic Days Classifier',
+  normalization: 'Phone Normalization',
+};
 
 function edgeId(source: string, target: string, suffix?: string): string {
   return suffix ? `${source}->${target}#${suffix}` : `${source}->${target}`;
@@ -111,18 +126,20 @@ function parseGraph(
   rawNodes: RawNode[],
   start: string | undefined,
   startPosition?: RawPos,
+  startData?: Record<string, unknown>,
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
   const nodes: FlowNode[] = [];
   const edges: FlowEdge[] = [];
 
-  // Node "start" tổng hợp: YAML không có node thật cho điểm bắt đầu.
+  // Node "start" tổng hợp: YAML không có node thật cho điểm bắt đầu; tham số của nó
+  // (Get Header / Acceptance Time / Context Setting) lưu riêng ở flow.startData.
   if (start) {
     nodes.push({
       id: SYNTHETIC_START_ID,
       type: 'start',
       label: 'Start',
       position: readPos(startPosition), // giữ toạ độ đã lưu (nếu có)
-      data: {},
+      data: startData && typeof startData === 'object' ? { ...startData } : {},
     });
     edges.push({
       id: edgeId(SYNTHETIC_START_ID, start),
@@ -139,7 +156,7 @@ function parseGraph(
       if (!STRUCTURAL_KEYS.has(key)) data[key] = value;
     }
 
-    const nodeType = coerceNodeType(raw.type);
+    let nodeType = coerceNodeType(raw.type);
     // Migrate key復唱 của node interaction: repeat/repeatAnnounce -> reconfirm/reconfirmAnnounce
     // (file cũ dùng tên "repeat" trước khi đổi thành "Re-confirm").
     if (data.reconfirm == null && data.repeat !== undefined) {
@@ -150,15 +167,29 @@ function parseGraph(
       data.reconfirmAnnounce = data.repeatAnnounce;
       delete data.repeatAnnounce;
     }
-    // Migrate key bộ chọn module của node logic: module -> moduleType (file cũ).
-    if (
-      nodeType === 'logic' &&
-      data.moduleType == null &&
-      typeof data.module === 'string' &&
-      LOGIC_MODULE_NAMES.has(data.module)
-    ) {
-      data.moduleType = data.module;
-      delete data.module;
+    if (MODULE_NODE_TYPES.includes(nodeType)) {
+      // Migrate key bộ chọn module: module -> moduleType (file rất cũ lưu bộ chọn
+      // ở key `module`; nay `module` là THAM SỐ 参照元モジュール của CDC/MRB).
+      if (
+        data.moduleType == null &&
+        typeof data.module === 'string' &&
+        (data.module in MODULE_NODE_BY_NAME || data.module in LEGACY_MODULE_ALIASES)
+      ) {
+        data.moduleType = data.module;
+        delete data.module;
+      }
+      // Migrate tên module cũ (vd Clinic Day Classifier -> Clinic Days Classifier).
+      if (typeof data.moduleType === 'string' && data.moduleType in LEGACY_MODULE_ALIASES) {
+        data.moduleType = LEGACY_MODULE_ALIASES[data.moduleType];
+      }
+      // Node logic cũ mang module phân loại/chuẩn hoá -> chuyển sang type mới
+      // (và ngược lại nếu file ghi lệch loại) — spec module giữ nguyên.
+      if (typeof data.moduleType === 'string' && data.moduleType in MODULE_NODE_BY_NAME) {
+        nodeType = MODULE_NODE_BY_NAME[data.moduleType];
+      } else if (data.moduleType == null && DEFAULT_MODULE_BY_TYPE[nodeType]) {
+        // classifier/normalization thiếu moduleType (file viết tay) -> seed mặc định.
+        data.moduleType = DEFAULT_MODULE_BY_TYPE[nodeType];
+      }
     }
     const node: FlowNode = {
       id: raw.id,
@@ -241,7 +272,7 @@ export function fromYaml(text: string): FlowIR {
   const parsed = parse(text) as RawFlowFile | null;
   const flow = parsed?.flow ?? {};
 
-  const { nodes, edges } = parseGraph(flow.nodes ?? [], flow.start, flow.startPosition);
+  const { nodes, edges } = parseGraph(flow.nodes ?? [], flow.start, flow.startPosition, flow.startData);
 
   // Sub Flow: mỗi entry là 1 graph riêng (name/nodes), id = slug duy nhất.
   // Sub flow KHÔNG có node Start (chỉ main flow có) — bỏ qua field start nếu file cũ còn.

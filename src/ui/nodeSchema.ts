@@ -1,4 +1,4 @@
-import type { FlowIR, FlowNode, NodeType } from '../ir/types';
+import { isModuleNodeType, type FlowIR, type FlowNode, type NodeType } from '../ir/types';
 import type { TKey } from './i18n';
 import { DEFAULT_CONTEXT_SETTING } from './defaultContextSetting';
 
@@ -113,13 +113,21 @@ const TRANSFER_TYPE_OPTIONS: FieldOption[] = [
   { value: 'BLIND', label: 'Blind Transfer' },
 ];
 
-// ── Module của node Logic ──
-export const LOGIC_MODULE_CDC = 'Clinic Day Classifier';
+// ── Module của 3 node "chọn module" (logic / classifier / normalization) ──
+// Node Logic cũ được TÁCH 3: logic giữ Script/MRB/CMR/Null Check; classifier gom các
+// module phân loại; normalization gom các module chuẩn hoá. Tên hằng giữ tiền tố
+// LOGIC_MODULE_ (di sản node Logic cũ) để không phải sửa hàng loạt file tham chiếu.
 export const LOGIC_MODULE_CMR = 'Context Match Router';
 export const LOGIC_MODULE_MRB = 'Module Result Binder';
 export const LOGIC_MODULE_SCRIPT = 'Script';
+// Null Check: kiểm tra biến/kết quả có rỗng không — 2 nhánh cố định true/false.
+export const LOGIC_MODULE_NULLCHECK = 'Null Check';
+
+// ── Module của node Classifier ──
+// Clinic Days Classifier (tên cũ: Clinic Day Classifier — fromYaml migrate).
+export const LOGIC_MODULE_CDC = 'Clinic Days Classifier';
 // Incoming Classifier: phân loại số gọi đến (非通知/海外/WebRTC/固定/携帯) — không có
-// tham số, chỉ có Branch Settings (bộ nhánh mặc định seed khi chọn module).
+// tham số, chỉ có Branch Settings (bộ nhánh cố định).
 export const LOGIC_MODULE_IC = 'Incoming Classifier';
 // Date Of Call Classifier: so thời điểm gọi với mốc HH:mm:ss (時間前/時間一致/時間後;
 // lỗi -> ERROR, đóng vai trò nhánh else giống FAILED).
@@ -128,8 +136,8 @@ export const LOGIC_MODULE_DOCC = 'Date Of Call Classifier';
 // cờ lưu context và các cặp (danh sách khoa -> tên output). Nhánh SINH TỪ output
 // (FAILED / NOT_COVERED + mỗi output 1 nhánh), khoá custom.
 export const LOGIC_MODULE_CDEPT = 'Clinical Department Classifier';
-// Null Check: kiểm tra biến/kết quả có rỗng không — 2 nhánh cố định true/false.
-export const LOGIC_MODULE_NULLCHECK = 'Null Check';
+
+// ── Module của node Normalization ──
 // Phone Normalization: chuẩn hoá số điện thoại (kiểm tra số gọi đến /復唱) — 2 nhánh
 // cố định INVALID/SUCCESS.
 export const LOGIC_MODULE_PHONE_NORM = 'Phone Normalization';
@@ -137,21 +145,40 @@ export const LOGIC_MODULE_PHONE_NORM = 'Phone Normalization';
 export const LOGIC_MODULE_DOB_RECONFIRM = 'DOB Re-confirmation';
 
 // Bộ chọn module lưu ở data.moduleType ('module' là THAM SỐ của CDC/MRB — 参照元モジュール).
-// Script đứng đầu pulldown (module mặc định, dùng thường xuyên nhất).
-const MODULE_OPTIONS: FieldOption[] = [
+// Mỗi loại node 1 pulldown riêng; phần tử ĐẦU danh sách = module mặc định của loại đó.
+const LOGIC_MODULE_OPTIONS: FieldOption[] = [
   { value: LOGIC_MODULE_SCRIPT, label: LOGIC_MODULE_SCRIPT },
-  { value: LOGIC_MODULE_PHONE_NORM, label: LOGIC_MODULE_PHONE_NORM },
-  { value: LOGIC_MODULE_DOB_RECONFIRM, label: LOGIC_MODULE_DOB_RECONFIRM },
-  { value: LOGIC_MODULE_CDC, label: LOGIC_MODULE_CDC },
-  { value: LOGIC_MODULE_CDEPT, label: LOGIC_MODULE_CDEPT },
   { value: LOGIC_MODULE_MRB, label: LOGIC_MODULE_MRB },
   { value: LOGIC_MODULE_CMR, label: LOGIC_MODULE_CMR },
   { value: LOGIC_MODULE_NULLCHECK, label: LOGIC_MODULE_NULLCHECK },
+];
+const CLASSIFIER_MODULE_OPTIONS: FieldOption[] = [
+  { value: LOGIC_MODULE_CDC, label: LOGIC_MODULE_CDC },
+  { value: LOGIC_MODULE_CDEPT, label: LOGIC_MODULE_CDEPT },
   { value: LOGIC_MODULE_IC, label: LOGIC_MODULE_IC },
   { value: LOGIC_MODULE_DOCC, label: LOGIC_MODULE_DOCC },
 ];
+const NORMALIZATION_MODULE_OPTIONS: FieldOption[] = [
+  { value: LOGIC_MODULE_PHONE_NORM, label: LOGIC_MODULE_PHONE_NORM },
+  { value: LOGIC_MODULE_DOB_RECONFIRM, label: LOGIC_MODULE_DOB_RECONFIRM },
+];
 
-// Module đang chọn của node logic (mặc định Script khi chưa chọn).
+// Module mặc định của từng loại node chọn module (khi data chưa có moduleType).
+export const DEFAULT_MODULE_BY_TYPE: Partial<Record<NodeType, string>> = {
+  logic: LOGIC_MODULE_SCRIPT,
+  classifier: LOGIC_MODULE_CDC,
+  normalization: LOGIC_MODULE_PHONE_NORM,
+};
+
+// Module đang chọn của node theo LOẠI (fallback về module mặc định của loại đó).
+export function moduleTypeOf(type: NodeType, data: Record<string, unknown>): string {
+  const v = data.moduleType;
+  return typeof v === 'string' && v ? v : DEFAULT_MODULE_BY_TYPE[type] ?? '';
+}
+
+// Module đang chọn của node logic (mặc định Script khi chưa chọn). Bản data-only
+// cho các predicate showIf (classifier/normalization luôn được seed moduleType nên
+// so sánh bằng vẫn đúng dù fallback là Script).
 export function logicModuleOf(data: Record<string, unknown>): string {
   const v = data.moduleType;
   return typeof v === 'string' && v ? v : LOGIC_MODULE_SCRIPT;
@@ -173,7 +200,7 @@ const moduleIsDobReconfirm = (d: Record<string, unknown>) => logicModuleOf(d) ==
 const phoneNormIsReconfirm = (d: Record<string, unknown>) =>
   moduleIsPhoneNorm(d) && d.mode === 'Re-confirm';
 
-// ── Clinic Day Classifier ──
+// ── Clinic Days Classifier ──
 // Nguồn ngày lễ cố định (nội các Nhật公開) — hiển thị read-only, không cho sửa.
 export const HOLIDAY_SOURCE_URL = 'https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv';
 
@@ -303,6 +330,8 @@ const mrbSaveContextOn = (d: Record<string, unknown>) => moduleIsMrb(d) && d.sav
 
 export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
   start: [
+    // Get Header đứng ĐẦU danh sách (trên cả Acceptance Time) — mặc định Có.
+    { key: 'getHeader', labelKey: 'fGetHeader', kind: 'yesno', options: YESNO_OPTIONS, default: 'yes' },
     { key: 'acceptanceTime', labelKey: 'fAcceptanceTime', kind: 'yesno', options: YESNO_OPTIONS, default: 'yes' },
     // Context Setting dạng JSON — editor có tô sáng cú pháp + số dòng, seed sẵn
     // bộ context mặc định (xem defaultContextSetting.ts).
@@ -349,12 +378,39 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     },
   ],
   logic: [
-    { key: 'moduleType', labelKey: 'fModule', kind: 'select', options: MODULE_OPTIONS, default: LOGIC_MODULE_SCRIPT },
+    { key: 'moduleType', labelKey: 'fModule', kind: 'select', options: LOGIC_MODULE_OPTIONS, default: LOGIC_MODULE_SCRIPT },
 
     // ── Script ──
     { key: 'script', labelKey: 'fScript', kind: 'code', rows: 18, showIf: moduleIsScript, aiGenerate: 'script' },
 
-    // ── Clinic Day Classifier ──
+    // ── Context Match Router ──
+    { key: 'nodeContext1', labelKey: 'fNodeContext1', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCmr },
+    { key: 'nodeContext2', labelKey: 'fNodeContext2', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCmr },
+    { key: 'pairs', labelKey: 'fPairs', kind: 'pairs', showIf: moduleIsCmr },
+
+    // ── Module Result Binder ──
+    { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsMrb },
+    { key: 'variable', labelKey: 'fVariable', kind: 'text', showIf: moduleIsMrb },
+    { key: 'saveContext2DB', labelKey: 'fSaveContext', kind: 'yesno', options: YESNO_HAI_OPTIONS, default: 'no', showIf: moduleIsMrb },
+    { key: 'contextName', labelKey: 'fContextName', kind: 'text', showIf: mrbSaveContextOn },
+    {
+      key: 'contextDisplayType',
+      labelKey: 'fContextType',
+      kind: 'select',
+      options: MRB_CONTEXT_TYPE_OPTIONS,
+      default: 'TEXT',
+      showIf: mrbSaveContextOn,
+    },
+
+    // ── Null Check ──
+    // key tham chiếu: nhận node Interaction + context (giống Module Result Binder).
+    { key: 'key', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsNullCheck },
+  ],
+  // Classifier: các module PHÂN LOẠI tách từ node Logic — spec/tham số giữ nguyên.
+  classifier: [
+    { key: 'moduleType', labelKey: 'fModule', kind: 'select', options: CLASSIFIER_MODULE_OPTIONS, default: LOGIC_MODULE_CDC },
+
+    // ── Clinic Days Classifier ──
     // Module tham chiếu: nhận node Interaction + context (giống Module Result Binder).
     { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCdc },
     {
@@ -397,29 +453,6 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2', showIf: moduleIsCdc },
     { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: moduleIsCdc },
 
-    // ── Context Match Router ──
-    { key: 'nodeContext1', labelKey: 'fNodeContext1', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCmr },
-    { key: 'nodeContext2', labelKey: 'fNodeContext2', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCmr },
-    { key: 'pairs', labelKey: 'fPairs', kind: 'pairs', showIf: moduleIsCmr },
-
-    // ── Date Of Call Classifier ──
-    // Mốc thời gian để so sánh (比較時点) — chỉ nhận đúng format HH:mm:ss.
-    { key: 'compareTime', labelKey: 'fCompareTime', kind: 'time', placeholder: 'HH:mm:ss', showIf: moduleIsDocc },
-
-    // ── Module Result Binder ──
-    { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsMrb },
-    { key: 'variable', labelKey: 'fVariable', kind: 'text', showIf: moduleIsMrb },
-    { key: 'saveContext2DB', labelKey: 'fSaveContext', kind: 'yesno', options: YESNO_HAI_OPTIONS, default: 'no', showIf: moduleIsMrb },
-    { key: 'contextName', labelKey: 'fContextName', kind: 'text', showIf: mrbSaveContextOn },
-    {
-      key: 'contextDisplayType',
-      labelKey: 'fContextType',
-      kind: 'select',
-      options: MRB_CONTEXT_TYPE_OPTIONS,
-      default: 'TEXT',
-      showIf: mrbSaveContextOn,
-    },
-
     // ── Clinical Department Classifier ──
     // module tham chiếu: nhận node Interaction + context (giống Module Result Binder).
     { key: 'module', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsCdept },
@@ -427,9 +460,15 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     // Danh sách set (List khoa khám -> Tên output). Nhánh sinh tự động từ Tên output.
     { key: 'departments', labelKey: 'fClinicalDeptList', kind: 'departments', showIf: moduleIsCdept },
 
-    // ── Null Check ──
-    // key tham chiếu: nhận node Interaction + context (giống Module Result Binder).
-    { key: 'key', labelKey: 'fMrbModule', kind: 'searchSelect', optionsFrom: 'nodeAndContexts', showIf: moduleIsNullCheck },
+    // ── Incoming Classifier: không có tham số (chỉ Branch Settings) ──
+
+    // ── Date Of Call Classifier ──
+    // Mốc thời gian để so sánh (比較時点) — chỉ nhận đúng format HH:mm:ss.
+    { key: 'compareTime', labelKey: 'fCompareTime', kind: 'time', placeholder: 'HH:mm:ss', showIf: moduleIsDocc },
+  ],
+  // Normalization: các module CHUẨN HOÁ tách từ node Logic — spec/tham số giữ nguyên.
+  normalization: [
+    { key: 'moduleType', labelKey: 'fModule', kind: 'select', options: NORMALIZATION_MODULE_OPTIONS, default: LOGIC_MODULE_PHONE_NORM },
 
     // ── Phone Normalization ──
     { key: 'mode', labelKey: 'fMode', kind: 'select', options: PHONE_MODE_OPTIONS, default: 'Incoming Check', showIf: moduleIsPhoneNorm },
@@ -516,6 +555,10 @@ export const BRANCH_SCHEMA: Record<NodeType, BranchSchema> = {
   interaction: { mode: 'fixed', fixed: FAILED_NEXT },
   nexus: { mode: 'editable' },
   logic: { mode: 'editable' },
+  // Classifier/Normalization: nhánh lưu qua data.branches như logic; các module đều
+  // có bộ nhánh CỐ ĐỊNH theo module (effectiveBranches đè lại) nên không sửa tay được.
+  classifier: { mode: 'editable' },
+  normalization: { mode: 'editable' },
   openai: { mode: 'fixed', fixed: FAILED_NEXT },
   faq: { mode: 'fixed', fixed: FAILED_NEXT },
   // Transfer: nhánh FAILED (nối máy thất bại) nằm trên nhánh NEXT.
@@ -546,7 +589,7 @@ export function catchAllEditable(type: NodeType, data: Record<string, unknown>):
   return type === 'nexus' || (type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_MRB);
 }
 
-// Bộ nhánh CỐ ĐỊNH của module Clinic Day Classifier — value + label khoá cứng,
+// Bộ nhánh CỐ ĐỊNH của module Clinic Days Classifier — value + label khoá cứng,
 // không thêm/xoá/sửa. Đánh giá TỪ TRÊN xuống:
 //   ^FAILED$ → 失敗 (FAILED_REGEX) · ^NON_BUSINESS_DAY$ → 休診日 · ^不明$ → 不明 ·
 //   ^PAST_DAY$ → 過去日 · catch-all ^.*$ → 診療日 (nằm cuối nên gom mọi kết quả còn lại).
@@ -647,15 +690,15 @@ export function fixedModuleBranches(
   type: NodeType,
   data: Record<string, unknown>,
 ): readonly DataBranch[] | null {
-  if (type !== 'logic') return null;
-  const mod = logicModuleOf(data);
+  if (!isModuleNodeType(type)) return null;
+  const mod = moduleTypeOf(type, data);
   if (mod === LOGIC_MODULE_CDEPT) return clinicalDepartmentBranches(data);
   return MODULE_FIXED_BRANCHES[mod] ?? null;
 }
 
 // Bộ nhánh mặc định theo module — seed khi đổi module ở panel NẾU node chưa có nhánh
 // tuỳ biến (khác bộ cố định ở trên: seed xong người dùng vẫn sửa được). Hiện chưa
-// module nào dùng (Clinic Day Classifier đã chuyển sang bộ nhánh CỐ ĐỊNH); giữ cơ
+// module nào dùng (Clinic Days Classifier đã chuyển sang bộ nhánh CỐ ĐỊNH); giữ cơ
 // chế cho các module tương lai cần seed-nhưng-sửa-được.
 export const MODULE_DEFAULT_BRANCHES: Record<string, readonly DataBranch[]> = {};
 
@@ -792,7 +835,7 @@ export function interactionNodeNames(ir: FlowIR | null): string[] {
     .map((n) => n.label.trim() || n.id);
 }
 
-// Tên context đã được tạo & lưu trong tài liệu: Nexus (saveContext), Clinic Day
+// Tên context đã được tạo & lưu trong tài liệu: Nexus (saveContext), Clinic Days
 // Classifier (saveContext2db) và Module Result Binder (saveContext2DB).
 export function savedContextNames(ir: FlowIR | null): string[] {
   const names: string[] = [];
@@ -800,9 +843,10 @@ export function savedContextNames(ir: FlowIR | null): string[] {
     const d = n.data;
     const name = typeof d.contextName === 'string' ? d.contextName.trim() : '';
     if (!name) continue;
+    const mod = isModuleNodeType(n.type) ? moduleTypeOf(n.type, d) : '';
     if (n.type === 'nexus' && d.saveContext === 'yes') names.push(name);
-    if (n.type === 'logic' && logicModuleOf(d) === LOGIC_MODULE_CDC && d.saveContext2db === 'yes') names.push(name);
-    if (n.type === 'logic' && logicModuleOf(d) === LOGIC_MODULE_MRB && d.saveContext2DB === 'yes') names.push(name);
+    if (mod === LOGIC_MODULE_CDC && d.saveContext2db === 'yes') names.push(name);
+    if (mod === LOGIC_MODULE_MRB && d.saveContext2DB === 'yes') names.push(name);
   }
   return names;
 }
@@ -868,8 +912,10 @@ export function defaultDataFor(type: NodeType): Record<string, unknown> {
     data[f.key] = f.default;
   }
   if (BRANCH_SCHEMA[type].mode === 'editable') {
-    // Mặc định chỉ có nhánh catch-all (^.*$), không sửa/không xoá.
-    data.branches = [{ id: CATCH_ALL_ID, value: '' }];
+    // Module mặc định có bộ nhánh CỐ ĐỊNH (classifier/normalization) -> seed bộ chuẩn
+    // ngay từ đầu; còn lại chỉ có nhánh catch-all (^.*$), không sửa/không xoá.
+    const fixed = fixedModuleBranches(type, data);
+    data.branches = fixed ? fixed.map((b) => ({ ...b })) : [{ id: CATCH_ALL_ID, value: '' }];
   }
   return data;
 }
