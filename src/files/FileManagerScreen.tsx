@@ -37,6 +37,29 @@ const normalizeSearch = (s: string) => s.normalize('NFKC').toLowerCase().trim();
 // Các mức số dòng hiển thị mỗi trang (tối đa 50).
 const PAGE_SIZES = [20, 50] as const;
 
+// ── Sort theo cột (bấm tiêu đề cột) ──
+// Cột sort được trên bảng (cột 操作 không sort).
+type SortKey = 'facility' | 'scenario' | 'createdAt' | 'updatedAt' | 'author';
+type SortDir = 'asc' | 'desc';
+
+// Giá trị so sánh của 1 dòng theo cột. Thiếu metadata -> undefined (luôn dồn
+// xuống cuối danh sách bất kể chiều sort — xem comparator bên dưới).
+function sortValue(f: FileRow, key: SortKey): string | undefined {
+  switch (key) {
+    case 'facility':
+      return f.meta.facility;
+    case 'scenario':
+      return f.meta.name ?? stripExt(f.name);
+    case 'createdAt':
+      // Định dạng 'yyyy-MM-dd HH:mm' -> so sánh chuỗi = so sánh thời gian.
+      return f.meta.createdAt;
+    case 'updatedAt':
+      return f.meta.updatedAt;
+    case 'author':
+      return f.meta.author;
+  }
+}
+
 // Tên file trên repo theo quy ước <tên bệnh viện>_<tên flow>.yaml.
 // (Màn quản lý vẫn hiển thị 2 phần tách riêng theo metadata trong file.)
 const flowFileName = (facility: string, scenario: string) =>
@@ -162,17 +185,40 @@ export function FileManagerScreen() {
     });
   }, [files, query]);
 
+  // Sort khi bấm tiêu đề cột: ASC -> DESC -> bỏ sort (về thứ tự mặc định theo tên file).
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
+  const toggleSort = (key: SortKey) =>
+    setSort((s) =>
+      !s || s.key !== key ? { key, dir: 'asc' } : s.dir === 'asc' ? { key, dir: 'desc' } : null,
+    );
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const { key, dir } = sort;
+    const sign = dir === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const va = sortValue(a, key);
+      const vb = sortValue(b, key);
+      // Dòng thiếu giá trị ('—') luôn nằm cuối, bất kể ASC hay DESC.
+      if (va === undefined && vb === undefined) return 0;
+      if (va === undefined) return 1;
+      if (vb === undefined) return -1;
+      // numeric: '施設2' đứng trước '施設10'; base: không phân biệt hoa/thường.
+      return sign * va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [filtered, sort]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageRows = useMemo(
-    () => filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filtered, safePage, pageSize],
+    () => sorted.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [sorted, safePage, pageSize],
   );
 
-  // Về trang 1 khi đổi từ khoá / số dòng mỗi trang.
+  // Về trang 1 khi đổi từ khoá / số dòng mỗi trang / cột sort.
   useEffect(() => {
     setPage(1);
-  }, [query, pageSize]);
+  }, [query, pageSize, sort]);
 
   // Giữ trang trong khoảng hợp lệ (vd sau khi xoá file làm giảm số trang).
   useEffect(() => {
@@ -422,6 +468,34 @@ export function FileManagerScreen() {
   const cell = 'px-4 py-3 text-sm text-[var(--bk-text)]';
   const th = 'px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]';
 
+  // Tiêu đề cột sort được: bấm để xoay vòng ASC -> DESC -> bỏ sort. Mũi tên chỉ
+  // chiều đang sort; cột không sort hiện mờ mũi tên khi hover (gợi ý bấm được).
+  const renderSortTh = (key: SortKey, label: TKey, extraClass = '') => {
+    const dir = sort && sort.key === key ? sort.dir : null;
+    return (
+      <th
+        className={`${th} ${extraClass}`}
+        aria-sort={dir ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className={`group inline-flex items-center gap-1 uppercase tracking-wide transition hover:text-[var(--bk-accent)] ${
+            dir ? 'text-[var(--bk-accent)]' : ''
+          }`}
+        >
+          {t(label)}
+          <Icon
+            icon={dir === 'desc' ? 'lucide:arrow-down' : 'lucide:arrow-up'}
+            width={12}
+            height={12}
+            className={dir ? '' : 'opacity-0 transition group-hover:opacity-50'}
+          />
+        </button>
+      </th>
+    );
+  };
+
   return (
     <div className="relative flex h-full flex-col bg-[var(--bk-bg)]">
       {/* ── Top bar: tiêu đề + nút menu (giống canvas) ── */}
@@ -642,11 +716,11 @@ export function FileManagerScreen() {
                 <thead>
                   <tr className="border-b border-[var(--bk-border)]">
                     {/* Cột 施設名 rộng ~1.5 lần trước đây (ghim min-width). */}
-                    <th className={`${th} w-[270px] min-w-[270px]`}>{t('colFacility')}</th>
-                    <th className={th}>{t('colScenario')}</th>
-                    <th className={th}>{t('colCreatedAt')}</th>
-                    <th className={th}>{t('colUpdatedAt')}</th>
-                    <th className={th}>{t('colAuthor')}</th>
+                    {renderSortTh('facility', 'colFacility', 'w-[270px] min-w-[270px]')}
+                    {renderSortTh('scenario', 'colScenario')}
+                    {renderSortTh('createdAt', 'colCreatedAt')}
+                    {renderSortTh('updatedAt', 'colUpdatedAt')}
+                    {renderSortTh('author', 'colAuthor')}
                     <th className={`${th} text-right`}>{t('colActions')}</th>
                   </tr>
                 </thead>
