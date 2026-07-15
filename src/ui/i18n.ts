@@ -338,7 +338,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     dmConnectBtn: 'Kết nối với Google Drive',
     dmConnecting: 'Đang kết nối…',
     dmConnectHint:
-      'Chỉ cần chấp thuận 1 lần cho mỗi tài khoản — các lần sau tự kết nối. Quyền truy cập chỉ lưu trong phiên trình duyệt này.',
+      'Chỉ cần chấp thuận 1 lần cho mỗi tài khoản — từ đó về sau app tự kết nối và tự gia hạn, không hỏi lại.',
     gdErrAuth: 'Phiên Google Drive hết hạn hoặc thiếu quyền. Hãy kết nối lại (kiểm tra folder kho flow đã share cho bạn).',
     gdErrNotFound: 'Không tìm thấy folder/file trên Drive (đã bị xoá hoặc chưa được share).',
     gdErrNetwork: 'Không kết nối được Google Drive. Kiểm tra mạng rồi thử lại.',
@@ -670,7 +670,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     dmConnectBtn: 'Google Drive に接続する',
     dmConnecting: '接続中…',
     dmConnectHint:
-      '承認は各アカウント初回のみ。以降は自動で接続されます。アクセス権はこのブラウザのセッション内のみ保持されます。',
+      '承認は各アカウント初回のみ。以降は自動で接続・自動で更新され、再度確認されることはありません。',
     gdErrAuth: 'Google Drive のセッションが切れたか、権限がありません。再接続してください（フォルダの共有設定もご確認ください）。',
     gdErrNotFound: 'Drive上のフォルダ/ファイルが見つかりません（削除済み、または未共有の可能性）。',
     gdErrNetwork: 'Google Drive に接続できません。ネットワークを確認して再試行してください。',

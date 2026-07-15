@@ -45,7 +45,8 @@ fixtures/    # sample-flow.yaml (dữ liệu test cho unit test)
   `auth/verifyIdToken.ts` siết claim (iss/aud/exp/nonce/hd/email_verified/sub) — defense-in-depth,
   KHÔNG verify chữ ký. Chặn bypass mạnh nhất = đặt OAuth consent screen **Internal** (xem README §Bảo mật).
 - Flow YAML lưu trên **Google Drive** (cây 施設名/シナリオ名/<シナリオ名>_V{N}.yaml) qua Drive REST API
-  bằng access token OAuth của người dùng (popup consent, token trong **sessionStorage**). `drive/` thuần fetch.
+  bằng access token OAuth của người dùng (consent 1 lần; token ~1h trong **localStorage**,
+  `drive/DriveTokenKeeper.tsx` tự gia hạn nền). `drive/` còn lại thuần fetch.
 - Phân quyền app (owner/admin/user) lưu trên Drive: file `access-log.json` giữ danh sách admin
   + nhật ký truy cập (xem `drive/permissions.ts`). Owner cố định qua email.
 
