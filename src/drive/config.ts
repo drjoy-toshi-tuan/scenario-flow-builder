@@ -9,8 +9,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Folder gốc trên Drive (share quyền Editor cho team). Override qua env khi đổi kho.
+// Dùng || (không phải ??): trên CI, secret/variable chưa đặt vẫn sinh ra biến env
+// CHUỖI RỖNG — rỗng thì phải rơi về mặc định, nếu không mọi URL Drive sẽ thiếu ID.
 export const DRIVE_ROOT_FOLDER_ID =
-  import.meta.env.VITE_DRIVE_ROOT_FOLDER_ID ?? '1Fk0B99UkzyJok4So-xFjO5ywfCn57vI2';
+  (import.meta.env.VITE_DRIVE_ROOT_FOLDER_ID as string | undefined) ||
+  '1Fk0B99UkzyJok4So-xFjO5ywfCn57vI2';
 
 export const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 export const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
