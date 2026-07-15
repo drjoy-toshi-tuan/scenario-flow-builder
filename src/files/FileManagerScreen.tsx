@@ -95,7 +95,8 @@ export function buildBlankFlow(o: { facility: string; name: string; author: stri
 }
 
 // Kiểm tra YAML có phải flow đọc được không (không ném lỗi khi vào canvas).
-function isValidFlowYaml(text: string): boolean {
+// Export để màn quản lý Drive dùng chung khi import file.
+export function isValidFlowYaml(text: string): boolean {
   try {
     return Array.isArray(fromYaml(text).nodes);
   } catch {
@@ -105,7 +106,8 @@ function isValidFlowYaml(text: string): boolean {
 
 // Cấu trúc flow cạnh tên kịch bản: logo Main Flow (luôn 1) | logo Sub Flow · số
 // lượng sub flow. Main & Sub ngăn cách bằng dấu gạch đứng. Dùng logo đồng bộ toàn app.
-function FlowStructureBadge({ subflowCount }: { subflowCount: number }) {
+// Export để màn quản lý Drive (DriveManagerScreen) dùng chung.
+export function FlowStructureBadge({ subflowCount }: { subflowCount: number }) {
   const t = useT();
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--bk-text-muted)]">
@@ -722,27 +724,25 @@ export function FileManagerScreen() {
                     {renderSortTh('createdAt', 'colCreatedAt')}
                     {renderSortTh('updatedAt', 'colUpdatedAt')}
                     {renderSortTh('author', 'colAuthor')}
-                    <th className={`${th} text-right`}>{t('colActions')}</th>
+                    {/* Ô trống cố định cuối dòng cho nút thao tác (hiện khi hover) */}
+                    <th className={`${th} w-[120px]`} aria-hidden />
                   </tr>
                 </thead>
                 <tbody>
                   {pageRows.map((file) => (
                     <tr
                       key={file.path}
-                      className="border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
+                      onClick={() => void handleOpen(file)}
+                      title={t('fmOpen')}
+                      className="group cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
                     >
                       <td className={`${cell} text-[var(--bk-text-muted)]`}>{file.meta.facility ?? '—'}</td>
                       <td className={cell}>
                         <div className="flex items-center gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => void handleOpen(file)}
-                            disabled={busy}
-                            className="flex min-w-0 items-center gap-2 text-left font-medium text-[var(--bk-text)] transition hover:text-[var(--bk-accent)] disabled:opacity-60"
-                          >
-                            <Icon icon="lucide:file-text" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
+                          <span className="flex min-w-0 items-center gap-2 text-left font-medium text-[var(--bk-text)]">
+                            <Icon icon="line-md:file-document" width={16} height={16} className="shrink-0 text-[var(--bk-accent)]" />
                             <span className="truncate">{file.meta.name ?? stripExt(file.name)}</span>
-                          </button>
+                          </span>
                           {/* Cấu trúc flow: Main Flow (luôn có 1) | Sub Flow · số lượng. */}
                           <FlowStructureBadge subflowCount={file.meta.subflowCount ?? 0} />
                         </div>
@@ -754,22 +754,16 @@ export function FileManagerScreen() {
                         {file.meta.updatedAt ?? '—'}
                       </td>
                       <td className={`${cell} text-[var(--bk-text-muted)]`}>{file.meta.author ?? '—'}</td>
-                      <td className={cell}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => void handleOpen(file)}
-                            disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-accent)] transition hover:bg-[var(--bk-accent-soft)] disabled:opacity-60"
-                            title={t('fmOpen')}
-                          >
-                            <Icon icon="fluent:open-16-filled" width={18} height={18} />
-                          </button>
+                      {/* Nút thao tác trong ô trống cuối dòng — chỉ hiện khi hover
+                          (hoặc focus bàn phím); icon-only, hover đổi màu theo hành
+                          động; chặn nổi bọt để không mở dòng. */}
+                      <td className={cell} onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                           <button
                             type="button"
                             onClick={() => openRenameModal(file)}
                             disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-accent-soft)] hover:text-[var(--bk-accent)] disabled:opacity-60"
+                            className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-[var(--bk-accent)] disabled:pointer-events-none disabled:opacity-40"
                             title={t('fmRename')}
                           >
                             <Icon icon="lucide:pencil" width={16} height={16} />
@@ -778,19 +772,19 @@ export function FileManagerScreen() {
                             type="button"
                             onClick={() => void handleDuplicate(file)}
                             disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[var(--bk-accent-soft)] hover:text-[var(--bk-accent)] disabled:opacity-60"
+                            className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-[#22c55e] disabled:pointer-events-none disabled:opacity-40"
                             title={t('fmDuplicate')}
                           >
-                            <Icon icon="lucide:copy" width={16} height={16} />
+                            <Icon icon="line-md:duplicate" width={17} height={17} />
                           </button>
                           <button
                             type="button"
                             onClick={() => setDeleteTarget(file)}
                             disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,#dc2626_12%,transparent)] hover:text-rose-500 disabled:opacity-60"
+                            className="flex h-8 w-8 items-center justify-center text-[var(--bk-text-faint)] transition hover:text-rose-500 disabled:pointer-events-none disabled:opacity-40"
                             title={t('fmDeleteTitle')}
                           >
-                            <Icon icon="lucide:trash-2" width={16} height={16} />
+                            <Icon icon="line-md:trash" width={17} height={17} />
                           </button>
                         </div>
                       </td>
