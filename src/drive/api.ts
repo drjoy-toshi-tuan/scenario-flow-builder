@@ -76,6 +76,13 @@ async function ensureOk(res: Response): Promise<Response> {
 // Escape giá trị chuỗi trong query q của Drive (tên có dấu nháy đơn).
 const qEscape = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
+// Kho flow nằm trong SHARED DRIVE (共有ドライブ): Drive API mặc định chỉ nhìn
+// thấy My Drive — thiếu supportsAllDrives=true là mọi item trong Shared Drive
+// trả 404 dù người dùng có quyền. Kèm vô hại với My Drive nên gắn cho MỌI call;
+// riêng files.list cần thêm includeItemsFromAllDrives=true.
+const ALL_DRIVES = 'supportsAllDrives=true';
+const ALL_DRIVES_LIST = `${ALL_DRIVES}&includeItemsFromAllDrives=true`;
+
 export const isFolder = (it: DriveItem) => it.mimeType === FOLDER_MIME;
 export const isYamlName = (name: string) => /\.ya?ml$/i.test(name);
 
@@ -95,7 +102,9 @@ export async function listChildren(token: string, parentIds: string[]): Promise<
         pageSize: '1000',
       });
       if (pageToken) params.set('pageToken', pageToken);
-      const res = await ensureOk(await dFetch(token, `${DRIVE_API_BASE}/files?${params.toString()}`));
+      const res = await ensureOk(
+        await dFetch(token, `${DRIVE_API_BASE}/files?${ALL_DRIVES_LIST}&${params.toString()}`),
+      );
       const body = (await res.json()) as { files: DriveItem[]; nextPageToken?: string };
       out.push(...body.files);
       pageToken = body.nextPageToken;
@@ -107,7 +116,7 @@ export async function listChildren(token: string, parentIds: string[]): Promise<
 // Đọc nội dung text của 1 file YAML.
 export async function getFileText(token: string, fileId: string): Promise<string> {
   const res = await ensureOk(
-    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(fileId)}?alt=media`),
+    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(fileId)}?alt=media&${ALL_DRIVES}`),
   );
   return res.text();
 }
@@ -123,7 +132,9 @@ export async function findChildFolder(
     fields: `files(${ITEM_FIELDS})`,
     pageSize: '1',
   });
-  const res = await ensureOk(await dFetch(token, `${DRIVE_API_BASE}/files?${params.toString()}`));
+  const res = await ensureOk(
+    await dFetch(token, `${DRIVE_API_BASE}/files?${ALL_DRIVES_LIST}&${params.toString()}`),
+  );
   const body = (await res.json()) as { files: DriveItem[] };
   return body.files[0] ?? null;
 }
@@ -131,7 +142,7 @@ export async function findChildFolder(
 // Tạo folder con.
 export async function createFolder(token: string, parentId: string, name: string): Promise<DriveItem> {
   const res = await ensureOk(
-    await dFetch(token, `${DRIVE_API_BASE}/files?fields=${encodeURIComponent(ITEM_FIELDS)}`, {
+    await dFetch(token, `${DRIVE_API_BASE}/files?${ALL_DRIVES}&fields=${encodeURIComponent(ITEM_FIELDS)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
@@ -169,7 +180,7 @@ export async function createYamlFile(
   const res = await ensureOk(
     await dFetch(
       token,
-      `${DRIVE_UPLOAD_BASE}/files?uploadType=multipart&fields=${encodeURIComponent(ITEM_FIELDS)}`,
+      `${DRIVE_UPLOAD_BASE}/files?uploadType=multipart&${ALL_DRIVES}&fields=${encodeURIComponent(ITEM_FIELDS)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -187,7 +198,7 @@ export async function updateYamlContent(token: string, fileId: string, content: 
   await ensureOk(
     await dFetch(
       token,
-      `${DRIVE_UPLOAD_BASE}/files/${encodeURIComponent(fileId)}?uploadType=media`,
+      `${DRIVE_UPLOAD_BASE}/files/${encodeURIComponent(fileId)}?uploadType=media&${ALL_DRIVES}`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/x-yaml; charset=UTF-8' },
@@ -200,7 +211,7 @@ export async function updateYamlContent(token: string, fileId: string, content: 
 // Đưa file/folder vào Thùng rác (khôi phục được ~30 ngày; folder trash cả cây con).
 export async function trashItem(token: string, id: string): Promise<void> {
   await ensureOk(
-    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(id)}`, {
+    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(id)}?${ALL_DRIVES}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trashed: true }),
@@ -211,6 +222,6 @@ export async function trashItem(token: string, id: string): Promise<void> {
 // Xác thực nhanh token + quyền trên folder gốc (gọi khi kết nối).
 export async function verifyDriveAccess(token: string, rootId: string): Promise<void> {
   await ensureOk(
-    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(rootId)}?fields=id,name`),
+    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(rootId)}?fields=id,name&${ALL_DRIVES}`),
   );
 }
