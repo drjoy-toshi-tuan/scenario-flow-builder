@@ -52,8 +52,8 @@ export function PermissionsModal({
 
   return (
     <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true">
-      {/* bk-modal mặc định 380px — nới cho bảng 3 cột (style đè trực tiếp, không dùng important của Tailwind) */}
-      <div className="bk-modal" style={{ maxWidth: 520 }}>
+      {/* bk-modal mặc định 380px — nới cho bảng 3 cột + ảnh đại diện (style đè trực tiếp, không dùng important của Tailwind) */}
+      <div className="bk-modal" style={{ maxWidth: 600 }}>
         <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
             <Icon icon="app:key-draw" width={15} height={15} />
@@ -76,11 +76,27 @@ export function PermissionsModal({
                 return (
                   <tr key={m.email} className="border-b border-[var(--bk-border)] last:border-0">
                     <td className="px-3 py-2">
-                      <div className="min-w-0">
-                        {m.name && (
-                          <div className="truncate font-medium text-[var(--bk-text)]">{m.name}</div>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {/* Ảnh đại diện tròn (ghi kèm khi ghi nhận truy cập); chưa có ảnh ->
+                            vòng tròn chữ cái đầu. referrerPolicy để ảnh googleusercontent không bị chặn. */}
+                        {m.picture ? (
+                          <img
+                            src={m.picture}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="h-8 w-8 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bk-accent-soft)] text-sm font-bold text-[var(--bk-accent)]">
+                            {(m.name.trim() || m.email).charAt(0).toUpperCase()}
+                          </span>
                         )}
-                        <div className="truncate text-xs text-[var(--bk-text-muted)]">{m.email}</div>
+                        <div className="min-w-0">
+                          {m.name && (
+                            <div className="truncate font-medium text-[var(--bk-text)]">{m.name}</div>
+                          )}
+                          <div className="truncate text-xs text-[var(--bk-text-muted)]">{m.email}</div>
+                        </div>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs text-[var(--bk-text-muted)]">
