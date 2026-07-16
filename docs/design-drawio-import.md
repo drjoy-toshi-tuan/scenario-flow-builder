@@ -44,10 +44,13 @@ Pipeline vì vậy thiết kế để chạy được với input tối thiểu 
 được** thành `interaction + nexus`. Phải hiểu câu thoại và bối cảnh mới chọn đúng
 node/module trong hệ thống:
 
-- 「1番はい、2番いいえでお答えください」 → `interaction` (DTMF), nhánh success (`next`)
-  nối vào `nexus` để **save input người dùng** (saveContext/contextName/contextType)
-  và rẽ nhánh theo giá trị đã nhận; nhánh `failed` của interaction KHÔNG vào nexus —
-  đi đường riêng (retry announce / hangup / transfer theo bảng 失敗時 ở page 2).
+- Hearing chỉ cần **lưu** câu trả lời (không rẽ nhánh): `interaction --next--> nexus`
+  (nexus save input qua saveContext/contextName/contextType, 1 nhánh next).
+- Hearing cần **rẽ nhánh**: interaction KHÔNG nối thẳng vào nexus. Bắt buộc có node
+  xử lý đứng giữa: `interaction --next--> logic (xử lý) --> nexus (lưu KẾT QUẢ của
+  logic + phân branch)`. Nexus luôn là nơi lưu kết quả và toả nhánh, không tự xử lý.
+- Nhánh `failed` của interaction KHÔNG bao giờ vào nexus — đi đường riêng
+  (retry announce / hangup / transfer theo bảng 失敗時 ở page 2).
 - Hỏi tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm bằng giọng nói → `interaction`
   (STT) **+ node `openai`** với prompt bỏ filler word, trích đúng tên thực thể
   (đây là cách dùng OpenAI ưu tiên hiện tại của hệ thống).
@@ -73,8 +76,8 @@ Phần deterministic chỉ lo **skeleton**: node nào, text gì, nối với nod
 flowchart TD
     A[".drawio XML<br/>(upload từ máy / Drive)"] --> B["<b>1. parse.ts</b> (thuần)<br/>mxfile → DrawioGraph<br/>node/text/màu/toạ độ/edge"]
     B --> C["<b>2. associate.ts</b> (thuần)<br/>gán nhãn nhánh ↔ edge (hình học)<br/>join bảng アナウンス一覧 (page 2)"]
-    C --> D["<b>3. aiMap.ts — LLM (giai đoạn chính)</b><br/>① chọn NodeType + moduleType từng bước<br/>② dựng branches (when/regex, thứ tự top-down)<br/>③ sinh code Script, prompt OpenAI<br/>④ sinh id tiếng Anh, tách/gộp node<br/>⑤ confidence + lý do từng quyết định"]
-    D --> E["<b>4. validate.ts</b> (thuần)<br/>schema + graph invariants<br/>(id unique, edge resolve, start,<br/>branch ↔ sourceHandle, module hợp lệ)"]
+    C --> D["<b>3. aiMap.ts — LLM (giai đoạn chính)</b><br/>① chọn NodeType + moduleType từng bước<br/>② dựng branches (when/regex, thứ tự top-down)<br/>③ sinh code Script, prompt OpenAI<br/>④ sinh id tiếng Anh, tách/gộp node<br/>⑤ phân chia main / sub flow + chèn node jump<br/>⑥ confidence + lý do từng quyết định"]
+    D --> E["<b>4. validate.ts</b> (thuần)<br/>schema + graph invariants<br/>(id unique, edge resolve, start,<br/>branch ↔ sourceHandle, module hợp lệ,<br/>quy tắc nexus & main/sub flow)"]
     E -- "lỗi → retry 1 lần kèm thông báo lỗi" --> D
     E --> F["<b>5. Màn Review Import</b><br/>canvas render draft IR<br/>+ panel confidence/lý do, click → focus node<br/>người dùng sửa bằng NodeSettingsPanel"]
     F --> G["flowStore (IR chính thức)"]
@@ -109,12 +112,36 @@ nằm trong 1 file prompt riêng `drawioMapPrompt.ts`):
 - OpenAI node: **ưu tiên dùng cho hậu xử lý hearing tự do** — bỏ filler word, trích
   đúng tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm từ câu trả lời; KHÔNG
   dùng OpenAI cho việc rẽ nhánh có module classifier chuyên dụng.
-- Pattern chuẩn sau mỗi hearing: `interaction --next--> nexus` (nexus save input +
-  rẽ nhánh theo giá trị); nhánh `failed` của interaction nối riêng theo cột 失敗時
-  của bảng page 2, không bao giờ trỏ vào nexus.
-- Chọn node rẽ nhánh theo thứ tự ưu tiên: module chuyên dụng (classifier/normalization)
-  → nexus (save + rẽ theo giá trị input vừa nhận) → logic Script (điều kiện tuỳ biến,
-  LLM sinh code) → openai (hiểu ngôn ngữ tự do).
+- Pattern chuẩn sau mỗi hearing:
+  - Chỉ lưu, không rẽ nhánh: `interaction --next--> nexus (saveContext)`.
+  - Có rẽ nhánh: `interaction --next--> logic (xử lý) --> nexus (lưu kết quả + phân
+    branch)` — interaction KHÔNG được nối thẳng vào nexus khi có branch.
+  - Nhánh `failed` của interaction nối riêng theo cột 失敗時 của bảng page 2,
+    không bao giờ trỏ vào nexus.
+- Chọn node xử lý theo thứ tự ưu tiên: module chuyên dụng (classifier/normalization)
+  → logic Script (điều kiện tuỳ biến, LLM sinh code) → openai (hiểu ngôn ngữ tự do,
+  bỏ filler word / trích tên thực thể).
+
+**Quy tắc phân chia Main / Sub flow** (IR đã hỗ trợ sẵn: `subflows[]` + node `jump`
+tham chiếu sub flow theo TÊN; hết sub flow tự quay về main — logic Brekeke):
+
+- Main flow **luôn chứa node start** và trục hội thoại chính
+  (vd 冒頭アナウンス → 受診歴 → 用件 → … → 終話).
+- Mục đích tách sub flow là **dễ đọc, dễ maintain, tránh flow khổng lồ** — KHÔNG tách
+  máy móc theo mọi nhánh: nhánh ít hearing thì để lại main (vd 用件 chia 3 nhánh
+  nhưng các nhánh ngắn → giữ trong main; 予約・遅刻に関する内容 vẫn thuộc main).
+- Tách thành sub flow khi nhánh đủ lớn / là một nghiệp vụ trọn vẹn:
+  vd nhánh 診療予約の確認; các nhánh 予約・変更・キャンセル・遅刻連絡 (tách từ branch
+  của 予約・遅刻に関する内容); đoạn 確認 → 電話番号聴取 tách thành sub flow 個人情報.
+- **KHÔNG lồng sub flow trong sub flow** (không nhảy từ sub flow sang sub flow "con"
+  của nó). Sub flow chỉ được nhảy sang sub flow khác khi có điều kiện từ một branch
+  (condition của logic nào đó).
+- Tên sub flow đặt theo **tên hoặc mục đích của nhánh** (vd 個人情報, 初診, 予約,
+  変更, キャンセル, 遅刻連絡) — node jump tham chiếu đúng tên này.
+
+Trong đó "không lồng sub flow", "main có start", "jump trỏ tới tên sub flow tồn tại"
+là quy tắc cứng → đưa cả vào `validate.ts`; còn "nhánh bao nhiêu là đủ lớn để tách"
+là phán đoán ngữ nghĩa → LLM quyết kèm lý do, người review chốt trên màn Review.
 - Quy ước nhánh: FAILED regex, catch-all cuối, nhãn 次へ/失敗 (từ `nodeSchema.ts`).
 
 **(c) Few-shot** — vài cặp (fragment drawio đã chuẩn hoá → fragment IR đúng) lấy từ
