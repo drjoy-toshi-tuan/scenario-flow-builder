@@ -368,11 +368,14 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  /* Kéo giãn theo chiều cao node: tên BÁM MÉP TRÊN, icon biểu thị BÁM MÉP DƯỚI
+     -> 2 dòng tách xa nhau rõ ràng. */
+  align-self: stretch;
+  justify-content: space-between;
 }
 .bk-node-name--cs {
   text-align: center;
-  font-size: 15px;
+  font-size: 17px;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators). */
 .bk-cs-indicators {
@@ -407,13 +410,12 @@ body {
   clip-path: inset(-1px -1px 50% -1px);
   pointer-events: none;
 }
-/* Chấm output CS: nhỏ (9px), ăn SÂU hết cỡ vào node — nằm TRỌN trong lòng hõm,
-   đỉnh chấm chạm vòm hõm. (Lưu ý trục: bottom càng ÂM là càng đẩy RA NGOÀI node;
-   -2px là mức sâu nhất mà chấm vẫn lọt gọn trong hõm 14px.) */
+/* Chấm output CS: nhỏ (9px), nằm HẲN trong node ngay trên mép đáy — lọt giữa
+   miệng hõm khoét. (Trục: bottom càng ÂM càng đẩy RA NGOÀI; 0 = sát mép trong.) */
 .bk-node--cs .react-flow__handle.bk-handle.react-flow__handle-bottom {
   width: 9px;
   height: 9px;
-  bottom: -2px;
+  bottom: 0;
 }
 /* Điểm đến: ẩn chấm tròn (mũi tên cuối dây thay thế) — vẫn nối dây vào được. */
 .bk-node--cs .react-flow__handle.bk-handle.target {
