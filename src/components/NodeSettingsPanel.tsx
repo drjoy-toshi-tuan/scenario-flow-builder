@@ -473,6 +473,7 @@ function FieldControl({
             className={`${inputClass} resize-y`}
             rows={field.rows ?? 3}
             value={value}
+            placeholder={field.placeholder}
             onChange={(e) => set(e.target.value)}
           />
         </label>

@@ -68,6 +68,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     fRetryAnnounce: 'Retry Announce',
     fReconfirm: 'Re-confirm',
     fReconfirmAnnounce: 'Re-confirm Announce',
+    fProfileWords: 'Word List',
     // Template (テンプレート) của node Interaction: chọn 1 mẫu để tự set + khoá tham số.
     fTemplate: 'Template',
     tplNone: '－',
@@ -406,6 +407,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     fRetryAnnounce: 'リトライアナウンス',
     fReconfirm: '復唱',
     fReconfirmAnnounce: '復唱アナウンス',
+    fProfileWords: '単語登録リスト',
     // Template (テンプレート) của node Interaction: chọn 1 mẫu để tự set + khoá tham số.
     fTemplate: 'テンプレート',
     tplNone: '－',

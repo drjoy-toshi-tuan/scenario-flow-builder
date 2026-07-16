@@ -364,6 +364,14 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
     // Retry Announce luôn nằm ngay dưới Retry Count.
     { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText' },
+    // Word List (単語登録リスト): mỗi dòng "từ gốc(漢字/カタカナ/ひらがな) [dấu cách] cách đọc(ひらがな)".
+    {
+      key: 'profile_words',
+      labelKey: 'fProfileWords',
+      kind: 'textarea',
+      rows: 4,
+      placeholder: '例: 診療 しんりょう',
+    },
   ],
   nexus: [
     { key: 'saveContext', labelKey: 'fSaveContext', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
