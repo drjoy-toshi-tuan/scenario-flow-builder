@@ -136,6 +136,10 @@ export const LOGIC_MODULE_DOCC = 'Date Of Call Classifier';
 // cờ lưu context và các cặp (danh sách khoa -> tên output). Nhánh SINH TỪ output
 // (FAILED / NOT_COVERED + mỗi output 1 nhánh), khoá custom.
 export const LOGIC_MODULE_CDEPT = 'Clinical Department Classifier';
+// Phone Type Classifier: phân loại LOẠI số điện thoại (携帯/固定/その他) — dùng khi
+// flow cần rẽ nhánh theo loại số (vd theo số gọi đến trước khi nghe số điện thoại).
+// Không có tham số, chỉ có Branch Settings (bộ nhánh cố định).
+export const LOGIC_MODULE_PHONE_TYPE = 'Phone Type Classifier';
 
 // ── Module của node Normalization ──
 // Phone Normalization: chuẩn hoá số điện thoại (kiểm tra số gọi đến /復唱) — 2 nhánh
@@ -157,6 +161,7 @@ const CLASSIFIER_MODULE_OPTIONS: FieldOption[] = [
   { value: LOGIC_MODULE_CDEPT, label: LOGIC_MODULE_CDEPT },
   { value: LOGIC_MODULE_IC, label: LOGIC_MODULE_IC },
   { value: LOGIC_MODULE_DOCC, label: LOGIC_MODULE_DOCC },
+  { value: LOGIC_MODULE_PHONE_TYPE, label: LOGIC_MODULE_PHONE_TYPE },
 ];
 const NORMALIZATION_MODULE_OPTIONS: FieldOption[] = [
   { value: LOGIC_MODULE_PHONE_NORM, label: LOGIC_MODULE_PHONE_NORM },
@@ -471,6 +476,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
 
     // ── Incoming Classifier: không có tham số (chỉ Branch Settings) ──
 
+    // ── Phone Type Classifier: không có tham số (chỉ Branch Settings) ──
+
     // ── Date Of Call Classifier ──
     // Mốc thời gian để so sánh (比較時点) — chỉ nhận đúng format HH:mm:ss.
     { key: 'compareTime', labelKey: 'fCompareTime', kind: 'time', placeholder: 'HH:mm:ss', showIf: moduleIsDocc },
@@ -621,6 +628,14 @@ export const IC_FIXED_BRANCHES: readonly DataBranch[] = [
   { id: 'b4', value: '携帯', label: '携帯' },
 ] as const;
 
+// Phone Type Classifier: catch-all (その他) + 携帯/固定 — bộ nhánh CỐ ĐỊNH,
+// value lẫn label đều không sửa được.
+export const PHONE_TYPE_FIXED_BRANCHES: readonly DataBranch[] = [
+  { id: CATCH_ALL_ID, value: '', label: 'その他' },
+  { id: 'b0', value: '携帯', label: '携帯' },
+  { id: 'b1', value: '固定', label: '固定' },
+] as const;
+
 // Date Of Call Classifier: catch-all chính là nhánh ^ERROR$ (vai trò giống FAILED,
 // label エラー) + 3 kết quả so sánh thời gian.
 export const DOCC_FIXED_BRANCHES: readonly DataBranch[] = [
@@ -651,6 +666,7 @@ export const MODULE_FIXED_BRANCHES: Record<string, readonly DataBranch[]> = {
   [LOGIC_MODULE_CDC]: CDC_FIXED_BRANCHES,
   [LOGIC_MODULE_IC]: IC_FIXED_BRANCHES,
   [LOGIC_MODULE_DOCC]: DOCC_FIXED_BRANCHES,
+  [LOGIC_MODULE_PHONE_TYPE]: PHONE_TYPE_FIXED_BRANCHES,
   [LOGIC_MODULE_NULLCHECK]: NULL_CHECK_FIXED_BRANCHES,
   [LOGIC_MODULE_PHONE_NORM]: INVALID_SUCCESS_FIXED_BRANCHES,
   [LOGIC_MODULE_DOB_RECONFIRM]: INVALID_SUCCESS_FIXED_BRANCHES,

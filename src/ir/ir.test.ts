@@ -21,6 +21,7 @@ import {
   LOGIC_MODULE_SCRIPT,
   LOGIC_MODULE_IC,
   LOGIC_MODULE_DOCC,
+  LOGIC_MODULE_PHONE_TYPE,
   LOGIC_MODULE_CDEPT,
   LOGIC_MODULE_NULLCHECK,
   LOGIC_MODULE_PHONE_NORM,
@@ -634,9 +635,22 @@ describe('logic module mới: Incoming Classifier / Date Of Call Classifier', ()
     ]);
   });
 
-  it('catchAllEditable: IC/DOCC đều KHÔNG sửa được catch-all (chỉ nexus/MRB)', () => {
+  it('bộ nhánh CỐ ĐỊNH của Phone Type Classifier: catch-all(その他) + 携帯/固定 (kèm label)', () => {
+    expect(MODULE_FIXED_BRANCHES[LOGIC_MODULE_PHONE_TYPE]).toEqual([
+      { id: CATCH_ALL_ID, value: '', label: 'その他' },
+      { id: 'b0', value: '携帯', label: '携帯' },
+      { id: 'b1', value: '固定', label: '固定' },
+    ]);
+    // Không có tham số riêng: PROPERTY_FIELDS của classifier không có field nào showIf theo Phone Type.
+    expect(
+      effectiveBranches('classifier', { moduleType: LOGIC_MODULE_PHONE_TYPE }).map((b) => b.value),
+    ).toEqual(['', '携帯', '固定']);
+  });
+
+  it('catchAllEditable: IC/DOCC/Phone Type đều KHÔNG sửa được catch-all (chỉ nexus/MRB)', () => {
     expect(catchAllEditable('logic', { moduleType: LOGIC_MODULE_DOCC })).toBe(false);
     expect(catchAllEditable('logic', { moduleType: LOGIC_MODULE_IC })).toBe(false);
+    expect(catchAllEditable('classifier', { moduleType: LOGIC_MODULE_PHONE_TYPE })).toBe(false);
   });
 
   it('effectiveBranches: DOCC dính nhánh của IC (data sai) vẫn trả về đúng bộ DOCC', () => {
@@ -1344,6 +1358,15 @@ flow:
     const again = fromYaml(out);
     expect(again.nodes.find((n) => n.id === 'a')!.type).toBe('classifier');
     expect(again.nodes.find((n) => n.id === 'c')!.type).toBe('normalization');
+  });
+
+  it('fromYaml: type logic mang moduleType Phone Type Classifier -> migrate sang classifier', () => {
+    const ir = fromYaml(
+      'flow:\n  name: "x"\n  nodes:\n    - id: a\n      type: logic\n      moduleType: Phone Type Classifier\n',
+    );
+    const node = ir.nodes.find((n) => n.id === 'a')!;
+    expect(node.type).toBe('classifier');
+    expect(node.data.moduleType).toBe(LOGIC_MODULE_PHONE_TYPE);
   });
 
   it('classifier/normalization thiếu moduleType (file viết tay) -> seed module mặc định', () => {

@@ -100,6 +100,7 @@ const MODULE_NODE_BY_NAME: Record<string, NodeType> = {
   'Clinical Department Classifier': 'classifier',
   'Incoming Classifier': 'classifier',
   'Date Of Call Classifier': 'classifier',
+  'Phone Type Classifier': 'classifier',
   'Phone Normalization': 'normalization',
   'DOB Re-confirmation': 'normalization',
 };

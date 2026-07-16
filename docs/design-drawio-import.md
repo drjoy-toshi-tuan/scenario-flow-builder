@@ -101,7 +101,7 @@ tay 2 nơi để khỏi lệch khi thêm module mới):
 | `interaction` | — | announce, inputType (DTMF/STT), voiceType, reconfirm, retryCount/Announce | FAILED + next |
 | `nexus` | — | saveContext, contextName, contextType (lưu input user đã nói/bấm) | tự do — chỉ nhận nhánh success của interaction, KHÔNG nhận FAILED |
 | `logic` | Script / MRB / CMR / Null Check | script (JS) / module tham chiếu / cặp match | tự do (Null Check: true/false) |
-| `classifier` | Clinic Days / Clinical Department / Incoming / Date Of Call | tuỳ module (CDEPT: list khoa→output) | cố định theo module (CDEPT sinh từ output) |
+| `classifier` | Clinic Days / Clinical Department / Incoming / Date Of Call / **Phone Type** | tuỳ module (CDEPT: list khoa→output; Phone Type & Incoming: không tham số) | cố định theo module (CDEPT sinh từ output; Phone Type: 携帯/固定/その他) |
 | `normalization` | Phone Normalization / DOB Re-confirmation | mode, module tham chiếu, save | INVALID / SUCCESS |
 | `openai` | — | prompt, retryCount/Announce | FAILED + next |
 | `faq` / `transfer` / `save` / `jump` / `hangup` | (save: Flag / Save Data 2 Dr.JOY) | … | … |
@@ -121,6 +121,14 @@ nằm trong 1 file prompt riêng `drawioMapPrompt.ts`):
 - Chọn node xử lý theo thứ tự ưu tiên: module chuyên dụng (classifier/normalization)
   → logic Script (điều kiện tuỳ biến, LLM sinh code) → openai (hiểu ngôn ngữ tự do,
   bỏ filler word / trích tên thực thể).
+- **Module Result Binder (logic)**: lấy được giá trị ĐÃ LƯU trong context làm tiền đề
+  tạo condition branch — dùng khi điểm rẽ nhánh dựa trên thông tin đã hỏi/lưu ở bước
+  TRƯỚC đó (không phải kết quả của bước liền kề).
+- **Phân nhánh theo số gọi đến (incoming)**: nếu sơ đồ rẽ nhánh theo loại điện thoại
+  (携帯/固定…) TRƯỚC khi flow nghe số điện thoại (vd sau 診察券番号 rẽ 携帯), nghĩa là
+  điều kiện lấy từ SỐ INCOMING → dùng `classifier` module **Phone Type Classifier**
+  (nhánh cố định 携帯/固定/その他) hoặc **Incoming Classifier** khi cần phân biệt chi
+  tiết hơn (非通知/海外/WebRTC/固定/携帯).
 
 **Quy tắc phân chia Main / Sub flow** (IR đã hỗ trợ sẵn: `subflows[]` + node `jump`
 tham chiếu sub flow theo TÊN; hết sub flow tự quay về main — logic Brekeke):
