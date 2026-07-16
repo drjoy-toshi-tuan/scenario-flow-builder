@@ -217,6 +217,46 @@ body {
   pointer-events: auto;
 }
 
+/* Icon trong dãy trượt "bắn ra" (fade + pop) theo thứ tự khi MỞ — giống hiệu ứng
+   icon ở panel "Thêm node" / menu header. Animation nằm trên trạng thái --open nên
+   TỰ phát lại mỗi lần mở (class được gắn lại), khớp với dãy nút luôn mounted. */
+@keyframes bk-ctrlbar-icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.bk-ctrlbar-tray--open .bk-ctrlbar-btn svg:not(.animate-spin) {
+  animation: bk-ctrlbar-icon-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
+}
+.bk-ctrlbar-tray--open > *:nth-child(1) svg:not(.animate-spin) {
+  animation-delay: 0.04s;
+}
+.bk-ctrlbar-tray--open > *:nth-child(2) svg:not(.animate-spin) {
+  animation-delay: 0.08s;
+}
+.bk-ctrlbar-tray--open > *:nth-child(3) svg:not(.animate-spin) {
+  animation-delay: 0.12s;
+}
+.bk-ctrlbar-tray--open > *:nth-child(4) svg:not(.animate-spin) {
+  animation-delay: 0.16s;
+}
+.bk-ctrlbar-tray--open > *:nth-child(5) svg:not(.animate-spin) {
+  animation-delay: 0.2s;
+}
+.bk-ctrlbar-tray--open > *:nth-child(n + 6) svg:not(.animate-spin) {
+  animation-delay: 0.24s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-ctrlbar-tray--open .bk-ctrlbar-btn svg:not(.animate-spin) {
+    animation: none;
+  }
+}
+
 /* Controls + MiniMap: bo góc, đổ bóng, nền theo token. */
 .react-flow__controls {
   border-radius: 12px;
