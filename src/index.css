@@ -420,7 +420,9 @@ body {
   background: var(--bk-canvas);
   /* Viền hõm cùng tông accent nhạt — khớp với viền node CS, không dùng xám chung. */
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--bk-surface));
-  clip-path: inset(-1px -1px 50% -1px);
+  /* Cắt DƯỚI đường kính ~2px: nền hõm che luôn viền đáy node chạy ngang qua miệng
+     hõm — không còn "đường kính" cắt ngang nửa vòng tròn. */
+  clip-path: inset(-1px -1px calc(50% - 2px) -1px);
   pointer-events: none;
 }
 /* Chấm output CS: nhỏ (9px), nằm HẲN trong node ngay trên mép đáy — lọt giữa
