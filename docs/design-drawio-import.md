@@ -2,6 +2,10 @@
 
 > Tài liệu thiết kế để review trước khi code. Chưa implement gì.
 > Input mẫu đã phân tích: `四谷メディカルキューブ 診療(デモ0714更新)` — file `.drawio` 2 page.
+>
+> **Rev 2** (sau góp ý review): LLM là **giai đoạn chính** của pipeline, không phải
+> fallback — vì chọn node/module cho các điểm rẽ nhánh, sinh code Script, và quyết định
+> chỗ nào dùng module OpenAI đều đòi hỏi hiểu câu thoại + bối cảnh nghiệp vụ.
 
 ## 1. Bài toán
 
@@ -13,140 +17,158 @@ trong Scenario Flow Builder và chạy trên Brekeke.
 Draw.io chỉ là **một adapter import mới** đứng cạnh `fromYaml`:
 
 ```
-.drawio XML ──▶ [drawio adapter] ──▶ FlowIR ──▶ canvas (review/sửa) ──▶ toYaml ──▶ .yaml
+.drawio XML ──▶ [drawio adapter: parse + LLM map] ──▶ FlowIR ──▶ canvas (review/sửa) ──▶ toYaml ──▶ .yaml
 ```
 
-AI **không bao giờ sinh YAML trực tiếp**. AI chỉ tham gia ở bước map "hình vẽ tự do →
-IR", còn YAML luôn do `toYaml` (deterministic, đã có test) sinh ra. Nhờ vậy output
-luôn hợp lệ về mặt cấu trúc.
+LLM **không bao giờ sinh YAML trực tiếp**. LLM sinh **IR draft** (JSON theo schema
+`FlowIR`), output bắt buộc qua validate + người review trên canvas; YAML luôn do
+`toYaml` (deterministic, đã có test) sinh ra — nhờ vậy output luôn hợp lệ về cấu trúc.
 
 ## 2. Những gì rút ra từ file mẫu
 
-Phân tích file `TEST.drawio` đính kèm:
-
 | Thành phần | Thực tế trong file | Hệ quả thiết kế |
 |---|---|---|
-| Page 1 `全体フロー図` | 37 node flow là `<object>` wrapper có attribute cấu trúc: `stepname`, `type` (`opening`=1, `hearing`=30, `termination`=6), `announce`, `repeat` | File "chuẩn" có thể map **rule-based, không cần AI** |
-| Edge | 47 `mxCell edge` nối bằng `source`/`target` id | Dựng `FlowEdge` trực tiếp |
-| Nhãn nhánh (はい/いいえ/初診/再診…) | Là text cell **trôi tự do** (`elbl_*`, parent=`1`), KHÔNG gắn vào edge | Phải gán nhãn↔edge bằng **hình học** (khoảng cách tới đường đi của edge); đây là chỗ mơ hồ nhất, cần AI/người xác nhận |
-| Page 2 `アナウンス一覧` | Bảng 聴取項目/復唱/リトライ/失敗時/発話文言, khóa theo id node page 1 (`p2_repeat_<id>`, `p2_retry_<id>`, `p2_fail_<id>`) | Join theo id để lấy `reconfirm`, `retryCount`, hành vi `failed`, câu thoại đầy đủ cho node `interaction` |
-| Node id | Bị mangle: tên tiếng Nhật → `___`, `____`, `_______` (khó đọc, dễ nhầm) | Phải **sinh lại id tiếng Anh có nghĩa** (`ask_visit_history`…) — việc AI làm tốt từ label tiếng Nhật |
-| Vị trí node | `mxGeometry` đầy đủ | Có thể giữ làm layout ban đầu, hoặc bỏ và chạy `ir/layout.ts` |
+| Page 1 `全体フロー図` | 37 node flow là `<object>` wrapper có attribute: `stepname`, `type` (`opening`=1, `hearing`=30, `termination`=6), `announce`, `repeat` | Parser lấy được text/loại thô — nhưng `hearing` KHÔNG đủ để chọn node IR (xem §5) |
+| Edge | 47 `mxCell edge` nối bằng `source`/`target` id | Dựng skeleton graph deterministic |
+| Nhãn nhánh (はい/いいえ/初診/再診…) | Text cell **trôi tự do** (`elbl_*`, parent=`1`), KHÔNG gắn vào edge | Gán nhãn↔edge bằng hình học (khoảng cách tới path của edge); LLM xác nhận lại chỗ mơ hồ |
+| Page 2 `アナウンス一覧` | Bảng 聴取項目/復唱/リトライ/失敗時/発話文言, khóa theo id node page 1 (`p2_repeat_<id>`…) | Join theo id → `reconfirm`, `retryCount`, hành vi thất bại, câu thoại đầy đủ |
+| Node id | Bị mangle: tên tiếng Nhật → `___`, `____` | LLM sinh id tiếng Anh có nghĩa (`ask_visit_history`…) |
+| Vị trí node | `mxGeometry` đầy đủ | Bỏ, chạy `ir/layout.ts` cho thống nhất (chốt khi review) |
 
-⚠️ File mẫu này vốn được sinh ra từ YAML bằng tool (agent ghi `yaml-to-drawio skill v2`),
-nên mới có attribute cấu trúc. **File do người vẽ tay sẽ không có** — chỉ có hình chữ
-nhật + text + màu. Thiết kế vì vậy có 2 làn: rule-based cho file chuẩn, AI cho file tự do.
+File vẽ tay của designer sẽ không có attribute `<object>` — chỉ có hình + text + màu.
+Pipeline vì vậy thiết kế để chạy được với input tối thiểu là "hình + text + dây".
 
-## 3. Kiến trúc tổng thể
+## 3. Vì sao map node/module bắt buộc cần LLM
+
+Điểm mấu chốt (từ góp ý review): một node `hearing` có nhiều edge ra **không map máy móc
+được** thành `interaction + nexus`. Phải hiểu câu thoại và bối cảnh mới chọn đúng
+node/module trong hệ thống:
+
+- 「1番はい、2番いいえでお答えください」 → `interaction` (DTMF) + `nexus` rẽ nhánh theo phím.
+- Hỏi tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm bằng giọng nói → `interaction`
+  (STT) **+ node `openai`** với prompt bỏ filler word, trích đúng tên thực thể
+  (đây là cách dùng OpenAI ưu tiên hiện tại của hệ thống).
+- Rẽ nhánh theo khoa khám → `classifier` module **Clinical Department Classifier**
+  (kèm danh sách khoa → output).
+- Rẽ theo ngày làm việc / thời điểm gọi / loại số gọi đến → `classifier` module
+  **Clinic Days / Date Of Call / Incoming Classifier**.
+- Kiểm tra số điện thoại, xác nhận lại ngày sinh → `normalization`
+  (**Phone Normalization / DOB Re-confirmation**).
+- Điều kiện tuỳ biến (giờ nhận cuộc gọi, cờ trạng thái…) → `logic` module **Script**
+  — LLM **sinh code JS** từ mô tả (như `check_hours` trong sample-flow.yaml),
+  hoặc **CMR / MRB / Null Check** khi khớp pattern.
+- Kết quả phân nhánh phải sinh đúng quy ước hệ thống: branch đánh giá **top-down**,
+  `FAILED = TIMEOUT|ERROR|NO_RESULT|INVALID`, catch-all `.*` nằm cuối
+  (theo `nodeSchema.ts`).
+
+⇒ Đây là quyết định ngữ nghĩa + sinh code + sinh prompt — đúng vùng của LLM.
+Phần deterministic chỉ lo **skeleton**: node nào, text gì, nối với node nào.
+
+## 4. Kiến trúc tổng thể
 
 ```mermaid
 flowchart TD
-    A[".drawio XML<br/>(upload từ máy / Drive)"] --> B["<b>1. parse.ts</b><br/>mxfile → DrawioGraph<br/>(thuần, deterministic)"]
-    B --> C["<b>2. associate.ts</b><br/>gán nhãn nhánh ↔ edge (hình học)<br/>join bảng アナウンス一覧 (page 2)"]
-    C --> D{"Node có attribute<br/>cấu trúc (type/stepname)?"}
-    D -- "Có (file sinh từ tool)" --> E["<b>3a. ruleMap.ts</b><br/>map deterministic → draft IR<br/>+ danh sách issue chưa chắc"]
-    D -- "Không / còn issue" --> F["<b>3b. aiMap.ts</b><br/>LLM structured-output<br/>graph JSON → draft IR<br/>(kèm confidence từng node)"]
-    E --> G["<b>4. validate.ts</b><br/>schema + graph invariants<br/>(id unique, edge resolve, start,<br/>branch ↔ sourceHandle khớp)"]
-    F --> G
-    G --> H["<b>5. Màn Review Import</b><br/>canvas render draft IR<br/>+ panel cảnh báo / node confidence thấp<br/>người dùng sửa tay"]
-    H --> I["flowStore (IR chính thức)"]
-    I --> J["toYaml (đã có) → .yaml lên Drive"]
+    A[".drawio XML<br/>(upload từ máy / Drive)"] --> B["<b>1. parse.ts</b> (thuần)<br/>mxfile → DrawioGraph<br/>node/text/màu/toạ độ/edge"]
+    B --> C["<b>2. associate.ts</b> (thuần)<br/>gán nhãn nhánh ↔ edge (hình học)<br/>join bảng アナウンス一覧 (page 2)"]
+    C --> D["<b>3. aiMap.ts — LLM (giai đoạn chính)</b><br/>① chọn NodeType + moduleType từng bước<br/>② dựng branches (when/regex, thứ tự top-down)<br/>③ sinh code Script, prompt OpenAI<br/>④ sinh id tiếng Anh, tách/gộp node<br/>⑤ confidence + lý do từng quyết định"]
+    D --> E["<b>4. validate.ts</b> (thuần)<br/>schema + graph invariants<br/>(id unique, edge resolve, start,<br/>branch ↔ sourceHandle, module hợp lệ)"]
+    E -- "lỗi → retry 1 lần kèm thông báo lỗi" --> D
+    E --> F["<b>5. Màn Review Import</b><br/>canvas render draft IR<br/>+ panel confidence/lý do, click → focus node<br/>người dùng sửa bằng NodeSettingsPanel"]
+    F --> G["flowStore (IR chính thức)"]
+    G --> H["toYaml (đã có) → .yaml lên Drive"]
 ```
 
-Bước 1–2–4 hoàn toàn deterministic và test được. AI chỉ nằm ở 3b, và output của AI
-bắt buộc đi qua validate + người review trước khi thành IR chính thức.
+Bước 1–2–4 deterministic, test được độc lập. Bước 3 là LLM nhưng bị kẹp giữa
+parser và validator + human review, nên sai sót của model luôn bị chặn lại trước
+khi thành YAML.
 
-## 4. Cấu trúc code mới
+## 5. Input cho LLM: catalog module + playbook chọn node
+
+LLM chỉ chọn đúng khi biết hệ thống có gì và quy ước dùng khi nào. Prompt gồm 3 phần:
+
+**(a) Catalog node/module** — sinh từ `src/ui/nodeSchema.ts` (một nguồn, không viết
+tay 2 nơi để khỏi lệch khi thêm module mới):
+
+| NodeType | Module | Tham số chính | Nhánh |
+|---|---|---|---|
+| `announce` | — | text | next |
+| `interaction` | — | announce, inputType (DTMF/STT), voiceType, reconfirm, retryCount/Announce | FAILED + next |
+| `nexus` | — | branches tự do | tự do |
+| `logic` | Script / MRB / CMR / Null Check | script (JS) / module tham chiếu / cặp match | tự do (Null Check: true/false) |
+| `classifier` | Clinic Days / Clinical Department / Incoming / Date Of Call | tuỳ module (CDEPT: list khoa→output) | cố định theo module (CDEPT sinh từ output) |
+| `normalization` | Phone Normalization / DOB Re-confirmation | mode, module tham chiếu, save | INVALID / SUCCESS |
+| `openai` | — | prompt, retryCount/Announce | FAILED + next |
+| `faq` / `transfer` / `save` / `jump` / `hangup` | (save: Flag / Save Data 2 Dr.JOY) | … | … |
+
+**(b) Playbook nghiệp vụ** (quy ước của team — phần này bạn bổ sung/duyệt được vì
+nằm trong 1 file prompt riêng `drawioMapPrompt.ts`):
+
+- OpenAI node: **ưu tiên dùng cho hậu xử lý hearing tự do** — bỏ filler word, trích
+  đúng tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm từ câu trả lời; KHÔNG
+  dùng OpenAI cho việc rẽ nhánh có module classifier chuyên dụng.
+- Chọn theo thứ tự ưu tiên: module chuyên dụng (classifier/normalization) → nexus
+  (rẽ đơn giản theo DTMF/kết quả) → logic Script (điều kiện tuỳ biến, LLM sinh code)
+  → openai (hiểu ngôn ngữ tự do).
+- Quy ước nhánh: FAILED regex, catch-all cuối, nhãn 次へ/失敗 (từ `nodeSchema.ts`).
+
+**(c) Few-shot** — vài cặp (fragment drawio đã chuẩn hoá → fragment IR đúng) lấy từ
+file mẫu này + sample-flow.yaml; sau này tích luỹ thêm từ những lần import được
+người dùng sửa lại (xem §8 Phase 3).
+
+**Cách gọi:** structured output theo JSON Schema của `FlowIR` (mở rộng thêm
+`confidence` + `reason` per node). Flow lớn chia theo subgraph liên thông rồi ghép.
+Validate fail → retry 1 lần kèm lỗi cụ thể.
+
+## 6. Cấu trúc code mới
 
 ```
 src/drawio/                 # THUẦN như ir/ — không import React
   types.ts                  # DrawioGraph, DrawioNode, DrawioEdge, AnnounceTableRow, ImportIssue
   parse.ts                  # XML (DOMParser) → DrawioGraph; hỗ trợ page nén deflate+base64 (pako)
   associate.ts              # nhãn↔edge theo hình học; join page アナウンス一覧 theo id
-  ruleMap.ts                # DrawioGraph → { draft: FlowIR, issues: ImportIssue[] }
-  validate.ts               # invariant check dùng chung cho cả 2 làn
+  validate.ts               # invariant check cho draft IR do LLM trả về
   drawio.test.ts            # unit test, fixture = file TEST.drawio rút gọn
-src/ai/                     # tầng gọi LLM, tách khỏi drawio/ để tái dùng sau này
+src/ai/                     # tầng gọi LLM, tách riêng để tái dùng (aiGenerate của openai node đã có chỗ dùng)
   LlmClient.ts              # interface + implementation (fetch); swappable transport
-  drawioMapPrompt.ts        # prompt + JSON schema of IR (structured output)
-  aiMap.ts                  # gọi LLM, validate JSON trả về, retry kèm lỗi
+  drawioMapPrompt.ts        # catalog (sinh từ nodeSchema) + playbook + few-shot + JSON schema
+  aiMap.ts                  # gọi LLM, validate, retry, chia subgraph
 src/components/
   ImportDrawioModal.tsx     # upload file, chạy pipeline, hiện tiến trình
-  ImportReviewPanel.tsx     # danh sách issue/confidence, click → focus node trên canvas
+  ImportReviewPanel.tsx     # confidence/lý do từng node, click → focus node trên canvas
 fixtures/
   sample-flow.drawio        # fixture test
 ```
 
-Điểm nối vào app: thêm mục "Import Draw.io" ở Toolbar/HeaderMenu (cạnh chỗ import YAML
-hiện tại — `flowStore` đã có action nhận text và gọi `fromYaml`; ta thêm action
-`importDrawio(xmlText)` tương tự nhưng trả về draft + issues thay vì set thẳng).
+Điểm nối vào app: mục "Import Draw.io" ở Toolbar/HeaderMenu; `flowStore` thêm action
+`importDrawio(xmlText)` trả về `{ draft, issues }` (không set thẳng IR).
 
-## 5. Quy tắc map (ruleMap — làn không cần AI)
-
-Với file có attribute cấu trúc như file mẫu:
-
-| Draw.io | IR |
-|---|---|
-| `type="opening"` + `announce` | node `announce` (text = announce) |
-| `type="hearing"` + announce, 1 edge ra | `interaction` (announce, inputType/retry từ bảng page 2) |
-| `type="hearing"` + **nhiều edge ra có nhãn** | tách thành `interaction` + `nexus` (mỗi nhãn nhánh → 1 `branch { when, to }`) — vì IR không cho `interaction` mang branches tự do |
-| `type="termination"` có câu thoại | `announce` + `hangup` (giống pattern `closed_announce → hangup` trong sample YAML) |
-| `type="termination"` không thoại | `hangup` |
-| Node đầu tiên (không có edge vào) | `flow.start` trỏ tới nó (node `__start__` tổng hợp như hiện tại) |
-| Bảng page 2: 復唱/リトライ/失敗時 | `reconfirm`, `retryCount`, edge `failed` → node xử lý thất bại |
-| Label tiếng Nhật | giữ làm `label`; **id mới** sinh bằng slug tiếng Anh (AI gợi ý hoặc romaji fallback) |
-
-Mọi chỗ rule không quyết được (nhãn nhánh không gán được vào edge nào, node màu lạ,
-text không rõ loại…) → đẩy vào `issues[]`, KHÔNG đoán bừa.
-
-## 6. Làn AI (aiMap) — dùng khi nào và chạy ở đâu
-
-**Dùng khi:** file vẽ tay không có attribute; hoặc rule-based còn `issues` (gán nhãn
-nhánh, phân loại node mơ hồ, sinh id/branch condition từ text tiếng Nhật).
-
-**Cách gọi:** 1 request structured-output. Input = DrawioGraph đã chuẩn hoá (JSON gọn:
-id, text, màu, hình, toạ độ, edges, bảng page 2) + JSON Schema của FlowIR + few-shot
-(cặp drawio-fragment → IR-fragment lấy từ chính file mẫu này). Output = draft FlowIR
-+ `confidence` per node. Nếu validate fail → retry 1 lần kèm thông báo lỗi. Flow lớn
-(>~100 node) chia theo subgraph liên thông rồi ghép.
-
-**Chạy ở đâu — cần bạn quyết (app là static site, không backend):**
+## 7. LLM chạy ở đâu — cần chốt (app là static site, không backend)
 
 | Phương án | Ưu | Nhược |
 |---|---|---|
-| **A. Gọi thẳng API LLM từ browser, key do user dán vào** (lưu localStorage như Drive token) | Không cần hạ tầng, làm nhanh nhất — hợp pilot nội bộ | Key nằm ở client; mỗi người phải có key |
-| **B. Serverless proxy (Cloud Run / Cloudflare Worker) giữ key công ty, verify Google ID token server-side** ✅ đề xuất cho bản chính | Key an toàn; tiện thể giải quyết luôn mục "verify auth server-side" trong README §Bảo mật; kiểm soát cost/log tập trung | Phải dựng + vận hành 1 endpoint |
-| C. Không AI ở v1 — chỉ rule-based, chỗ mơ hồ để người sửa tay trên canvas | Zero hạ tầng, file mẫu của bạn đã đủ cấu trúc để chạy làn này | File vẽ tay tự do sẽ import ra nhiều lỗ hổng phải sửa tay |
+| **A. Gọi thẳng API từ browser, key user dán vào** (lưu localStorage như Drive token) | Không cần hạ tầng, nhanh nhất — hợp pilot nội bộ | Key ở client; mỗi người cần key |
+| **B. Serverless proxy (Cloud Run / CF Worker) giữ key công ty, verify Google ID token server-side** ✅ đề xuất bản chính | Key an toàn; tiện thể giải quyết mục "verify auth server-side" trong README §Bảo mật; kiểm soát cost/log | Phải dựng + vận hành 1 endpoint |
 
-`LlmClient` viết dạng interface nên đổi A → B sau này không đụng logic map.
-Model: hệ thống đang dùng OpenAI (node `openai`) nên mặc định OpenAI API; đổi
-provider chỉ là đổi implementation của `LlmClient`.
-
-## 7. Màn Review Import (bắt buộc, kể cả làn rule)
-
-Import KHÔNG ghi đè flow ngay. Pipeline trả về `{ draft, issues }` →
-
-1. Canvas render draft IR (dùng chính `irToReactFlow` hiện có).
-2. Panel bên phải liệt kê issues: node confidence thấp, nhãn nhánh chưa gán,
-   node không phân loại được — click issue → focus node.
-3. Người dùng sửa trực tiếp bằng NodeSettingsPanel hiện có.
-4. Bấm "Xác nhận" → draft thành IR chính thức trong `flowStore` → Save lên Drive
-   qua đường `toYaml` bình thường.
+`LlmClient` là interface nên đổi A → B không đụng logic map. Hệ thống runtime đang
+dùng OpenAI, nhưng model cho việc **map thiết kế** chọn theo chất lượng
+code-gen/structured-output — quyết ở phase 2, không ảnh hưởng kiến trúc.
 
 ## 8. Lộ trình đề xuất
 
-- **Phase 1 (không AI):** `src/drawio/` parse + associate + ruleMap + validate
-  + modal import + màn review. File mẫu của bạn import được end-to-end ở phase này.
-  Unit test với fixture rút gọn từ file mẫu.
-- **Phase 2 (AI):** `src/ai/` + aiMap cho file vẽ tay tự do + confidence UI.
-  Cần chốt phương án A/B ở §6 trước khi làm.
-- **Phase 3 (sau):** nâng chất lượng — few-shot library theo mẫu vẽ của từng người
-  thiết kế, export ngược IR → drawio (đóng vòng tròn với tool yaml-to-drawio đang có).
+- **Phase 1 — skeleton + khung review:** `src/drawio/` parse + associate + validate
+  + modal import + màn review. Chưa có LLM thì draft chỉ gồm node `announce`/text thô
+  + edges — đủ để nhìn thấy flow trên canvas và kiểm chứng parser bằng file thật.
+- **Phase 2 — LLM mapping (giá trị chính):** `src/ai/` + catalog/playbook/few-shot
+  + confidence UI. Cần chốt phương án A/B ở §7 trước khi làm.
+- **Phase 3 — nâng chất lượng:** tích luỹ few-shot từ các lần import được người dùng
+  sửa; export ngược IR → drawio (đóng vòng với tool yaml-to-drawio đang có);
+  mở rộng aiGenerate trong NodeSettingsPanel (sinh prompt OpenAI, sinh script) dùng
+  chung `LlmClient`.
 
 ## 9. Câu hỏi cần chốt khi review
 
-1. **AI transport:** chọn A (key user, nhanh) hay B (serverless proxy, an toàn) — hay đi C→A→B theo phase?
-2. **Id node:** sinh id tiếng Anh mới (đề xuất) hay giữ id gốc drawio?
-3. **Vị trí node:** giữ toạ độ từ drawio làm layout ban đầu, hay bỏ và chạy auto-layout `ir/layout.ts` (đề xuất: chạy auto-layout cho thống nhất)?
-4. **Nguồn file:** chỉ upload từ máy, hay đọc luôn `.drawio` từ cây Google Drive hiện có?
-5. File drawio của các 施設 khác có cùng format 2-page (フロー図 + アナウンス一覧) không? Nếu format bảng page 2 ổn định thì rule join làm chặt được, không cần AI cho phần đó.
+1. **LLM transport:** A (key user, nhanh) hay B (serverless proxy) — hay A ở phase 2 rồi chuyển B?
+2. **Playbook §5(b):** các quy ước chọn module trên đã đúng ý chưa? Còn quy tắc nghiệp vụ nào cần thêm (vd khi nào bắt buộc reconfirm, khi nào transfer)?
+3. **Vị trí node:** chạy auto-layout `ir/layout.ts` (đề xuất) hay giữ toạ độ drawio?
+4. **Nguồn file:** chỉ upload từ máy, hay đọc `.drawio` từ cây Google Drive luôn?
+5. File drawio của các 施設 khác có cùng format 2-page (フロー図 + アナウンス一覧) không? Format bảng page 2 ổn định thì phần join làm chặt bằng rule.
