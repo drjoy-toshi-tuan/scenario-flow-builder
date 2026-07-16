@@ -1218,7 +1218,7 @@ body {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
-  white-space: normal;
+  white-space: pre-line;
   word-break: break-word;
   box-shadow: var(--bk-shadow);
   backdrop-filter: blur(2px);
