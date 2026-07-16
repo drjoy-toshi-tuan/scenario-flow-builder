@@ -15,6 +15,12 @@ export function gdErrorKey(input: unknown): TKey {
       return 'gdErrRateLimit';
     case 'popup':
       return 'gdErrPopup';
+    // Đường token proxy (tokenProxy.ts): 'revoked' = quyền bị thu hồi -> mời kết
+    // nối lại (thông điệp gdErrAuth khớp); 'mismatch' = chọn nhầm tài khoản trong popup.
+    case 'revoked':
+      return 'gdErrAuth';
+    case 'mismatch':
+      return 'gdErrMismatch';
     default:
       return 'gdErrOther';
   }

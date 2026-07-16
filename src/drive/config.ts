@@ -15,12 +15,29 @@ export const DRIVE_ROOT_FOLDER_ID =
   (import.meta.env.VITE_DRIVE_ROOT_FOLDER_ID as string | undefined) ||
   '1Fk0B99UkzyJok4So-xFjO5ywfCn57vI2';
 
+// ── Endpoint cấp/gia hạn token Drive trên proxy Vercel (xem proxy-vercel/api/drive-token.js) ──
+// Có URL này => dùng auth-code flow + refresh ngầm (KHÔNG popup mỗi giờ).
+// Không có => rơi về implicit flow cũ (popup GIS mỗi lần token hết hạn).
+// Ưu tiên VITE_DRIVE_TOKEN_URL; không đặt thì suy ra từ VITE_AI_PROXY_URL
+// (cùng project Vercel: .../api/chat -> .../api/drive-token).
+export const DRIVE_TOKEN_PROXY_URL = (() => {
+  const explicit = (import.meta.env.VITE_DRIVE_TOKEN_URL as string | undefined)?.trim();
+  if (explicit) return explicit;
+  const ai = (import.meta.env.VITE_AI_PROXY_URL as string | undefined)?.trim() || '';
+  return /\/api\/chat\/?$/.test(ai) ? ai.replace(/\/api\/chat\/?$/, '/api/drive-token') : '';
+})();
+
 export const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 export const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
 
 // Scope đầy đủ (consent screen Internal nên không cần Google verification).
 // Cần full `drive` (không phải drive.file) vì folder gốc tạo tay ngoài app.
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+
+// Scope cho auth-code flow (kết nối qua proxy): thêm openid+email để bước đổi
+// code trên server nhận được id_token — dùng đối chiếu "tài khoản chọn trong
+// popup Drive = tài khoản đang đăng nhập app" (xem proxy-vercel/api/drive-token.js).
+export const DRIVE_CODE_SCOPE = `openid email ${DRIVE_SCOPE}`;
 
 export const FOLDER_MIME = 'application/vnd.google-apps.folder';
 

@@ -46,7 +46,10 @@ fixtures/    # sample-flow.yaml (dữ liệu test cho unit test)
   KHÔNG verify chữ ký. Chặn bypass mạnh nhất = đặt OAuth consent screen **Internal** (xem README §Bảo mật).
 - Flow YAML lưu trên **Google Drive** (cây 施設名/シナリオ名/<シナリオ名>_V{N}.yaml) qua Drive REST API
   bằng access token OAuth của người dùng (consent 1 lần; token ~1h trong **localStorage**,
-  `drive/DriveTokenKeeper.tsx` tự gia hạn nền). `drive/` còn lại thuần fetch.
+  `drive/DriveTokenKeeper.tsx` tự gia hạn nền). Gia hạn ưu tiên đường **token proxy Vercel**
+  (`proxy-vercel/api/drive-token.js`: auth-code flow + refresh token niêm phong AES-GCM thành
+  `refresh_blob` client giữ — fetch ngầm, không popup); không có proxy thì fallback implicit flow
+  (popup GIS cưỡi user gesture). `drive/` còn lại thuần fetch.
 - Phân quyền app (owner/admin/user) lưu trên Drive: file `access-log.json` giữ danh sách admin
   + nhật ký truy cập (xem `drive/permissions.ts`). Owner cố định qua email.
 
