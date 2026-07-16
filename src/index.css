@@ -148,31 +148,68 @@ body {
   fill: var(--bk-edge);
 }
 
-/* Thanh công cụ canvas: nút toggle + dãy nút TRƯỢT NGANG (zoom/fit/lock/undo/redo). */
-.bk-canvas-controls {
+/* Thanh công cụ canvas: GIỮ kiểu "cũ" của React Flow Controls (phẳng, gộp 1 khối,
+   có đường kẻ ngăn giữa các nút) — nhưng nằm NGANG và trượt ra sau nút toggle. */
+.bk-ctrlbar {
   display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.bk-canvas-controls-tray {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: stretch;
+  width: max-content;
+  border-radius: 12px;
   overflow: hidden;
-  /* Đóng: co về 0 chiều ngang, mờ, lùi nhẹ trái -> tạo cảm giác "trượt ra". */
+  border: 1px solid var(--bk-border);
+  box-shadow: var(--bk-shadow);
+  background: var(--bk-surface);
+}
+.bk-ctrlbar-btn {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  width: 34px;
+  border: 0;
+  background: var(--bk-surface);
+  color: var(--bk-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+/* Đường kẻ ngăn: mỗi nút trong dãy trượt có viền trái (kể cả nút đầu -> ngăn với
+   nút toggle). Nút toggle (con trực tiếp của .bk-ctrlbar) không có viền. */
+.bk-ctrlbar-tray > .bk-ctrlbar-btn {
+  border-left: 1px solid var(--bk-border);
+}
+.bk-ctrlbar-btn:hover:not(:disabled) {
+  background: var(--bk-surface-2);
+  color: var(--bk-accent);
+}
+.bk-ctrlbar-btn--active {
+  background: var(--bk-surface-2);
+  color: var(--bk-accent);
+}
+.bk-ctrlbar-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.bk-ctrlbar-btn svg {
+  fill: currentColor;
+}
+.bk-ctrlbar-tray {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  /* Đóng: co về 0 chiều ngang + mờ -> cảm giác "trượt ra" từ nút toggle. */
   max-width: 0;
   opacity: 0;
-  transform: translateX(-8px);
   pointer-events: none;
   transition:
     max-width 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.1),
-    opacity 0.18s ease,
-    transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+    opacity 0.18s ease;
 }
-.bk-canvas-controls-tray--open {
+.bk-ctrlbar-tray--open {
   max-width: 320px;
   opacity: 1;
-  transform: translateX(0);
   pointer-events: auto;
 }
 

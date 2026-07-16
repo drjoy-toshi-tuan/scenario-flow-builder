@@ -233,6 +233,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     redo: 'Làm lại',
     // Thanh công cụ canvas (ngang, trượt ra từ nút toggle)
     ctrlTools: 'Công cụ canvas',
+    ctrlClose: 'Đóng',
     ctrlZoomIn: 'Phóng to',
     ctrlZoomOut: 'Thu nhỏ',
     ctrlFitView: 'Vừa khung hình',
@@ -581,6 +582,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     redo: 'やり直し',
     // キャンバスツールバー（横並び・トグルボタンからスライド展開）
     ctrlTools: 'キャンバスツール',
+    ctrlClose: '閉じる',
     ctrlZoomIn: '拡大',
     ctrlZoomOut: '縮小',
     ctrlFitView: '画面に合わせる',

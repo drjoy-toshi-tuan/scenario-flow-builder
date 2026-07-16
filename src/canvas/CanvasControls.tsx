@@ -6,16 +6,14 @@ import { Icon } from '../ui/icons';
 import { HoverLabelButton } from '../components/HoverTip';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Thanh công cụ canvas (thay <Controls> mặc định của React Flow):
-//   - 1 nút toggle (icon fluent:column-triple-20-filled) — bấm để TRƯỢT NGANG mở
-//     dãy nút zoom / fit / lock / undo / redo (thay vì thanh dọc cũ).
-//   - Mở/đóng qua store.canvasPanel === 'controls' nên TỰ loại trừ với panel
-//     "Thêm node" / "Main-Sub Flow" (mở cái này thì cái kia đóng).
-// Hover mỗi nút hiện tooltip (VI/JA theo ngôn ngữ hiện tại) qua HoverLabelButton.
+// Thanh công cụ canvas (thay <Controls> mặc định của React Flow) — GIỮ kiểu nút
+// "cũ" (phẳng, gộp 1 khối, có đường kẻ ngăn) nhưng nằm NGANG và trượt ra sau 1 nút:
+//   - Nút toggle: đóng = icon 3 cột (fluent:column-triple-20-filled); mở = dấu X
+//     (báo hiệu bấm để đóng). Bấm mở/đóng dãy nút zoom/fit/lock/undo/redo.
+//   - Mở/đóng qua store.canvasPanel === 'controls' -> TỰ loại trừ với panel
+//     "Thêm node" / "Main-Sub Flow"; click ra ngoài cũng đóng.
+// Hover mỗi nút hiện tooltip (VI/JA theo ngôn ngữ hiện tại).
 // ─────────────────────────────────────────────────────────────────────────────
-
-const BTN_CLASS =
-  'flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] text-[var(--bk-text-muted)] shadow-[var(--bk-shadow)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)] hover:shadow-md active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:border-[var(--bk-border)] disabled:hover:text-[var(--bk-text-muted)] disabled:hover:shadow-[var(--bk-shadow)]';
 
 export function CanvasControls() {
   // Mở/đóng qua store để loại trừ với các panel canvas khác (spec chung).
@@ -63,7 +61,7 @@ export function CanvasControls() {
   }, [open]);
 
   return (
-    <div ref={wrapRef} className="bk-canvas-controls">
+    <div ref={wrapRef} className="bk-ctrlbar">
       <button
         type="button"
         // Toggle tại mousedown (tránh mất click khi panel khác đóng cùng lúc làm
@@ -72,47 +70,47 @@ export function CanvasControls() {
         onClick={(e) => {
           if (e.detail === 0) setOpen(!open);
         }}
-        className={`${BTN_CLASS} ${open ? 'border-[var(--bk-accent)] text-[var(--bk-accent)]' : ''}`}
+        className={`bk-ctrlbar-btn ${open ? 'bk-ctrlbar-btn--active' : ''}`}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={t('ctrlTools')}
-        title={t('ctrlTools')}
+        aria-label={open ? t('ctrlClose') : t('ctrlTools')}
+        title={open ? t('ctrlClose') : t('ctrlTools')}
       >
-        <Icon icon="fluent:column-triple-20-filled" width={17} height={17} />
+        <Icon icon={open ? 'lucide:x' : 'fluent:column-triple-20-filled'} width={16} height={16} />
       </button>
 
       {/* Dãy nút LUÔN mounted (inert khi đóng nhờ pointer-events) để trượt được cả 2 chiều. */}
       <div
         role="menu"
         aria-hidden={!open}
-        className={`bk-canvas-controls-tray ${open ? 'bk-canvas-controls-tray--open' : ''}`}
+        className={`bk-ctrlbar-tray ${open ? 'bk-ctrlbar-tray--open' : ''}`}
       >
-        <HoverLabelButton label={t('ctrlZoomIn')} className={BTN_CLASS} placement="top" onClick={() => void zoomIn({ duration: 200 })}>
-          <Icon icon="fluent:zoom-in-20-filled" width={17} height={17} />
+        <HoverLabelButton label={t('ctrlZoomIn')} className="bk-ctrlbar-btn" placement="top" onClick={() => void zoomIn({ duration: 200 })}>
+          <Icon icon="fluent:zoom-in-20-filled" width={16} height={16} />
         </HoverLabelButton>
-        <HoverLabelButton label={t('ctrlZoomOut')} className={BTN_CLASS} placement="top" onClick={() => void zoomOut({ duration: 200 })}>
-          <Icon icon="fluent:zoom-out-20-filled" width={17} height={17} />
+        <HoverLabelButton label={t('ctrlZoomOut')} className="bk-ctrlbar-btn" placement="top" onClick={() => void zoomOut({ duration: 200 })}>
+          <Icon icon="fluent:zoom-out-20-filled" width={16} height={16} />
         </HoverLabelButton>
-        <HoverLabelButton label={t('ctrlFitView')} className={BTN_CLASS} placement="top" onClick={() => void fitView({ padding: 0.2, duration: 250 })}>
-          <Icon icon="fluent:arrow-fit-20-filled" width={17} height={17} />
+        <HoverLabelButton label={t('ctrlFitView')} className="bk-ctrlbar-btn" placement="top" onClick={() => void fitView({ padding: 0.2, duration: 250 })}>
+          <Icon icon="fluent:arrow-fit-20-filled" width={16} height={16} />
         </HoverLabelButton>
         <HoverLabelButton
           label={interactive ? t('ctrlLock') : t('ctrlUnlock')}
-          className={BTN_CLASS}
+          className="bk-ctrlbar-btn"
           placement="top"
           onClick={toggleInteractivity}
         >
           <Icon
             icon={interactive ? 'fluent:lock-open-20-filled' : 'fluent:lock-closed-20-filled'}
-            width={17}
-            height={17}
+            width={16}
+            height={16}
           />
         </HoverLabelButton>
-        <HoverLabelButton label={t('undo')} className={BTN_CLASS} placement="top" disabled={!canUndo} onClick={() => undo()}>
-          <Icon icon="fa7-solid:undo-alt" width={14} height={14} />
+        <HoverLabelButton label={t('undo')} className="bk-ctrlbar-btn" placement="top" disabled={!canUndo} onClick={() => undo()}>
+          <Icon icon="fa7-solid:undo-alt" width={13} height={13} />
         </HoverLabelButton>
-        <HoverLabelButton label={t('redo')} className={BTN_CLASS} placement="top" disabled={!canRedo} onClick={() => redo()}>
-          <Icon icon="fa7-solid:redo-alt" width={14} height={14} />
+        <HoverLabelButton label={t('redo')} className="bk-ctrlbar-btn" placement="top" disabled={!canRedo} onClick={() => redo()}>
+          <Icon icon="fa7-solid:redo-alt" width={13} height={13} />
         </HoverLabelButton>
       </div>
     </div>
