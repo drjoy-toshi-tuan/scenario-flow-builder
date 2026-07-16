@@ -157,6 +157,10 @@ function announceLines(ir: FlowIR, token: string): string[] {
       lines.push(promptLine(`リトライ_${name}`, str(node.data.retryAnnounce), token));
     } else if (node.type === 'openai') {
       lines.push(promptLine(`リトライ_LLM_${name}`, str(node.data.retryAnnounce), token));
+    } else if (node.type === 'hangup') {
+      // Câu 終話 phát trước khi cúp máy — field mới, flow cũ chưa có nên chỉ ghi khi có nội dung.
+      const text = str(node.data.announce);
+      if (text.trim()) lines.push(promptLine(name, text, token));
     }
   }
   return lines;

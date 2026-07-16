@@ -535,7 +535,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
   ],
   // Jump: chọn sub flow để nhảy tới (danh sách sub flow sẽ bổ sung sau).
   jump: [{ key: 'subflow', labelKey: 'fSubflow', kind: 'searchSelect', optionsFrom: 'subflows' }],
-  hangup: [],
+  // Hangup: câu 終話 (announce chào kết thúc) phát trước khi cúp máy.
+  hangup: [{ key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' }],
 };
 
 // Nhánh cố định: VALUE (name, hiển thị ^name$); LABEL mặc định là 次へ / 失敗 —

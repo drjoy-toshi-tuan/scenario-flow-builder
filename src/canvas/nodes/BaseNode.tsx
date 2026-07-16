@@ -26,7 +26,9 @@ export function makeNode(nodeType: NodeType) {
 
   function TypedNode({ id, data, selected }: NodeProps) {
     const d = data as unknown as RFNodeData;
-    const description = pickDescription(d.nodeData);
+    // Dòng dưới tên node: mô tả tự nhập; không có thì hiện NỘI DUNG chính của node
+    // (câu announce/終話) — nhìn node là nắm được nội dung, chi tiết xem ở hover preview.
+    const description = pickDescription(d.nodeData) ?? pickContent(nodeType, d.nodeData);
     const handles = d.sourceHandles;
     const selectNode = useFlowStore((s) => s.selectNode);
     const requestDeleteNode = useFlowStore((s) => s.requestDeleteNode);
@@ -191,10 +193,23 @@ function SourceHandle({ id, label, style }: { id: string; label?: string; style?
   );
 }
 
-// Mô tả là field do người dùng tự nhập (data.description). Không lấy text/prompt
-// làm mô tả — những field đó chỉ sửa trong panel setting.
+// Mô tả là field do người dùng tự nhập (data.description) — luôn được ưu tiên.
 function pickDescription(data: Record<string, unknown>): string | null {
   const value = data.description;
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+// Field NỘI DUNG chính theo loại node (câu announce/終話) — fallback cho dòng mô tả
+// khi người dùng không tự nhập description (CSS cắt 1 dòng + "…", đầy đủ xem preview).
+const CONTENT_KEYS: Partial<Record<NodeType, string>> = {
+  announce: 'text',
+  interaction: 'announce',
+  transfer: 'announce',
+  hangup: 'announce',
+};
+function pickContent(type: NodeType, data: Record<string, unknown>): string | null {
+  const key = CONTENT_KEYS[type];
+  const value = key ? data[key] : undefined;
   return typeof value === 'string' && value.trim() ? value : null;
 }
 

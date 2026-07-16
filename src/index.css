@@ -260,7 +260,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 18px;
   background: var(--bk-surface);
   border: 1px solid var(--bk-border);
   box-shadow: var(--bk-shadow);

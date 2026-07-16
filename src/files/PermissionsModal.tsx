@@ -1,13 +1,14 @@
 import { useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { SlideToggle } from '../components/SlideToggle';
-import { OWNER_EMAIL, resolveRole, type PermissionsData } from '../drive/permissions';
+import { OWNER_EMAIL, resolveRole, type Department, type PermissionsData } from '../drive/permissions';
 import { formatDateTime } from '../ir/ivrProperty';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal 権限管理 — CHỈ owner thấy (mở từ menu màn quản lý flow). Liệt kê các tài
-// khoản đã truy cập app (tự ghi nhận mỗi lần vào màn Drive) và cho owner gạt
-// quyền Admin/User từng người. Không đóng khi click ra ngoài — chỉ nút Đóng.
+// khoản đã truy cập app (tự ghi nhận mỗi lần vào màn Drive), cho owner gạt
+// quyền Admin/User và bộ phận CS/TS từng người (nhân sự chuyển bộ phận thì owner
+// đổi ở đây). Không đóng khi click ra ngoài — chỉ nút Đóng.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function PermissionsModal({
@@ -15,6 +16,7 @@ export function PermissionsModal({
   busy,
   error,
   onChangeRole,
+  onChangeDepartment,
   onClose,
 }: {
   data: PermissionsData;
@@ -23,6 +25,8 @@ export function PermissionsModal({
   error?: string | null;
   // makeAdmin=true -> cấp Admin; false -> về User. Không truyền -> chỉ xem (mock).
   onChangeRole?: (email: string, makeAdmin: boolean) => void;
+  // Gạt bộ phận CS/TS. Không truyền -> chỉ xem (mock).
+  onChangeDepartment?: (email: string, department: Department) => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -52,8 +56,8 @@ export function PermissionsModal({
 
   return (
     <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true">
-      {/* bk-modal mặc định 380px — nới cho bảng 3 cột + ảnh đại diện (style đè trực tiếp, không dùng important của Tailwind) */}
-      <div className="bk-modal" style={{ maxWidth: 600 }}>
+      {/* bk-modal mặc định 380px — nới cho bảng 4 cột + ảnh đại diện (style đè trực tiếp, không dùng important của Tailwind) */}
+      <div className="bk-modal" style={{ maxWidth: 680 }}>
         <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
             <Icon icon="app:key-draw" width={15} height={15} />
@@ -67,6 +71,7 @@ export function PermissionsModal({
               <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
                 <th className="px-3 py-2">{t('pmColUser')}</th>
                 <th className="px-3 py-2 whitespace-nowrap">{t('pmColLastAccess')}</th>
+                <th className="px-3 py-2 text-right">{t('pmColDept')}</th>
                 <th className="px-3 py-2 text-right">{t('pmColRole')}</th>
               </tr>
             </thead>
@@ -103,6 +108,16 @@ export function PermissionsModal({
                       {fmt(m.lastAccessAt)}
                     </td>
                     <td className="px-3 py-2 text-right">
+                      {/* Bộ phận gạt được cho MỌI thành viên (kể cả owner) — chưa gán
+                          thì cả 2 nút đều nhạt để owner thấy ai còn thiếu. */}
+                      <DeptToggle
+                        value={m.department}
+                        disabled={busy || !onChangeDepartment}
+                        onSelect={(d) => onChangeDepartment?.(m.email, d)}
+                        ariaLabel={`${t('pmColDept')}: ${m.email}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
                       {role === 'owner' ? (
                         roleBadge(t('pmRoleOwner'), 'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]')
                       ) : (
@@ -126,7 +141,7 @@ export function PermissionsModal({
               })}
               {others.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-xs text-[var(--bk-text-faint)]">
+                  <td colSpan={4} className="px-3 py-4 text-center text-xs text-[var(--bk-text-faint)]">
                     {t('pmEmpty')}
                   </td>
                 </tr>
@@ -152,6 +167,46 @@ export function PermissionsModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Cặp nút CS/TS gạt bộ phận. KHÔNG dùng SlideToggle vì cần trạng thái "chưa gán"
+// (không bên nào sáng) — SlideToggle luôn coi 1 trong 2 bên là đang chọn.
+function DeptToggle({
+  value,
+  disabled,
+  onSelect,
+  ariaLabel,
+}: {
+  value?: Department;
+  disabled: boolean;
+  onSelect: (d: Department) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className="inline-flex overflow-hidden rounded-full border border-[var(--bk-border)] text-[11px] font-semibold"
+    >
+      {(['cs', 'ts'] as const).map((d) => (
+        <button
+          key={d}
+          type="button"
+          role="radio"
+          aria-checked={value === d}
+          disabled={disabled}
+          onClick={() => value !== d && onSelect(d)}
+          className={
+            value === d
+              ? 'bg-[var(--bk-accent)] px-2.5 py-1 text-white'
+              : 'px-2.5 py-1 text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]'
+          }
+        >
+          {d.toUpperCase()}
+        </button>
+      ))}
     </div>
   );
 }

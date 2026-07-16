@@ -29,6 +29,8 @@ import {
   recordAccess,
   resolveRole,
   saveAdmins,
+  saveDepartment,
+  type Department,
   type PermMember,
   type PermissionsData,
 } from '../drive/permissions';
@@ -540,6 +542,25 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     }
   };
 
+  // Owner gạt bộ phận CS/TS cho 1 thành viên trong modal 権限管理 — ghi vào
+  // members của cùng file access-log.json.
+  const changeDepartment = async (email: string, department: Department) => {
+    if (busy) return;
+    setBusy(true);
+    setPermError(null);
+    try {
+      const log = await saveDepartment(token, email, department);
+      setAdmins(log.admins);
+      setMembers(log.members);
+      showToast(t('pmSaved'));
+    } catch (err) {
+      if (handledAsExpired(err)) return;
+      setPermError(t(gdErrorKey(err)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Đọc subflowCount cho các version của 1 kịch bản khi người dùng vào tầng flow
   // (mỗi version có thể khác nhau nên phải đọc từng file — lazy + cache để không
   // tải cả kho khi load danh sách). Chạy nền, không khoá UI.
@@ -745,6 +766,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
           ? {
               data: { admins, members },
               onChangeRole: (email, makeAdmin) => void changeRole(email, makeAdmin),
+              onChangeDepartment: (email, department) => void changeDepartment(email, department),
               error: permError,
             }
           : null
@@ -782,6 +804,7 @@ function DriveInner({
   permissions?: {
     data: PermissionsData;
     onChangeRole?: (email: string, makeAdmin: boolean) => void;
+    onChangeDepartment?: (email: string, department: Department) => void;
     error?: string | null; // lỗi khi đổi quyền (hiện trong modal)
   } | null;
 }) {
@@ -1941,6 +1964,7 @@ function DriveInner({
           busy={busy}
           error={permissions.error}
           onChangeRole={permissions.onChangeRole}
+          onChangeDepartment={permissions.onChangeDepartment}
           onClose={() => setShowPermissions(false)}
         />
       )}

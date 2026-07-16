@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@xyflow/react';
+import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import type { FlowIR, FlowNode, NodeType } from '../ir/types';
 import { sourceHandlesFor, BRANCH_SCHEMA } from '../ui/nodeSchema';
 
@@ -68,6 +68,12 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
   });
 
   const nodeById = new Map(ir.nodes.map((n) => [n.id, n]));
+  // Số dây ĐI RA thực tế của mỗi node — node >1 dây ra là "đang rẽ nhánh thật",
+  // nhãn nhánh trên các dây đó luôn hiện (không tính theo handle: interaction luôn
+  // có 2 handle FAILED/NEXT nhưng thường chỉ nối 1 dây -> đừng rải "次へ" khắp canvas).
+  const outCount = new Map<string, number>();
+  for (const e of ir.edges) outCount.set(e.source, (outCount.get(e.source) ?? 0) + 1);
+
   const edges: Edge[] = ir.edges.map((e) => {
     const handles = handlesByNode.get(e.source) ?? [];
     // Nhãn của handle mà dây xuất phát (FAILED/NEXT hoặc giá trị nhánh).
@@ -89,10 +95,15 @@ export function irToReactFlow(ir: FlowIR): { nodes: Node[]; edges: Edge[] } {
       label:
         (isFixed || mode === 'editable' || handles.length > 1 ? matched : undefined) ??
         conditionOutputLabel(e.condition ?? e.label),
+      // Mũi tên ở đầu đích cho MỌI dây — thấy ngay chiều đi của nhánh. Màu đồng bộ
+      // token qua CSS .react-flow__arrowhead (index.css).
+      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
       data: {
         condition: e.condition,
-        // Node condition/script: nhãn giá trị nhánh luôn hiện; node khác chỉ hiện khi hover.
-        alwaysLabel: srcNode ? BRANCH_SCHEMA[srcNode.type].mode === 'editable' : false,
+        // Nhãn nhánh LUÔN hiện khi node nguồn thật sự rẽ nhánh: nhánh tự do
+        // (nexus/logic/jump) hoặc có >1 dây ra (vd NEXT + FAILED đều nối). Node chỉ
+        // nối 1 đường ra giữ hover-only để canvas không đầy chữ "次へ" thừa.
+        alwaysLabel: mode === 'editable' || (outCount.get(e.source) ?? 0) > 1,
       } satisfies RFEdgeData,
     };
   });
