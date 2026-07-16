@@ -349,9 +349,6 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     // Template (テンプレート): chọn mẫu -> tự set + khoá các tham số bên dưới.
     { key: 'template', labelKey: 'fTemplate', kind: 'select', options: TEMPLATE_OPTIONS },
     { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
-    // Re-confirm (復唱): ngay dưới Announce; bật -> hiện Re-confirm Announce (復唱アナウンス).
-    { key: 'reconfirm', labelKey: 'fReconfirm', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
-    { key: 'reconfirmAnnounce', labelKey: 'fReconfirmAnnounce', kind: 'autoText', showIf: reconfirmOn },
     { key: 'inputType', labelKey: 'fInputType', kind: 'select', options: INPUT_TYPE_OPTIONS, default: 'STT' },
     {
       key: 'voiceType',
@@ -361,10 +358,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       default: 'TEXT',
       showIf: inputHasStt,
     },
-    { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
-    // Retry Announce luôn nằm ngay dưới Retry Count.
-    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText' },
-    // Word List (単語登録リスト): mỗi dòng "từ gốc(漢字/カタカナ/ひらがな) [dấu cách] cách đọc(ひらがな)".
+    // Word List (単語登録リスト): nằm giữa Voice Type và Retry Count.
+    // Mỗi dòng "từ gốc(漢字/カタカナ/ひらがな) [dấu cách] cách đọc(ひらがな)".
     {
       key: 'profile_words',
       labelKey: 'fProfileWords',
@@ -372,6 +367,12 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
       rows: 4,
       placeholder: '例: 診療 しんりょう',
     },
+    // Re-confirm (復唱): dưới Word List; bật -> hiện Re-confirm Announce (復唱アナウンス).
+    { key: 'reconfirm', labelKey: 'fReconfirm', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
+    { key: 'reconfirmAnnounce', labelKey: 'fReconfirmAnnounce', kind: 'autoText', showIf: reconfirmOn },
+    { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
+    // Retry Announce luôn nằm ngay dưới Retry Count.
+    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText' },
   ],
   nexus: [
     { key: 'saveContext', labelKey: 'fSaveContext', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
