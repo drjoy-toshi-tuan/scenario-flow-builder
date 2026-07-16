@@ -3,8 +3,6 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
-  ControlButton,
   MiniMap,
   Panel,
   SelectionMode,
@@ -21,13 +19,12 @@ import {
 } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import { useTheme } from '../ui/theme';
-import { useT } from '../ui/i18n';
-import { Icon } from '../ui/icons';
 import type { NodeType } from '../ir/types';
 import { irToReactFlow } from './irAdapter';
 import { nodeTypes } from './nodes';
 import { edgeTypes } from './edges/DeletableEdge';
 import { AddModulePanel, DND_MIME } from '../components/AddModulePanel';
+import { CanvasControls } from './CanvasControls';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canvas React Flow. IR là source of truth:
@@ -59,10 +56,7 @@ export function FlowCanvas() {
   const pasteNodes = useFlowStore((s) => s.pasteNodes);
   const undo = useFlowStore((s) => s.undo);
   const redo = useFlowStore((s) => s.redo);
-  const canUndo = useFlowStore((s) => s.past.length > 0);
-  const canRedo = useFlowStore((s) => s.future.length > 0);
   const theme = useTheme((s) => s.theme);
-  const t = useT();
   const { screenToFlowPosition } = useReactFlow();
   const store = useStoreApi();
 
@@ -293,15 +287,10 @@ export function FlowCanvas() {
         <AddModulePanel />
       </Panel>
       <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
-      <Controls>
-        {/* Undo / Redo cùng thanh với zoom/fit/lock. */}
-        <ControlButton onClick={() => undo()} disabled={!canUndo} title={t('undo')} aria-label={t('undo')}>
-          <Icon icon="fa7-solid:undo-alt" />
-        </ControlButton>
-        <ControlButton onClick={() => redo()} disabled={!canRedo} title={t('redo')} aria-label={t('redo')}>
-          <Icon icon="fa7-solid:redo-alt" />
-        </ControlButton>
-      </Controls>
+      {/* Thanh công cụ canvas NGANG (zoom/fit/lock/undo/redo) sau 1 nút toggle. */}
+      <Panel position="bottom-left">
+        <CanvasControls />
+      </Panel>
       <MiniMap pannable zoomable />
     </ReactFlow>
   );

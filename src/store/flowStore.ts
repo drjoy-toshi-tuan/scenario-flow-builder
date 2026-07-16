@@ -59,9 +59,10 @@ interface FlowState {
   // Xoá sub flow — đang đứng trong nó thì đưa về main flow.
   deleteSubflow: (id: string) => void;
 
-  // Panel nổi vùng canvas ('Thêm node' / 'Main-Sub Flow') — mở panel này tự đóng panel kia.
-  canvasPanel: 'addNode' | 'flows' | null;
-  setCanvasPanel: (panel: 'addNode' | 'flows' | null) => void;
+  // Panel nổi vùng canvas ('Thêm node' / 'Main-Sub Flow' / 'Công cụ canvas') —
+  // mở panel này tự đóng các panel kia (cùng 1 ô canvasPanel).
+  canvasPanel: 'addNode' | 'flows' | 'controls' | null;
+  setCanvasPanel: (panel: 'addNode' | 'flows' | 'controls' | null) => void;
 
   // Đang kéo/di chuyển canvas (pan/zoom) -> ẩn thanh công cụ nổi trên node.
   isPanning: boolean;

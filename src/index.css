@@ -148,6 +148,75 @@ body {
   fill: var(--bk-edge);
 }
 
+/* Thanh công cụ canvas: GIỮ kiểu "cũ" của React Flow Controls (phẳng, gộp 1 khối,
+   có đường kẻ ngăn giữa các nút) — nhưng nằm NGANG và trượt ra sau nút toggle. */
+.bk-ctrlbar {
+  display: flex;
+  align-items: stretch;
+  width: max-content;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--bk-border);
+  box-shadow: var(--bk-shadow);
+  /* Nền giảm nhẹ opacity (~85%) + blur -> cảm giác hơi trong suốt (glass). */
+  background: color-mix(in srgb, var(--bk-surface) 85%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.bk-ctrlbar-btn {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  width: 34px;
+  border: 0;
+  /* Trong suốt để lộ nền hơi mờ của .bk-ctrlbar phía dưới. */
+  background: transparent;
+  color: var(--bk-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+/* Đường kẻ ngăn: mỗi nút trong dãy trượt có viền trái (kể cả nút đầu -> ngăn với
+   nút toggle). Nút toggle (con trực tiếp của .bk-ctrlbar) không có viền. */
+.bk-ctrlbar-tray > .bk-ctrlbar-btn {
+  border-left: 1px solid var(--bk-border);
+}
+.bk-ctrlbar-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bk-surface-2) 85%, transparent);
+  color: var(--bk-accent);
+}
+.bk-ctrlbar-btn--active {
+  background: color-mix(in srgb, var(--bk-surface-2) 85%, transparent);
+  color: var(--bk-accent);
+}
+.bk-ctrlbar-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.bk-ctrlbar-btn svg {
+  fill: currentColor;
+}
+.bk-ctrlbar-tray {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  /* Đóng: co về 0 chiều ngang + mờ -> cảm giác "trượt ra" từ nút toggle. */
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    max-width 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.1),
+    opacity 0.18s ease;
+}
+.bk-ctrlbar-tray--open {
+  max-width: 320px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Controls + MiniMap: bo góc, đổ bóng, nền theo token. */
 .react-flow__controls {
   border-radius: 12px;

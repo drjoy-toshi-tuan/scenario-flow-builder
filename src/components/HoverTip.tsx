@@ -82,14 +82,19 @@ export function useClipTip(ref: RefObject<HTMLElement | null>, content: string) 
 // Hook: tooltip LUÔN hiện khi hover (không cần cắt chữ) — dùng cho nhãn nhánh trên
 // chấm output ở đáy node. Khi output CHƯA nối dây thì không có edge mang nhãn, nên
 // hover chấm là cách duy nhất xem nhánh này là nhánh nào (label ở Branch Settings).
-// Tooltip hiện phía DƯỚI vì chấm nằm ở đáy node.
-export function useHoverLabel(ref: RefObject<HTMLElement | null>, content: string) {
+// `placement` chọn phía hiện tooltip: 'bottom' (mặc định, cho chấm ở đáy node) hoặc
+// 'top' (cho nút nằm sát mép DƯỚI màn hình — vd thanh công cụ canvas — kẻo bị cắt).
+export function useHoverLabel(
+  ref: RefObject<HTMLElement | null>,
+  content: string,
+  placement: 'top' | 'bottom' = 'bottom',
+) {
   const { show, hide, tip } = useFloatingTip(content);
 
   const onMouseEnter = () => {
     const el = ref.current;
     if (!el || !content) return;
-    show(el.getBoundingClientRect(), true);
+    show(el.getBoundingClientRect(), placement === 'bottom');
   };
 
   return { onMouseEnter, onMouseLeave: hide, tip };
@@ -102,17 +107,19 @@ export function HoverLabelButton({
   label,
   className,
   disabled,
+  placement = 'bottom',
   onClick,
   children,
 }: {
   label: string; // text tooltip (đã dịch) — cũng là aria-label
   className?: string;
   disabled?: boolean;
+  placement?: 'top' | 'bottom'; // phía hiện tooltip (mặc định dưới)
   onClick?: () => void;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const { onMouseEnter, onMouseLeave, tip } = useHoverLabel(ref, label);
+  const { onMouseEnter, onMouseLeave, tip } = useHoverLabel(ref, label, placement);
 
   return (
     <button
