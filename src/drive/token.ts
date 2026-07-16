@@ -81,6 +81,45 @@ export function validDriveToken(state: { token: string | null; expiresAt: number
   return state.token && state.expiresAt > Date.now() + EXPIRY_MARGIN_MS ? state.token : null;
 }
 
+// ── refresh_blob theo email (đường gia hạn ngầm qua proxy Vercel) ──
+//
+// Blob = refresh token Google đã bị proxy MÃ HOÁ (client không đọc được) — xem
+// tokenProxy.ts. Lưu localStorage kèm email: đổi tài khoản thì blob cũ vô hiệu
+// (proxy cũng tự chặn vì blob bị niêm phong theo tài khoản, đây chỉ là lớp UX).
+
+const REFRESH_BLOB_KEY = 'brekeke-flow-builder.drive.refresh';
+
+export function saveDriveRefreshBlob(email: string, blob: string): void {
+  try {
+    localStorage.setItem(
+      REFRESH_BLOB_KEY,
+      JSON.stringify({ email: email.trim().toLowerCase(), blob }),
+    );
+  } catch {
+    // localStorage không khả dụng — mất đường gia hạn ngầm, vẫn chạy được.
+  }
+}
+
+export function loadDriveRefreshBlob(email: string | undefined): string | null {
+  if (!email) return null;
+  try {
+    const raw = localStorage.getItem(REFRESH_BLOB_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as { email?: string; blob?: string };
+    return data.email === email.trim().toLowerCase() && data.blob ? data.blob : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearDriveRefreshBlob(): void {
+  try {
+    localStorage.removeItem(REFRESH_BLOB_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 // ── Cờ consent theo email (đổi tài khoản thì phải chấp thuận lại) ──
 
 export function markDriveConsent(email: string): void {

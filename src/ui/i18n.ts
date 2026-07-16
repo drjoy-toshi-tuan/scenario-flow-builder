@@ -351,6 +351,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     gdErrNetwork: 'Không kết nối được Google Drive. Kiểm tra mạng rồi thử lại.',
     gdErrRateLimit: 'Đã chạm giới hạn tần suất Google Drive. Thử lại sau ít phút.',
     gdErrPopup: 'Popup Google bị chặn hoặc bị đóng giữa chừng. Hãy cho phép popup rồi thử lại.',
+    gdErrMismatch:
+      'Tài khoản Google chọn trong popup khác tài khoản đang đăng nhập app. Hãy chọn đúng tài khoản đang dùng rồi thử lại.',
     gdErrOther: 'Có lỗi khi gọi Google Drive. Thử lại.',
     loginDemoNotice:
       'Chưa cấu hình VITE_GOOGLE_CLIENT_ID. Bạn đang xem bản demo UI — đăng nhập Google bị tắt.',
@@ -690,6 +692,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     gdErrNetwork: 'Google Drive に接続できません。ネットワークを確認して再試行してください。',
     gdErrRateLimit: 'Google Drive のレート制限に達しました。しばらくして再試行してください。',
     gdErrPopup: 'Googleのポップアップがブロックまたは閉じられました。ポップアップを許可して再試行してください。',
+    gdErrMismatch:
+      'ポップアップで選択したGoogleアカウントが、アプリにログイン中のアカウントと異なります。同じアカウントを選択して再試行してください。',
     gdErrOther: 'Google Drive の呼び出しでエラーが発生しました。再試行してください。',
     loginDemoNotice:
       'VITE_GOOGLE_CLIENT_ID が未設定です。UIデモを表示中 — Googleログインは無効です。',
