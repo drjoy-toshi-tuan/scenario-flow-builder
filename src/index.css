@@ -349,6 +349,9 @@ body {
    - Điểm đến (target) không cần chấm tròn — mũi tên ở cuối dây là đủ.
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
+  /* Nới ngang +20px so với node TS: tên 17px căn giữa THEO NODE cần lề trái/phải
+     đối xứng 58px (né icon) — không nới thì tên ~12 ký tự đã bị cắt "…". */
+  width: 264px;
   height: 70px;
   padding: 10px 14px;
   /* Nền pha nhẹ accent — cùng icon loại (nhỏ) giúp nhận diện loại node. */
@@ -368,12 +371,17 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* Kéo giãn theo chiều cao node: tên BÁM MÉP TRÊN, icon biểu thị BÁM MÉP DƯỚI
-     -> 2 dòng tách xa nhau rõ ràng. */
+  /* Tên đã tách thành lớp tuyệt đối -> cột này chỉ còn icon biểu thị, ghim đáy. */
   align-self: stretch;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
+/* Tên node: lớp tuyệt đối phủ ngang node với lề trái/phải ĐỐI XỨNG (đủ né icon)
+   -> tâm chữ trùng đúng TÂM NODE, không bị icon/indicator xô lệch. */
 .bk-node-name--cs {
+  position: absolute;
+  top: 9px;
+  left: 58px;
+  right: 58px;
   text-align: center;
   font-size: 17px;
 }
