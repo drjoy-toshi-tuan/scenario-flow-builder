@@ -44,7 +44,10 @@ Pipeline vì vậy thiết kế để chạy được với input tối thiểu 
 được** thành `interaction + nexus`. Phải hiểu câu thoại và bối cảnh mới chọn đúng
 node/module trong hệ thống:
 
-- 「1番はい、2番いいえでお答えください」 → `interaction` (DTMF) + `nexus` rẽ nhánh theo phím.
+- 「1番はい、2番いいえでお答えください」 → `interaction` (DTMF), nhánh success (`next`)
+  nối vào `nexus` để **save input người dùng** (saveContext/contextName/contextType)
+  và rẽ nhánh theo giá trị đã nhận; nhánh `failed` của interaction KHÔNG vào nexus —
+  đi đường riêng (retry announce / hangup / transfer theo bảng 失敗時 ở page 2).
 - Hỏi tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm bằng giọng nói → `interaction`
   (STT) **+ node `openai`** với prompt bỏ filler word, trích đúng tên thực thể
   (đây là cách dùng OpenAI ưu tiên hiện tại của hệ thống).
@@ -93,7 +96,7 @@ tay 2 nơi để khỏi lệch khi thêm module mới):
 |---|---|---|---|
 | `announce` | — | text | next |
 | `interaction` | — | announce, inputType (DTMF/STT), voiceType, reconfirm, retryCount/Announce | FAILED + next |
-| `nexus` | — | branches tự do | tự do |
+| `nexus` | — | saveContext, contextName, contextType (lưu input user đã nói/bấm) | tự do — chỉ nhận nhánh success của interaction, KHÔNG nhận FAILED |
 | `logic` | Script / MRB / CMR / Null Check | script (JS) / module tham chiếu / cặp match | tự do (Null Check: true/false) |
 | `classifier` | Clinic Days / Clinical Department / Incoming / Date Of Call | tuỳ module (CDEPT: list khoa→output) | cố định theo module (CDEPT sinh từ output) |
 | `normalization` | Phone Normalization / DOB Re-confirmation | mode, module tham chiếu, save | INVALID / SUCCESS |
@@ -106,9 +109,12 @@ nằm trong 1 file prompt riêng `drawioMapPrompt.ts`):
 - OpenAI node: **ưu tiên dùng cho hậu xử lý hearing tự do** — bỏ filler word, trích
   đúng tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm từ câu trả lời; KHÔNG
   dùng OpenAI cho việc rẽ nhánh có module classifier chuyên dụng.
-- Chọn theo thứ tự ưu tiên: module chuyên dụng (classifier/normalization) → nexus
-  (rẽ đơn giản theo DTMF/kết quả) → logic Script (điều kiện tuỳ biến, LLM sinh code)
-  → openai (hiểu ngôn ngữ tự do).
+- Pattern chuẩn sau mỗi hearing: `interaction --next--> nexus` (nexus save input +
+  rẽ nhánh theo giá trị); nhánh `failed` của interaction nối riêng theo cột 失敗時
+  của bảng page 2, không bao giờ trỏ vào nexus.
+- Chọn node rẽ nhánh theo thứ tự ưu tiên: module chuyên dụng (classifier/normalization)
+  → nexus (save + rẽ theo giá trị input vừa nhận) → logic Script (điều kiện tuỳ biến,
+  LLM sinh code) → openai (hiểu ngôn ngữ tự do).
 - Quy ước nhánh: FAILED regex, catch-all cuối, nhãn 次へ/失敗 (từ `nodeSchema.ts`).
 
 **(c) Few-shot** — vài cặp (fragment drawio đã chuẩn hoá → fragment IR đúng) lấy từ
