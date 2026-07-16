@@ -349,25 +349,42 @@ body {
    - Điểm đến (target) không cần chấm tròn — mũi tên ở cuối dây là đủ.
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
-  height: 46px;
-  padding: 6px 14px 6px 16px;
-  /* Không còn icon loại -> màu phải "gánh" việc nhận diện: nền pha nhẹ accent. */
+  height: 70px;
+  padding: 10px 14px;
+  /* Nền pha nhẹ accent — cùng icon loại (nhỏ) giúp nhận diện loại node. */
   background: color-mix(in srgb, var(--accent) 5%, var(--bk-surface));
 }
 /* Dải accent trái dày hơn (6px) — tín hiệu loại node chính trên màn CS. */
 .bk-node--cs::before {
   background: linear-gradient(90deg, var(--accent) 0 6px, transparent 6px);
 }
-.bk-node--cs .bk-node-name {
+/* Bố cục CS: xếp DỌC căn GIỮA — hàng (icon loại nhỏ + tên) trên, icon biểu thị dưới. */
+.bk-node-body--cs {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.bk-cs-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.bk-cs-type-icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+.bk-cs-title .bk-node-name {
   font-size: 13.5px;
 }
-/* Dải icon biểu thị cấu hình (announce/reconfirm/retry/số transfer…). */
+/* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators). */
 .bk-cs-indicators {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 7px;
-  color: var(--bk-text-muted);
+  gap: 9px;
 }
 .bk-cs-ind {
   display: inline-flex;
@@ -380,12 +397,13 @@ body {
   line-height: 1;
 }
 /* Hõm "khoét" ở cạnh đáy node: hình tròn màu NỀN CANVAS đè lên mép node, clip giữ
-   nửa TRÊN (nửa nằm trong node) -> nhìn như node bị lẹm vào một miếng tròn. */
+   nửa TRÊN (nửa nằm trong node) -> nhìn như node bị lẹm vào một miếng tròn.
+   Hõm TO HƠN chấm nối (18px vs 12px): chấm nằm lọt trong hõm, hở ra một khe nhỏ. */
 .bk-cs-notch {
   position: absolute;
-  bottom: -8px;
-  width: 16px;
-  height: 16px;
+  bottom: -9px;
+  width: 18px;
+  height: 18px;
   transform: translateX(-50%);
   border-radius: 9999px;
   background: var(--bk-canvas);
@@ -393,9 +411,9 @@ body {
   clip-path: inset(-1px -1px 50% -1px);
   pointer-events: none;
 }
-/* Chấm output tách RỜI khỏi node (cách hõm 1 đoạn) — dây bắt đầu từ chấm này. */
+/* Chấm output nằm LỌT GIỮA hõm (tâm trùng mép đáy node) — khe hở = phần hõm thừa. */
 .bk-node--cs .react-flow__handle.bk-handle.react-flow__handle-bottom {
-  bottom: -22px;
+  bottom: -6px;
 }
 /* Điểm đến: ẩn chấm tròn (mũi tên cuối dây thay thế) — vẫn nối dây vào được. */
 .bk-node--cs .react-flow__handle.bk-handle.target {

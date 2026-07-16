@@ -135,9 +135,11 @@ export function makeNode(nodeType: NodeType) {
         {showTarget && <Handle type="target" position={Position.Top} className="bk-handle" />}
 
         {csMode ? (
-          // CS: chỉ TÊN node + icon biểu thị cấu hình — loại node nhận diện bằng màu.
-          <div className="bk-node-body">
-            <div className="bk-node-text">
+          // CS: xếp DỌC căn giữa — (icon loại NHỎ + tên node) ở trên, dải icon biểu
+          // thị cấu hình (mỗi loại một màu riêng) ở dưới.
+          <div className="bk-node-body bk-node-body--cs">
+            <div className="bk-cs-title">
+              <Icon icon={cfg.icon} className="bk-cs-type-icon" width={14} height={14} />
               <div className="bk-node-name" title={d.label}>
                 {d.label}
               </div>
@@ -224,25 +226,44 @@ function SourceHandle({ id, label, style }: { id: string; label?: string; style?
 // Chỉ hiện icon của cấu hình CÓ THẬT — node trống thì không có icon nào.
 function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unknown> }) {
   const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-  const icons: { key: string; icon: string; title: string; text?: string }[] = [];
+  // Mỗi loại biểu thị một MÀU cố định riêng (không theo accent node) để nhìn phát
+  // phân biệt được ngay: announce xanh lá, reconfirm hổ phách, retry chàm, phone sky.
+  const icons: { key: string; icon: string; title: string; color: string; text?: string }[] = [];
 
   const announceText = str(type === 'announce' ? data.text : data.announce);
-  if (announceText) icons.push({ key: 'announce', icon: 'lucide:volume-2', title: announceText });
+  if (announceText)
+    icons.push({ key: 'announce', icon: 'lucide:volume-2', title: announceText, color: '#10b981' });
   if (type === 'interaction') {
     if (data.reconfirm === 'yes')
-      icons.push({ key: 'reconfirm', icon: 'lucide:rotate-ccw', title: str(data.reconfirmAnnounce) || 'Re-confirm' });
+      icons.push({
+        key: 'reconfirm',
+        icon: 'lucide:rotate-ccw',
+        title: str(data.reconfirmAnnounce) || 'Re-confirm',
+        color: '#f59e0b',
+      });
     // Retry: hiện số lần (default 2) — icon vòng lặp + con số nhỏ.
     const retry = str(data.retryCount) || '2';
-    icons.push({ key: 'retry', icon: 'lucide:refresh-cw', title: str(data.retryAnnounce), text: retry });
+    icons.push({
+      key: 'retry',
+      icon: 'lucide:refresh-cw',
+      title: str(data.retryAnnounce),
+      color: '#6366f1',
+      text: retry,
+    });
   }
   if (type === 'transfer' && str(data.transferNumber))
-    icons.push({ key: 'phone', icon: 'lucide:phone-forwarded', title: str(data.transferNumber) });
+    icons.push({
+      key: 'phone',
+      icon: 'lucide:phone-forwarded',
+      title: str(data.transferNumber),
+      color: '#0ea5e9',
+    });
 
   if (icons.length === 0) return null;
   return (
     <div className="bk-cs-indicators">
       {icons.map((it) => (
-        <span key={it.key} className="bk-cs-ind" title={it.title}>
+        <span key={it.key} className="bk-cs-ind" title={it.title} style={{ color: it.color }}>
           <Icon icon={it.icon} width={13} height={13} />
           {it.text && <span className="bk-cs-ind-num">{it.text}</span>}
         </span>
