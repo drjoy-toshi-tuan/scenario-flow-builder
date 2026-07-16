@@ -635,16 +635,16 @@ describe('logic module mới: Incoming Classifier / Date Of Call Classifier', ()
     ]);
   });
 
-  it('bộ nhánh CỐ ĐỊNH của Phone Type Classifier: catch-all(その他) + 携帯/固定 (kèm label)', () => {
+  it('bộ nhánh CỐ ĐỊNH của Phone Type Classifier: 携帯/固定 + catch-all(その他) (kèm label)', () => {
     expect(MODULE_FIXED_BRANCHES[LOGIC_MODULE_PHONE_TYPE]).toEqual([
-      { id: CATCH_ALL_ID, value: '', label: 'その他' },
       { id: 'b0', value: '携帯', label: '携帯' },
       { id: 'b1', value: '固定', label: '固定' },
+      { id: CATCH_ALL_ID, value: 'その他', label: 'その他' },
     ]);
     // Không có tham số riêng: PROPERTY_FIELDS của classifier không có field nào showIf theo Phone Type.
     expect(
       effectiveBranches('classifier', { moduleType: LOGIC_MODULE_PHONE_TYPE }).map((b) => b.value),
-    ).toEqual(['', '携帯', '固定']);
+    ).toEqual(['携帯', '固定', 'その他']);
   });
 
   it('catchAllEditable: IC/DOCC/Phone Type đều KHÔNG sửa được catch-all (chỉ nexus/MRB)', () => {

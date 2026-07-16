@@ -628,12 +628,12 @@ export const IC_FIXED_BRANCHES: readonly DataBranch[] = [
   { id: 'b4', value: '携帯', label: '携帯' },
 ] as const;
 
-// Phone Type Classifier: catch-all (その他) + 携帯/固定 — bộ nhánh CỐ ĐỊNH,
-// value lẫn label đều không sửa được.
+// Phone Type Classifier: 携帯/固定 + catch-all (その他) — bộ nhánh CỐ ĐỊNH,
+// value lẫn label đều không sửa được. Thứ tự hiển thị: 携帯 → 固定 → その他 (cuối).
 export const PHONE_TYPE_FIXED_BRANCHES: readonly DataBranch[] = [
-  { id: CATCH_ALL_ID, value: '', label: 'その他' },
   { id: 'b0', value: '携帯', label: '携帯' },
   { id: 'b1', value: '固定', label: '固定' },
+  { id: CATCH_ALL_ID, value: 'その他', label: 'その他' },
 ] as const;
 
 // Date Of Call Classifier: catch-all chính là nhánh ^ERROR$ (vai trò giống FAILED,

@@ -20,6 +20,7 @@ import {
   CATCH_ALL_ID,
   LOGIC_MODULE_SCRIPT,
   LOGIC_MODULE_CDC,
+  LOGIC_MODULE_PHONE_TYPE,
   type PropertyField,
 } from '../ui/nodeSchema';
 import { Icon } from '../ui/icons';
@@ -916,9 +917,12 @@ function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknow
   const branches =
     pairMode || fixedModule ? effectiveBranches(node.type, data) : readBranches(data);
   const catchAllValue = catchAllDisplay(branches);
-  // Clinic Days Classifier: nhánh catch-all (診療日) để CUỐI cùng theo yêu cầu; các
-  // module/loại khác giữ catch-all ở trên đầu như cũ.
-  const catchAllLast = node.type === 'classifier' && logicModuleOf(data) === LOGIC_MODULE_CDC;
+  // Clinic Days Classifier / Phone Type Classifier: nhánh catch-all (診療日/その他) để
+  // CUỐI cùng theo yêu cầu; các module/loại khác giữ catch-all ở trên đầu như cũ.
+  const catchAllModule = logicModuleOf(data);
+  const catchAllLast =
+    node.type === 'classifier' &&
+    (catchAllModule === LOGIC_MODULE_CDC || catchAllModule === LOGIC_MODULE_PHONE_TYPE);
   const catchAllBranch = branches.filter((b) => b.id === CATCH_ALL_ID);
   const otherBranches = branches.filter((b) => b.id !== CATCH_ALL_ID);
   const ordered = catchAllLast
