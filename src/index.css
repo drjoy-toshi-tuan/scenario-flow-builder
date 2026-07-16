@@ -255,7 +255,7 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node {
   position: relative;
-  width: 244px;
+  width: 280px;
   height: 80px;
   display: flex;
   flex-direction: column;
@@ -349,13 +349,14 @@ body {
    - Điểm đến (target) không cần chấm tròn — mũi tên ở cuối dây là đủ.
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
-  /* Nới ngang +20px so với node TS: tên 17px căn giữa THEO NODE cần lề trái/phải
-     đối xứng 58px (né icon) — không nới thì tên ~12 ký tự đã bị cắt "…". */
-  width: 264px;
-  height: 70px;
+  /* Cao tối thiểu 70px, tên dài xuống dòng (tối đa 2 dòng) thì node tự cao thêm. */
+  height: auto;
+  min-height: 70px;
   padding: 10px 14px;
   /* Nền pha nhẹ accent — cùng icon loại (nhỏ) giúp nhận diện loại node. */
   background: color-mix(in srgb, var(--accent) 5%, var(--bk-surface));
+  /* Viền cùng tông màu node nhưng nhạt — không dùng viền xám chung. */
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-surface));
 }
 /* Dải accent trái dày hơn (6px) — tín hiệu loại node chính trên màn CS. */
 .bk-node--cs::before {
@@ -371,19 +372,22 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* Tên đã tách thành lớp tuyệt đối -> cột này chỉ còn icon biểu thị, ghim đáy. */
+  /* Tên bám mép trên, icon biểu thị bám mép dưới -> 2 dòng tách xa nhau. */
   align-self: stretch;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 4px;
 }
-/* Tên node: lớp tuyệt đối phủ ngang node với lề trái/phải ĐỐI XỨNG (đủ né icon)
-   -> tâm chữ trùng đúng TÂM NODE, không bị icon/indicator xô lệch. */
+/* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
+   mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ. */
 .bk-node-name--cs {
-  position: absolute;
-  top: 9px;
-  left: 58px;
-  right: 58px;
   text-align: center;
   font-size: 17px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators). */
 .bk-cs-indicators {
