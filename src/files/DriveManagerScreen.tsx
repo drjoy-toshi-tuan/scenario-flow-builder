@@ -51,8 +51,10 @@ import { formatDateTime } from '../ir/ivrProperty';
 // vào danh sách kịch bản, tầng シナリオ vào danh sách phiên bản, tầng バージョン
 // mở file lên canvas. Không còn nút "Mở" riêng.
 //
-// Cột デプロイ状況 đọc từ appProperties.appliedVersion trên folder シナリオ — phần
-// chờ cho phase deploy (bot Selenium sẽ ghi giá trị này sau khi deploy thành công).
+// Cột デプロイバージョン đọc từ appProperties trên folder シナリオ — phần chờ cho
+// phase deploy (bot Selenium sẽ ghi sau khi deploy thành công): mỗi môi trường 1 key
+//   appliedVersionMaster (本番) / appliedVersionDemo (デモ)
+// key cũ appliedVersion (1 môi trường) vẫn đọc được — coi là bản deploy MASTER.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface VersionNode {
@@ -72,7 +74,9 @@ export interface ScenarioNode {
   id: string;
   name: string;
   createdAt?: string; // createdTime của folder シナリオ (作成日時)
-  appliedV: number | null; // version đang chạy trên hệ thống AI電話 (null = chưa deploy)
+  // Version đang chạy trên từng môi trường AI電話 (null = môi trường đó chưa deploy).
+  appliedMaster: number | null; // 本番
+  appliedDemo: number | null; // デモ
   versions: VersionNode[]; // sắp DESC theo v (mới nhất trước)
 }
 
@@ -179,7 +183,8 @@ const MOCK_FACILITIES: FacilityNode[] = [
         id: 's1',
         name: '診療予約',
         createdAt: '2026-07-02 14:00',
-        appliedV: 2,
+        appliedMaster: 2,
+        appliedDemo: 3,
         versions: [
           { fileId: 'm1', v: 3, createdAt: '2026-07-14 18:22', updatedAt: '2026-07-15 10:05', author: 'Tuan Nguyen', subflowCount: 3, note: 'Đang chỉnh lại nhánh xác nhận ngày sinh — CHƯA deploy bản này.' },
           { fileId: 'm2', v: 2, createdAt: '2026-07-10 09:41', updatedAt: '2026-07-12 14:20', author: 'Tuan Nguyen', subflowCount: 2, note: 'V2 đang chạy thật trên tổng đài. Trước khi deploy bản mới cần xác nhận lại giờ tiếp nhận với bệnh viện.' },
@@ -190,7 +195,8 @@ const MOCK_FACILITIES: FacilityNode[] = [
         id: 's2',
         name: '予約変更・キャンセル',
         createdAt: '2026-07-08 11:20',
-        appliedV: 1,
+        appliedMaster: 1,
+        appliedDemo: null,
         versions: [
           { fileId: 'm4', v: 1, createdAt: '2026-07-08 11:30', updatedAt: '2026-07-08 11:30', author: '田中 花子', subflowCount: 1 },
         ],
@@ -199,7 +205,8 @@ const MOCK_FACILITIES: FacilityNode[] = [
         id: 's3',
         name: '休診日案内',
         createdAt: '2026-07-12 16:40',
-        appliedV: null,
+        appliedMaster: null,
+        appliedDemo: null,
         versions: [
           { fileId: 'm5', v: 2, createdAt: '2026-07-15 08:12', updatedAt: '2026-07-15 08:12', author: 'Tuan Nguyen', subflowCount: 0 },
           { fileId: 'm6', v: 1, createdAt: '2026-07-12 16:48', updatedAt: '2026-07-13 09:02', author: '佐藤 健', subflowCount: 0 },
@@ -212,12 +219,13 @@ const MOCK_FACILITIES: FacilityNode[] = [
     name: '聖路加国際病院',
     createdAt: '2026-05-02 10:15',
     scenarios: [
-      { id: 's4', name: '診療予約', createdAt: '2026-05-04 09:00', appliedV: 22, versions: MANY_VERSIONS },
+      { id: 's4', name: '診療予約', createdAt: '2026-05-04 09:00', appliedMaster: 22, appliedDemo: 24, versions: MANY_VERSIONS },
       {
         id: 's5',
         name: '検査結果案内',
         createdAt: '2026-07-11 17:00',
-        appliedV: null,
+        appliedMaster: null,
+        appliedDemo: null,
         versions: [
           { fileId: 'm7', v: 1, createdAt: '2026-07-11 17:19', updatedAt: '2026-07-11 17:19', author: '田中 花子', subflowCount: 2 },
         ],
@@ -233,7 +241,8 @@ const MOCK_FACILITIES: FacilityNode[] = [
         id: 's6',
         name: '診療時間案内',
         createdAt: '2026-07-06 10:30',
-        appliedV: 1,
+        appliedMaster: 1,
+        appliedDemo: 2,
         versions: [
           { fileId: 'm8', v: 2, createdAt: '2026-07-14 19:55', updatedAt: '2026-07-14 19:55', author: '田中 花子', subflowCount: 1 },
           { fileId: 'm9', v: 1, createdAt: '2026-07-06 10:33', updatedAt: '2026-07-07 15:41', author: '田中 花子', subflowCount: 0 },
@@ -248,7 +257,14 @@ const MOCK_FACILITIES: FacilityNode[] = [
 const MOCK_PERMISSIONS: PermissionsData = {
   admins: ['ha.pham@drjoy.jp'],
   members: [
-    { email: 'tuan.nguyen4@drjoy.jp', name: 'Tuan Nguyen', lastAccessAt: '2026-07-15T09:12:00+09:00' },
+    {
+      email: 'tuan.nguyen4@drjoy.jp',
+      name: 'Tuan Nguyen',
+      // Ảnh đại diện mẫu (SVG inline, không gọi mạng) — review UI ảnh tròn ở modal.
+      picture:
+        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="%230ea5e9"/><circle cx="32" cy="24" r="12" fill="white"/><path d="M8 62c0-13 11-20 24-20s24 7 24 20z" fill="white"/></svg>',
+      lastAccessAt: '2026-07-15T09:12:00+09:00',
+    },
     { email: 'ha.pham@drjoy.jp', name: 'Ha Pham', lastAccessAt: '2026-07-14T18:40:00+09:00' },
     { email: 'hanako.tanaka@drjoy.jp', name: '田中 花子', lastAccessAt: '2026-07-13T10:05:00+09:00' },
   ],
@@ -333,16 +349,24 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
     versByParent.set(parent, [...(versByParent.get(parent) ?? []), node]);
   }
 
+  // Đọc số version deploy từ appProperties (chuỗi) — không hợp lệ/<=0 coi như chưa deploy.
+  const readApplied = (raw: string | undefined): number | null => {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
   const scenByParent = new Map<string, ScenarioNode[]>();
   for (const s of scen) {
     const parent = s.parents?.[0];
     if (!parent) continue;
-    const applied = Number(s.appProperties?.appliedVersion);
+    const props = s.appProperties ?? {};
     const node: ScenarioNode = {
       id: s.id,
       name: s.name,
       createdAt: fmtTime(s.createdTime),
-      appliedV: Number.isFinite(applied) && applied > 0 ? applied : null,
+      // Key cũ appliedVersion (1 môi trường) -> coi là bản deploy MASTER (本番).
+      appliedMaster: readApplied(props.appliedVersionMaster) ?? readApplied(props.appliedVersion),
+      appliedDemo: readApplied(props.appliedVersionDemo),
       versions: (versByParent.get(s.id) ?? []).sort((a, b) => b.v - a.v),
     };
     scenByParent.set(parent, [...(scenByParent.get(parent) ?? []), node]);
@@ -441,7 +465,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     void (async () => {
       try {
         const log = user?.email
-          ? await recordAccess(token, { email: user.email, name: user.name })
+          ? await recordAccess(token, { email: user.email, name: user.name, picture: user.picture })
           : await loadAccessLog(token);
         if (!cancelled) {
           setMembers(log.members);
@@ -1021,7 +1045,7 @@ function DriveInner({
         case 'latest':
           return latestOf(s) || undefined;
         case 'applied':
-          return s.appliedV ?? undefined;
+          return s.appliedMaster ?? s.appliedDemo ?? undefined;
         case 'createdAt':
           return s.createdAt;
         case 'updatedAt':
@@ -1403,19 +1427,27 @@ function DriveInner({
                           </td>
                           <td className={`${cell} font-semibold`}>{latest ? `V${latest}` : '—'}</td>
                           <td className={cell}>
-                            {s.appliedV == null ? (
+                            {/* Stamp môi trường + V{N} đang chạy, bố cục giống badge Main|Sub flow
+                                (ngăn bằng gạch đứng); môi trường chưa deploy thì KHÔNG hiện. */}
+                            {s.appliedMaster == null && s.appliedDemo == null ? (
                               <span className="text-[var(--bk-text-faint)]">—</span>
                             ) : (
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                  s.appliedV === latest
-                                    ? 'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#16a34a]'
-                                    : 'bg-amber-100 text-amber-700'
-                                }`}
-                                title={t('dmAppliedBadge')}
-                              >
-                                <Icon icon="lucide:circle-check" width={12} height={12} />
-                                V{s.appliedV}
+                              <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--bk-text-muted)]">
+                                {s.appliedMaster != null && (
+                                  <span className="flex items-center gap-1">
+                                    <EnvStamp env="master" />
+                                    <span>V{s.appliedMaster}</span>
+                                  </span>
+                                )}
+                                {s.appliedMaster != null && s.appliedDemo != null && (
+                                  <span aria-hidden className="h-3.5 w-px bg-[var(--bk-border)]" />
+                                )}
+                                {s.appliedDemo != null && (
+                                  <span className="flex items-center gap-1">
+                                    <EnvStamp env="demo" />
+                                    <span>V{s.appliedDemo}</span>
+                                  </span>
+                                )}
                               </span>
                             )}
                           </td>
@@ -1459,7 +1491,9 @@ function DriveInner({
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-[var(--bk-border)]">
-                      {renderSortTh('v', 'colVersion', 'w-[380px] min-w-[300px]')}
+                      {renderSortTh('v', 'colVersion', 'w-[340px] min-w-[280px]')}
+                      {/* Môi trường đã deploy bản này (stamp MASTER/DEMO) — không sort */}
+                      <th className={th}>{t('colDeployedEnv')}</th>
                       {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       {renderSortTh('author', 'colAuthor')}
@@ -1470,7 +1504,8 @@ function DriveInner({
                   <tbody>
                     {pageSlice(versionRows).map((ver) => {
                       const isLatest = ver.v === latestOf(scenario);
-                      const isApplied = scenario.appliedV === ver.v;
+                      const onMaster = scenario.appliedMaster === ver.v;
+                      const onDemo = scenario.appliedDemo === ver.v;
                       return (
                         // Click bất kỳ chỗ nào trên dòng (trừ cột thao tác) = mở bản này lên canvas.
                         <tr
@@ -1479,7 +1514,6 @@ function DriveInner({
                           onClick={() => {
                             if (!busy) actions.onOpenVersion?.(facility, scenario, ver);
                           }}
-                          title={t('fmOpen')}
                           className="group cursor-pointer border-b border-[var(--bk-border)] transition last:border-0 hover:bg-[var(--bk-surface-2)]"
                         >
                           <td className={cell}>
@@ -1495,18 +1529,26 @@ function DriveInner({
                               {ver.subflowCount !== undefined && (
                                 <FlowStructureBadge subflowCount={ver.subflowCount} />
                               )}
-                              {isApplied && (
-                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[color-mix(in_srgb,#16a34a_14%,transparent)] px-2 py-0.5 text-xs font-semibold text-[#16a34a]">
-                                  <Icon icon="lucide:circle-check" width={12} height={12} />
-                                  {t('dmAppliedBadge')}
-                                </span>
-                              )}
                               {isLatest && (
-                                <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--bk-accent)] px-2 py-0.5 text-[11px] font-semibold text-[var(--bk-accent)]">
-                                  {t('dmLatestBadge')}
+                                <span
+                                  className="inline-flex shrink-0 items-center text-[#b026ff]"
+                                  title={t('dmLatestBadge')}
+                                >
+                                  <Icon icon="mdi:new-box" width={20} height={20} />
                                 </span>
                               )}
                             </div>
+                          </td>
+                          <td className={cell}>
+                            {/* Bản này đang chạy trên môi trường nào (stamp MASTER/DEMO). */}
+                            {!onMaster && !onDemo ? (
+                              <span className="text-[var(--bk-text-faint)]">—</span>
+                            ) : (
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                {onMaster && <EnvStamp env="master" />}
+                                {onDemo && <EnvStamp env="demo" />}
+                              </span>
+                            )}
                           </td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.createdAt}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.updatedAt}</td>
@@ -1872,6 +1914,26 @@ function DriveInner({
         />
       )}
     </div>
+  );
+}
+
+// Stamp môi trường deploy: MAS/本番 (xanh emerald ngả cyan) / DEM/デモ (cam) — nền
+// đặc, chữ trắng bold (KHÔNG nghiêng). Font cùng phong cách với logo (Space Grotesk):
+// tiếng Nhật dùng Zen Kaku Gothic New — cùng chất geometric/hiện đại.
+function EnvStamp({ env }: { env: 'master' | 'demo' }) {
+  const t = useT();
+  const master = env === 'master';
+  return (
+    <span
+      title={t('dmAppliedBadge')}
+      className="inline-flex shrink-0 items-center rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-widest text-white"
+      style={{
+        background: master ? '#10b981' : '#f97316',
+        fontFamily: "'Space Grotesk', 'Zen Kaku Gothic New', sans-serif",
+      }}
+    >
+      {t(master ? 'dmEnvMaster' : 'dmEnvDemo')}
+    </span>
   );
 }
 

@@ -35,6 +35,8 @@ export type NodeType =
   | 'interaction' // thu DTMF hoặc STT (tên cũ: input)
   | 'nexus' // phân nhánh theo điều kiện (tên cũ: condition)
   | 'logic' // module logic / script (tên cũ: script)
+  | 'classifier' // các module PHÂN LOẠI (tách từ logic): Clinic Days / Clinical Department / Incoming / Date Of Call
+  | 'normalization' // các module CHUẨN HOÁ (tách từ logic): Phone Normalization / DOB Re-confirmation
   | 'openai' // gọi OpenAI / LLM (tên cũ: llm)
   | 'faq' // hỏi-đáp (FAQ)
   | 'transfer' // chuyển máy
@@ -48,6 +50,8 @@ export const NODE_TYPES: readonly NodeType[] = [
   'interaction',
   'nexus',
   'logic',
+  'classifier',
+  'normalization',
   'openai',
   'faq',
   'transfer',
@@ -57,6 +61,8 @@ export const NODE_TYPES: readonly NodeType[] = [
 ] as const;
 
 // Tên type cũ trong YAML -> tên mới (đổi tên hệ thống nhưng file cũ vẫn mở được).
+// Node logic cũ mang module phân loại/chuẩn hoá được migrate THEO moduleType ở
+// fromYaml (không map được ở đây vì cùng type 'logic').
 export const LEGACY_TYPE_ALIASES: Record<string, NodeType> = {
   input: 'interaction',
   condition: 'nexus',
@@ -65,9 +71,21 @@ export const LEGACY_TYPE_ALIASES: Record<string, NodeType> = {
   flag: 'save',
 };
 
+// 3 loại node "chọn module" (data.moduleType) tách ra từ node Logic cũ — dùng chung
+// cho fromYaml/nodeSchema/flowStore để cư xử đồng nhất.
+export const MODULE_NODE_TYPES: readonly NodeType[] = ['logic', 'classifier', 'normalization'] as const;
+export const isModuleNodeType = (t: NodeType): boolean => MODULE_NODE_TYPES.includes(t);
+
 // Loại node có nhánh TỰ DO (data.branches) — dùng chung cho fromYaml/toYaml/nodeSchema
-// để 3 nơi không lệch nhau khi thêm loại node mới.
-export const EDITABLE_BRANCH_TYPES: readonly NodeType[] = ['nexus', 'logic', 'jump'] as const;
+// để 3 nơi không lệch nhau khi thêm loại node mới. (classifier/normalization dùng bộ
+// nhánh cố định theo module nhưng vẫn lưu/đọc qua data.branches như logic.)
+export const EDITABLE_BRANCH_TYPES: readonly NodeType[] = [
+  'nexus',
+  'logic',
+  'classifier',
+  'normalization',
+  'jump',
+] as const;
 
 export interface FlowNode {
   id: string;

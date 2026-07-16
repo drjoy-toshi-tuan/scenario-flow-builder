@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { FlowIR, FlowEdge, FlowNode, NodeType, SubFlow } from '../ir/types';
+import { isModuleNodeType, type FlowIR, type FlowEdge, type FlowNode, type NodeType, type SubFlow } from '../ir/types';
 import { fromYaml } from '../ir/fromYaml';
 import { toYaml } from '../ir/toYaml';
 import { layout } from '../ir/layout';
@@ -9,7 +9,7 @@ import {
   readBranches,
   effectiveBranches,
   catchAllEditable,
-  logicModuleOf,
+  moduleTypeOf,
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
   MODULE_DEFAULT_BRANCHES,
@@ -788,18 +788,19 @@ export const useFlowStore = create<FlowState>((set, get) => {
         const locks = TEMPLATE_LOCKS[value];
         if (locks) Object.assign(data, locks);
       }
-      // Đổi module của node logic -> ĐẶT LẠI nhánh theo module mới. Trước đây các
-      // module không có bộ nhánh riêng (Script/CMR/Module Result Binder) giữ nguyên
-      // data.branches nên mang nhầm nhánh của module trước (vd Incoming Classifier).
-      if (node?.type === 'logic' && key === 'moduleType' && typeof value === 'string') {
+      // Đổi module của node chọn module (logic/classifier/normalization) -> ĐẶT LẠI
+      // nhánh theo module mới. Trước đây các module không có bộ nhánh riêng
+      // (Script/CMR/Module Result Binder) giữ nguyên data.branches nên mang nhầm
+      // nhánh của module trước (vd Incoming Classifier).
+      if (node && isModuleNodeType(node.type) && key === 'moduleType' && typeof value === 'string') {
         const fixed = MODULE_FIXED_BRANCHES[value];
         const defaults = MODULE_DEFAULT_BRANCHES[value];
         if (fixed) {
-          // Module nhánh CỐ ĐỊNH tĩnh (Incoming Classifier / Date Of Call Classifier /
-          // Null Check): THAY HẲN bằng bộ chuẩn.
+          // Module nhánh CỐ ĐỊNH tĩnh (Clinic Days / Incoming / Date Of Call
+          // Classifier / Null Check / Phone Norm / DOB): THAY HẲN bằng bộ chuẩn.
           data.branches = fixed.map((b) => ({ ...b }));
         } else if (defaults) {
-          // Module có bộ nhánh mặc định sửa được (Clinic Day Classifier): seed bộ mặc định.
+          // Module có bộ nhánh mặc định sửa được: seed bộ mặc định.
           data.branches = defaults.map((b) => ({ ...b }));
         } else if (value !== LOGIC_MODULE_CDEPT) {
           // Script / Context Match Router / Module Result Binder: về slate sạch (chỉ
@@ -810,8 +811,8 @@ export const useFlowStore = create<FlowState>((set, get) => {
       // Clinical Department Classifier: nhánh SINH TỪ property (FAILED / NOT_COVERED +
       // mỗi Tên output 1 nhánh) — đồng bộ data.branches mỗi lần đổi field để chấm nối,
       // dây và YAML luôn khớp danh sách output hiện tại.
-      if (node?.type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_CDEPT) {
-        data.branches = effectiveBranches('logic', data).map((b) => ({ ...b }));
+      if (node && isModuleNodeType(node.type) && moduleTypeOf(node.type, data) === LOGIC_MODULE_CDEPT) {
+        data.branches = effectiveBranches(node.type, data).map((b) => ({ ...b }));
       }
       set({ draft: { ...draft, data } });
     },
@@ -831,8 +832,8 @@ export const useFlowStore = create<FlowState>((set, get) => {
         data[`clinical_department_${i + 1}`] = d.list;
         data[`result_name_${i + 1}`] = d.output;
       });
-      if (node?.type === 'logic' && logicModuleOf(data) === LOGIC_MODULE_CDEPT) {
-        data.branches = effectiveBranches('logic', data).map((b) => ({ ...b }));
+      if (node && isModuleNodeType(node.type) && moduleTypeOf(node.type, data) === LOGIC_MODULE_CDEPT) {
+        data.branches = effectiveBranches(node.type, data).map((b) => ({ ...b }));
       }
       set({ draft: { ...draft, data } });
     },

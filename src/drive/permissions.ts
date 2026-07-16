@@ -23,6 +23,7 @@ export type PermRole = 'owner' | 'admin' | 'user';
 export interface PermMember {
   email: string;
   name: string;
+  picture?: string; // URL ảnh đại diện Google (nếu có) — modal 権限管理 hiển thị ảnh tròn
   lastAccessAt: string; // ISO 8601 — UI tự format theo múi giờ máy
 }
 
@@ -90,12 +91,20 @@ export async function loadAccessLog(token: string): Promise<AccessLog> {
 // lastAccessAt, rồi lưu lại (giữ nguyên admins). Trả về bản mới nhất để UI dùng luôn.
 export async function recordAccess(
   token: string,
-  user: { email: string; name?: string },
+  user: { email: string; name?: string; picture?: string },
 ): Promise<AccessLog> {
   const log = await loadAccessLog(token);
   const email = normEmail(user.email);
   const rest = log.members.filter((m) => normEmail(m.email) !== email);
-  const members = [...rest, { email, name: user.name ?? '', lastAccessAt: new Date().toISOString() }];
+  const members = [
+    ...rest,
+    {
+      email,
+      name: user.name ?? '',
+      ...(user.picture ? { picture: user.picture } : {}),
+      lastAccessAt: new Date().toISOString(),
+    },
+  ];
   const next: AccessLog = { ...log, members };
   await updateFileContent(token, log.fileId, serialize(next), 'application/json');
   return next;
