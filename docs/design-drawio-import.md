@@ -51,9 +51,11 @@ node/module trong hệ thống:
   logic + phân branch)`. Nexus luôn là nơi lưu kết quả và toả nhánh, không tự xử lý.
 - Nhánh `failed` của interaction KHÔNG bao giờ vào nexus — đi đường riêng
   (retry announce / hangup / transfer theo bảng 失敗時 ở page 2).
-- Hỏi tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm bằng giọng nói → `interaction`
-  (STT) **+ node `openai`** với prompt bỏ filler word, trích đúng tên thực thể
-  (đây là cách dùng OpenAI ưu tiên hiện tại của hệ thống).
+- Hỏi tên bệnh viện / tên công ty / tên đoàn thể bảo hiểm bằng giọng nói →
+  `interaction --next--> openai --next--> nexus (lưu)`: openai đứng giữa để bỏ filler
+  word / trích đúng tên thực thể (cách dùng OpenAI ưu tiên hiện tại), thành công mới
+  tới nexus lưu context; nhánh `failed` của openai **hội tụ về cùng đích** với nhánh
+  failed của interaction.
 - Rẽ nhánh theo khoa khám → `classifier` module **Clinical Department Classifier**
   (kèm danh sách khoa → output).
 - Rẽ theo ngày làm việc / thời điểm gọi / loại số gọi đến → `classifier` module
@@ -76,7 +78,7 @@ Phần deterministic chỉ lo **skeleton**: node nào, text gì, nối với nod
 flowchart TD
     A[".drawio XML<br/>(upload từ máy / Drive)"] --> B["<b>1. parse.ts</b> (thuần)<br/>mxfile → DrawioGraph<br/>node/text/màu/toạ độ/edge"]
     B --> C["<b>2. associate.ts</b> (thuần)<br/>gán nhãn nhánh ↔ edge (hình học)<br/>join bảng アナウンス一覧 (page 2)"]
-    C --> D["<b>3. aiMap.ts — LLM (giai đoạn chính)</b><br/>① chọn NodeType + moduleType từng bước<br/>② dựng branches (when/regex, thứ tự top-down)<br/>③ sinh code Script, prompt OpenAI<br/>④ sinh id tiếng Anh, tách/gộp node<br/>⑤ phân chia main / sub flow + chèn node jump<br/>⑥ confidence + lý do từng quyết định"]
+    C --> D["<b>3. aiMap.ts — LLM (giai đoạn chính)</b><br/>① chọn NodeType + moduleType từng bước<br/>② dựng branches (when/regex, thứ tự top-down)<br/>③ sinh code Script, prompt OpenAI<br/>④ sinh id tiếng Anh, tách/gộp node<br/>⑤ phân chia main / sub flow + chèn node jump<br/>⑥ sinh tên context + Context Setting (node start)<br/>⑦ confidence + lý do từng quyết định"]
     D --> E["<b>4. validate.ts</b> (thuần)<br/>schema + graph invariants<br/>(id unique, edge resolve, start,<br/>branch ↔ sourceHandle, module hợp lệ,<br/>quy tắc nexus & main/sub flow)"]
     E -- "lỗi → retry 1 lần kèm thông báo lỗi" --> D
     E --> F["<b>5. Màn Review Import</b><br/>canvas render draft IR<br/>+ panel confidence/lý do, click → focus node<br/>người dùng sửa bằng NodeSettingsPanel"]
@@ -128,7 +130,84 @@ nằm trong 1 file prompt riêng `drawioMapPrompt.ts`):
   (携帯/固定…) TRƯỚC khi flow nghe số điện thoại (vd sau 診察券番号 rẽ 携帯), nghĩa là
   điều kiện lấy từ SỐ INCOMING → dùng `classifier` module **Phone Type Classifier**
   (nhánh cố định 携帯/固定/その他) hoặc **Incoming Classifier** khi cần phân biệt chi
-  tiết hơn (非通知/海外/WebRTC/固定/携帯).
+  tiết hơn (非通知/海外/WebRTC/固定/携帯). Kết quả thường lưu vào context `phoneType`.
+- **Cờ trạng thái**: dùng node `save` (module Flag — ステータスフラグ / SMSフラグ),
+  không dùng logic/nexus để set cờ.
+
+**Context & Context Settings (node start)**:
+
+- LLM phải **sinh tên context** cho mỗi mục hearing cần lưu, nhưng theo thứ tự:
+  ① khớp bảng context MẶC ĐỊNH bên dưới → dùng đúng tên đó; ② khớp bảng TÊN QUY CHUẨN
+  cho mục hay xuất hiện (bên dưới) → dùng đúng tên đó; ③ không khớp mới sinh tên mới
+  theo quy tắc đặt tên: **camelCase** (chữ đầu viết thường, không dấu cách, chữ đầu
+  mỗi từ sau viết hoa), tiếng Anh dễ hiểu + contextNameJp theo tên mục hearing.
+- Bảng context **mặc định** (tên EN + tên JP + displayType đều CỐ ĐỊNH;
+  `editable: true, deletable: false, itemDefault: true`):
+
+  | contextName | contextNameJp | displayType |
+  |---|---|---|
+  | classification | 区分 | CLASSIFICATION |
+  | patientName | 患者名 | TEXT |
+  | medicalCardNumber | 診察券番号 | NUMBER |
+  | clinicalDepartment | 診療科 | DEPARTMENT |
+  | patientDateOfBirth | 生年月日 | DATE_OF_BIRTH |
+  | reason | 理由 | TEXT |
+  | reservationDate | 現在の予約日 | DATE |
+  | additionalPhoneNumber | 連絡先電話番号 | PHONE_NUMBER |
+
+  Ngoại lệ: `callId 通話ID NUMBER` cũng là mặc định nhưng
+  `editable: true, deletable: true, itemDefault: false`.
+
+  Bộ mặc định này là **bất di bất dịch**: LLM copy NGUYÊN VĂN vào Context Setting,
+  không thêm bớt/đổi tên/đổi type — chỗ DUY NHẤT được điền theo flow là `rangeValues`
+  của các context dạng pulldown (classification theo các giá trị phân loại thực tế
+  trong flow, clinicalDepartment theo danh sách khoa của bệnh viện). File seed
+  `src/ui/defaultContextSetting.ts` chỉ chứa đúng bộ này (rangeValues để dummy).
+- Bảng **tên quy chuẩn** cho các mục hearing hay xuất hiện (context KHÔNG mặc định
+  nhưng cố định tên để tránh phân mảnh giữa các flow — nằm trong playbook, sẽ bổ
+  sung dần):
+
+  | Mục hearing (JP) | contextName chuẩn |
+  |---|---|
+  | 本人確認 | identityVerification |
+  | 受診歴 | visitHistory |
+  | 症状 | symptoms |
+  | 問い合わせ内容 | inquiryContent |
+  | 予約希望日 | preferredReservationDate |
+  | 予約希望時期 | preferredReservationPeriod |
+  | 変更希望日 | preferredChangeDate |
+  | 変更内容 | changeContent |
+  | 詳細変更内容 | changeDetails |
+  | 紹介元医療機関 | referringMedicalInstitution |
+  | 医療機関名 | medicalInstitutionName |
+  | 紹介状有無 | referralLetterExists |
+  | 他科予約有無 | otherAppointmentExists |
+  | 担当者名 | personInCharge |
+  | 患者／医療機関 | guestType |
+  | 年齢／性別 | ageAndGender |
+  | 緊急性 | urgency |
+  | コース | course |
+  | 追加オプション | additionalOptions |
+  | 疾患の概要 | diseaseSummary |
+  | 電話タイプ | phoneType |
+  | 最終確認 | finalConfirmation |
+- **4 displayType độc quyền**: DEPARTMENT / PHONE_NUMBER / CLASSIFICATION /
+  DATE_OF_BIRTH chỉ được dùng cho đúng context mặc định tương ứng ở bảng trên —
+  context tên khác KHÔNG được mang các type này (validate cứng).
+- Context KHÔNG mặc định: luôn `editable: true, deletable: true, itemDefault: false`,
+  displayType chỉ trong {TEXT, NUMBER, DATE}.
+- Context dạng pulldown có `rangeValues` (order + value): classification (lấy từ các
+  giá trị phân loại thực tế trong flow), clinicalDepartment (danh sách khoa của bệnh
+  viện), và các context tự do kiểu changeContent/urgency/guestType/phoneType.
+- **Node start**: LLM tổng hợp TOÀN BỘ context dùng trong flow thành JSON
+  Context Setting ghi vào `flow.startData` (cơ chế round-trip đã có sẵn trong
+  fromYaml/toYaml): khối context mặc định copy nguyên văn (chỉ điền rangeValues
+  pulldown) + các context không mặc định flow dùng tới. Few-shot cho phần này xây
+  từ chính knowledge trên (bảng mặc định + bảng tên quy chuẩn + quy tắc đặt tên),
+  KHÔNG dùng file context thật của bệnh viện.
+- Validate cứng: mọi `contextName` được saveContext trong flow phải tồn tại trong
+  Context Setting của start; đúng quy tắc type độc quyền; context mặc định không bị
+  đổi tên/type.
 
 **Quy tắc phân chia Main / Sub flow** (IR đã hỗ trợ sẵn: `subflows[]` + node `jump`
 tham chiếu sub flow theo TÊN; hết sub flow tự quay về main — logic Brekeke):
