@@ -391,9 +391,9 @@ body {
    cùng tâm ngay TRÊN MÉP node -> khe hở quanh chấm rất mảnh (2px). */
 .bk-cs-notch {
   position: absolute;
-  bottom: -6.5px;
-  width: 13px;
-  height: 13px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
   transform: translateX(-50%);
   border-radius: 9999px;
   background: var(--bk-canvas);
@@ -401,12 +401,12 @@ body {
   clip-path: inset(-1px -1px 50% -1px);
   pointer-events: none;
 }
-/* Chấm output CS: nhỏ (9px), tâm đặt ĐÚNG mép đáy node — nửa trong node (lọt giữa
-   hõm khoét), nửa ngoài. */
+/* Chấm output CS: nhỏ (9px), ăn SÂU vào trong node — đỉnh chấm gần chạm vòm hõm
+   (hở ~1px), chỉ ló phần dưới ra ngoài mép. */
 .bk-node--cs .react-flow__handle.bk-handle.react-flow__handle-bottom {
   width: 9px;
   height: 9px;
-  bottom: -4.5px;
+  bottom: -3px;
 }
 /* Điểm đến: ẩn chấm tròn (mũi tên cuối dây thay thế) — vẫn nối dây vào được. */
 .bk-node--cs .react-flow__handle.bk-handle.target {
