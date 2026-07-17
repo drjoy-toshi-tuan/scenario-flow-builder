@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -194,11 +194,53 @@ export function DeletableEdge({
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const removeEdge = useFlowStore((s) => s.removeEdge);
+  const setEdgeLabelOffset = useFlowStore((s) => s.setEdgeLabelOffset);
   const t = useT();
   const hasLabel = typeof label === 'string' && label.length > 0;
+  const edgeData = data as RFEdgeData | undefined;
   // Node condition/script: nhãn giá trị nhánh luôn hiện; các node khác chỉ hiện khi hover.
-  const alwaysLabel = (data as RFEdgeData | undefined)?.alwaysLabel === true;
+  const alwaysLabel = edgeData?.alwaysLabel === true;
   const labelVisible = alwaysLabel || hovered;
+
+  // ── Stamp điều kiện kéo được ────────────────────────────────────────────────
+  // Vị trí nhãn = tâm dây + stagger chống chồng (irAdapter tính) + offset người dùng
+  // đã kéo (lưu ở node nguồn) + delta đang kéo dở. Kéo xong commit vào flowStore.
+  const stagger = edgeData?.labelStagger ?? { x: 0, y: 0 };
+  const savedOffset = edgeData?.labelOffset ?? { x: 0, y: 0 };
+  const zoom = useStore((s) => s.transform[2]);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null);
+  const offsetX = savedOffset.x + (dragDelta?.x ?? 0);
+  const offsetY = savedOffset.y + (dragDelta?.y ?? 0);
+
+  const onLabelPointerDown = (e: ReactPointerEvent<HTMLSpanElement>) => {
+    // Chỉ stamp luôn-hiện mới kéo được (nhãn hover-only giữ nguyên hành vi cũ).
+    if (!alwaysLabel) return;
+    e.stopPropagation();
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    setDragDelta({ x: 0, y: 0 });
+  };
+  const onLabelPointerMove = (e: ReactPointerEvent<HTMLSpanElement>) => {
+    if (!dragStart.current) return;
+    // Delta màn hình -> toạ độ flow (chia zoom) để nhãn bám đúng con trỏ mọi mức zoom.
+    setDragDelta({
+      x: (e.clientX - dragStart.current.x) / zoom,
+      y: (e.clientY - dragStart.current.y) / zoom,
+    });
+  };
+  const onLabelPointerUp = (e: ReactPointerEvent<HTMLSpanElement>) => {
+    if (!dragStart.current) return;
+    const dx = (e.clientX - dragStart.current.x) / zoom;
+    const dy = (e.clientY - dragStart.current.y) / zoom;
+    dragStart.current = null;
+    setDragDelta(null);
+    // Chỉ commit khi thật sự kéo (tránh ghi offset 0 khi chỉ click vào nhãn).
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      setEdgeLabelOffset(id, { x: savedOffset.x + dx, y: savedOffset.y + dy });
+    }
+  };
 
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
@@ -258,21 +300,30 @@ export function DeletableEdge({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       />
-      {/* Nhãn điều kiện căn GIỮA dây; nút xoá tách hẳn sang phải (position absolute) nên
-          không đè lên nhãn và không làm lệch tâm nhãn.
-          - Node condition/script (nhánh tự do): nhãn GIÁ TRỊ luôn hiện.
+      {/* Nhãn điều kiện căn GIỮA dây (+ stagger chống chồng + offset người dùng kéo);
+          nút xoá tách hẳn sang phải (position absolute) nên không đè lên nhãn và
+          không làm lệch tâm nhãn.
+          - Node có stamp luôn-hiện (alwaysLabel): nhãn LUÔN hiện và KÉO ĐƯỢC để tự sắp.
           - Các node khác: nhãn chỉ hiện khi hover (dùng opacity nên vẫn giữ chỗ ->
             không lệch tâm, vùng bắt hover không đổi).
           Nút xoá luôn chỉ hiện khi hover. */}
       <EdgeLabelRenderer>
         <div
           className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          style={{
+            transform: `translate(-50%, -50%) translate(${labelX + stagger.x + offsetX}px, ${labelY + stagger.y + offsetY}px)`,
+          }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
           {hasLabel && (
-            <span className="edge-label" style={{ opacity: labelVisible ? 1 : 0 }}>
+            <span
+              className={`edge-label${alwaysLabel ? ' edge-label--draggable' : ''}${dragDelta ? ' edge-label--dragging' : ''}`}
+              style={{ opacity: labelVisible ? 1 : 0 }}
+              onPointerDown={onLabelPointerDown}
+              onPointerMove={onLabelPointerMove}
+              onPointerUp={onLabelPointerUp}
+            >
               {label}
             </span>
           )}

@@ -11,6 +11,7 @@ import {
 import { ensureSettings } from '../ir/settings';
 import { fromYaml } from '../ir/fromYaml';
 import { toYaml } from '../ir/toYaml';
+import { toDrawio } from '../ir/toDrawio';
 import { layout } from '../ir/layout';
 import { nodeTypeLabel } from '../ui/nodeConfig';
 import { CS_ELSE_LABEL } from '../ui/csLogic';
@@ -111,6 +112,8 @@ interface FlowState {
   autoLayout: () => Promise<void>;
   // Xuất IR hiện tại ra chuỗi YAML (round-trip).
   exportYaml: () => string;
+  // Xuất IR hiện tại ra XML Draw.io (mở được bằng diagrams.net) — export màn CS.
+  exportDrawio: () => string;
 
   // Cập nhật metadata flow (name/facility/author/createdAt/updatedAt) — dùng khi
   // lưu về repo để đóng dấu 更新日時/作成者. Không ghi vào lịch sử Undo.
@@ -154,6 +157,10 @@ interface FlowState {
   // Nối / xoá dây.
   addEdge: (edge: FlowEdge) => void;
   removeEdge: (id: string) => void;
+  // Lưu độ lệch stamp điều kiện của 1 dây (người dùng kéo nhãn trên canvas) vào
+  // node NGUỒN (data.labelOffsets[handle]) — round-trip qua YAML như field data khác.
+  // Không ghi lịch sử Undo (chỉ là tinh chỉnh hiển thị).
+  setEdgeLabelOffset: (edgeId: string, offset: { x: number; y: number }) => void;
 
   // Chọn node để mở panel setting (có kiểm tra thay đổi chưa lưu).
   selectNode: (id: string | null) => void;
@@ -523,6 +530,11 @@ export const useFlowStore = create<FlowState>((set, get) => {
       return doc ? toYaml(doc) : '';
     },
 
+    exportDrawio: () => {
+      const doc = assembleDoc();
+      return doc ? toDrawio(doc) : '';
+    },
+
     setMeta: (patch) => {
       const { ir } = get();
       if (!ir) return;
@@ -768,6 +780,36 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const { ir } = get();
       if (!ir) return;
       set({ ...snapshot(), ir: { ...ir, edges: ir.edges.filter((e) => e.id !== id) } });
+    },
+
+    setEdgeLabelOffset: (edgeId, offset) => {
+      const { ir } = get();
+      if (!ir) return;
+      const edge = ir.edges.find((e) => e.id === edgeId);
+      if (!edge) return;
+      const handle = edge.sourceHandle ?? 'default';
+      set({
+        ir: {
+          ...ir,
+          nodes: ir.nodes.map((n) => {
+            if (n.id !== edge.source) return n;
+            const prev =
+              n.data.labelOffsets && typeof n.data.labelOffsets === 'object'
+                ? (n.data.labelOffsets as Record<string, { x: number; y: number }>)
+                : {};
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                labelOffsets: {
+                  ...prev,
+                  [handle]: { x: Math.round(offset.x), y: Math.round(offset.y) },
+                },
+              },
+            };
+          }),
+        },
+      });
     },
 
     undo: () => {

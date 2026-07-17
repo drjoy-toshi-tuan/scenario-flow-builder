@@ -66,7 +66,7 @@ export function StatusSettingsTab() {
       <div className="mx-auto max-w-[900px]">
         <div className="mb-4 flex items-center gap-2 text-[15px] font-bold text-[var(--bk-text)]">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
-            <Icon icon="lucide:circle-check" width={17} height={17} />
+            <Icon icon="gravity-ui:flag" width={17} height={17} />
           </span>
           {t('ctStatus')}
         </div>

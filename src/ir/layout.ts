@@ -17,8 +17,9 @@ import { SYNTHETIC_START_ID } from './types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Kích thước node THẬT (khớp .bk-node trong index.css) để chừa khoảng cách đúng.
-const NODE_WIDTH = 244;
-const NODE_HEIGHT = 80;
+// Export cho adapter khác dùng chung (toDrawio vẽ node đúng cỡ canvas).
+export const NODE_WIDTH = 244;
+export const NODE_HEIGHT = 80;
 
 // Tham số layout CỐ ĐỊNH (deterministic):
 const LAYER_GAP = 96; // hở trên–dưới giữa 2 tầng

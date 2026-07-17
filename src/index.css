@@ -411,16 +411,17 @@ body {
   flex-direction: column;
   align-items: stretch;
   align-self: stretch;
-  /* Cụm (tên + dải icon) căn giữa theo chiều dọc: KHÔNG có icon thì tên nằm đúng
-     tâm node; CÓ icon thì tên tự nhích lên một chút — cân bằng thị giác. */
+  /* Tên node LUÔN nằm đúng tâm node theo chiều dọc — dải icon biểu thị neo absolute
+     góc dưới phải (xem .bk-cs-indicators) nên không đẩy tên lệch tâm. */
   justify-content: center;
-  gap: 5px;
+  position: relative;
 }
 /* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
-   mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ. */
+   mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ.
+   Font hạ nhẹ (17 -> 15) để chừa khoảng thở với dải icon neo góc dưới. */
 .bk-node-name--cs {
   text-align: center;
-  font-size: 17px;
+  font-size: 15px;
   white-space: normal;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -429,8 +430,11 @@ body {
   overflow: hidden;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
-   Dòng riêng dưới tên, căn phải; node không có icon nào thì dòng này không render. */
+   Neo ABSOLUTE góc dưới phải để không ảnh hưởng căn giữa dọc của tên node. */
 .bk-cs-indicators {
+  position: absolute;
+  right: 0;
+  bottom: -3px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -441,8 +445,9 @@ body {
   align-items: center;
   gap: 2px;
 }
+/* Số lần retry: to ngang cỡ icon (13px) cho dễ đọc. */
 .bk-cs-ind-num {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
 }
@@ -1499,6 +1504,16 @@ body {
   font-weight: 500;
   /* Nhãn chỉ hiện khi hover vào dây (opacity điều khiển trong DeletableEdge). */
   transition: opacity 0.15s ease;
+}
+/* Stamp điều kiện luôn-hiện (logic/transfer/hearing màn CS): kéo được để tự sắp
+   chỗ khi nhiều dây chập nhau — con trỏ grab/grabbing báo hiệu kéo được. */
+.edge-label--draggable {
+  cursor: grab;
+  touch-action: none;
+}
+.edge-label--dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bk-accent) 35%, transparent);
 }
 .edge-trash {
   display: inline-flex;

@@ -24,7 +24,34 @@ export interface RFEdgeData {
   // Node nguồn có nhánh TỰ DO (condition/script) -> nhãn giá trị luôn hiện;
   // các node khác nhãn chỉ hiện khi hover (xem DeletableEdge).
   alwaysLabel?: boolean;
+  // Độ lệch nhãn do NGƯỜI DÙNG kéo stamp (lưu ở node nguồn data.labelOffsets[handle],
+  // round-trip qua YAML) — cộng vào vị trí mặc định giữa dây.
+  labelOffset?: { x: number; y: number };
+  // Độ lệch CHỐNG CHỒNG nhãn tự tính khi nhiều dây (từ nhiều node) cùng chập về
+  // 1 đích — xếp so le dọc để các stamp điều kiện không đè lên nhau.
+  labelStagger?: { x: number; y: number };
   [key: string]: unknown;
+}
+
+// CS: loại node nguồn có "stamp" điều kiện LUÔN hiển thị trên dây (không cần hover).
+// Các loại khác ở màn CS bỏ hẳn nhãn — hover chỉ còn nút xoá dây.
+const CS_CONDITION_SOURCE_TYPES: ReadonlySet<NodeType> = new Set([
+  'logic',
+  'transfer',
+  'interaction',
+]);
+
+// Đọc độ lệch nhãn người dùng đã kéo (node.data.labelOffsets = { [handle]: {x,y} }).
+function readLabelOffset(
+  data: Record<string, unknown>,
+  handle: string,
+): { x: number; y: number } | undefined {
+  const raw = data.labelOffsets;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const v = (raw as Record<string, unknown>)[handle];
+  if (!v || typeof v !== 'object') return undefined;
+  const { x, y } = v as { x?: unknown; y?: unknown };
+  return typeof x === 'number' && typeof y === 'number' ? { x, y } : undefined;
 }
 
 // Nhãn hiển thị trên dây của node condition: CHỈ lấy giá trị output mà nhánh trả
@@ -71,11 +98,6 @@ export function irToReactFlow(ir: FlowIR, opts?: { cs?: boolean }): { nodes: Nod
   });
 
   const nodeById = new Map(ir.nodes.map((n) => [n.id, n]));
-  // Số dây ĐI RA thực tế của mỗi node — node >1 dây ra là "đang rẽ nhánh thật",
-  // nhãn nhánh trên các dây đó luôn hiện (không tính theo handle: interaction luôn
-  // có 2 handle FAILED/NEXT nhưng thường chỉ nối 1 dây -> đừng rải "次へ" khắp canvas).
-  const outCount = new Map<string, number>();
-  for (const e of ir.edges) outCount.set(e.source, (outCount.get(e.source) ?? 0) + 1);
 
   const edges: Edge[] = ir.edges.map((e) => {
     const handles = handlesByNode.get(e.source) ?? [];
@@ -85,32 +107,63 @@ export function irToReactFlow(ir: FlowIR, opts?: { cs?: boolean }): { nodes: Nod
     const mode = srcNode ? BRANCH_SCHEMA[srcNode.type].mode : 'none';
     const isFixed = mode === 'fixed';
 
+    // Nhãn nhánh căn GIỮA dây:
+    //   - Node nhánh CỐ ĐỊNH (FAILED/NEXT…): nhãn = tên nhánh cố định (kể cả node 1 nhánh).
+    //   - Node nhánh TỰ DO (condition/logic): nhãn = label nhánh (fallback giá trị nhánh).
+    const baseLabel =
+      (isFixed || mode === 'editable' || handles.length > 1 ? matched : undefined) ??
+      conditionOutputLabel(e.condition ?? e.label);
+    // CS: CHỈ node logic / transfer / hearing có stamp điều kiện (luôn hiện);
+    // các loại khác bỏ hẳn nhãn — hover chỉ còn nút xoá dây. TS giữ hành vi cũ.
+    const csCondition = cs && srcNode != null && CS_CONDITION_SOURCE_TYPES.has(srcNode.type);
+    const label = cs ? (csCondition ? baseLabel : undefined) : baseLabel;
+
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       sourceHandle: e.sourceHandle ?? undefined,
       type: 'deletable',
-      // Nhãn nhánh căn GIỮA dây, hành vi giống nhau cho MỌI loại node:
-      //   - Node nhánh CỐ ĐỊNH (FAILED/NEXT…): nhãn = tên nhánh cố định (kể cả node 1 nhánh).
-      //   - Node nhánh TỰ DO (condition/logic): nhãn = label nhánh (fallback giá trị nhánh).
-      // Nút xoá hiện khi hover; nhãn + nút đều bám tâm dây (xem DeletableEdge).
-      label:
-        (isFixed || mode === 'editable' || handles.length > 1 ? matched : undefined) ??
-        conditionOutputLabel(e.condition ?? e.label),
+      label,
       // CS: mũi tên ở đầu đích cho MỌI dây — thấy ngay chiều đi của nhánh. Màu đồng
       // bộ token qua CSS .react-flow__arrowhead (index.css). TS không có mũi tên.
       ...(cs ? { markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } } : {}),
       data: {
         condition: e.condition,
         // TS: node condition/script nhãn giá trị nhánh luôn hiện; node khác hover mới hiện.
-        // CS: nhãn nhánh LUÔN hiện khi node nguồn thật sự rẽ nhánh: nhánh tự do
-        // (nexus/logic/jump) hoặc có >1 dây ra (vd NEXT + FAILED đều nối). Node chỉ
-        // nối 1 đường ra giữ hover-only để canvas không đầy chữ "次へ" thừa.
-        alwaysLabel: mode === 'editable' || (cs && (outCount.get(e.source) ?? 0) > 1),
+        // CS: stamp điều kiện của logic/transfer/hearing LUÔN hiện (không cần hover).
+        alwaysLabel: cs ? csCondition && label != null : mode === 'editable',
+        // Độ lệch stamp người dùng đã kéo (nếu có) — lưu ở node nguồn.
+        ...(srcNode && label != null
+          ? { labelOffset: readLabelOffset(srcNode.data, e.sourceHandle ?? 'default') }
+          : {}),
       } satisfies RFEdgeData,
     };
   });
+
+  // CS: nhiều dây (từ nhiều node) chập về CÙNG 1 đích -> các stamp luôn-hiện dễ đè
+  // lên nhau quanh điểm hội tụ. Xếp so le dọc quanh tâm (bước 22px) làm vị trí MẶC
+  // ĐỊNH; người dùng vẫn kéo từng stamp để tự sắp (labelOffset cộng thêm).
+  if (cs) {
+    const byTarget = new Map<string, Edge[]>();
+    for (const edge of edges) {
+      const d = edge.data as RFEdgeData;
+      if (d.alwaysLabel && edge.label != null) {
+        const list = byTarget.get(edge.target) ?? [];
+        list.push(edge);
+        byTarget.set(edge.target, list);
+      }
+    }
+    for (const list of byTarget.values()) {
+      if (list.length < 2) continue;
+      list.forEach((edge, i) => {
+        (edge.data as RFEdgeData).labelStagger = {
+          x: 0,
+          y: i * 22 - ((list.length - 1) * 22) / 2,
+        };
+      });
+    }
+  }
 
   return { nodes, edges };
 }

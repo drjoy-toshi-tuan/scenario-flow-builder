@@ -13,7 +13,7 @@ const TABS: { id: CanvasTab; labelKey: TKey; icon: string }[] = [
   { id: 'flow', labelKey: 'ctFlow', icon: 'lucide:git-fork' },
   { id: 'announce', labelKey: 'ctAnnounce', icon: 'lucide:volume-2' },
   { id: 'general', labelKey: 'ctGeneral', icon: 'lucide:layout-dashboard' },
-  { id: 'status', labelKey: 'ctStatus', icon: 'lucide:circle-check' },
+  { id: 'status', labelKey: 'ctStatus', icon: 'gravity-ui:flag' },
 ];
 
 export function CanvasTabs() {

@@ -252,40 +252,52 @@ function SourceHandle({ id, label, style }: { id: string; label?: string; style?
 // ── Icon biểu thị cấu hình trên node CS ──────────────────────────────────────
 // Thay cho chữ: nhìn dải icon là biết node đã set gì (tooltip xem giá trị).
 // Chỉ hiện icon của cấu hình CÓ THẬT — node trống thì không có icon nào.
+// (KHÔNG có icon announce — nội dung announce xem ở preview/tab Announce List.)
 function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unknown> }) {
   const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-  // Mỗi loại biểu thị một MÀU cố định riêng (không theo accent node) để nhìn phát
-  // phân biệt được ngay: announce xanh lá, reconfirm hổ phách, retry chàm, phone sky.
+  // Mỗi loại biểu thị một MÀU tươi sáng cố định riêng (không theo accent node) để
+  // nhìn phát phân biệt ngay: reconfirm vàng, retry hồng sáng, flag cyan sáng.
   const icons: { key: string; icon: string; title: string; color: string; text?: string }[] = [];
 
-  const announceText = str(type === 'announce' ? data.text : data.announce);
-  if (announceText)
-    icons.push({ key: 'announce', icon: 'lucide:volume-2', title: announceText, color: '#10b981' });
   if (type === 'interaction') {
     if (data.reconfirm === 'yes')
       icons.push({
         key: 'reconfirm',
-        icon: 'lucide:rotate-ccw',
+        icon: 'fluent:arrow-sync-checkmark-20-regular',
         title: str(data.reconfirmAnnounce) || 'Re-confirm',
-        color: '#f59e0b',
+        color: '#fbbf24',
       });
-    // Retry: hiện số lần (default 2) — icon vòng lặp + con số nhỏ. Retry = 0 thì ẩn.
+    // Retry: hiện số lần (default 2) — icon vòng lặp + con số to bằng icon. Retry = 0 thì ẩn.
     const retry = str(data.retryCount) || '2';
     if (retry !== '0')
       icons.push({
         key: 'retry',
-        icon: 'lucide:refresh-cw',
+        icon: 'fluent:arrow-sync-24-filled',
         title: str(data.retryAnnounce),
-        color: '#6366f1',
+        color: '#f472b6',
         text: retry,
       });
+  }
+  // Flag: node có set Status/SMS Flag (transfer/hangup: statusFlag/smsFlag; hearing:
+  // 切断時フラグ từ tab Announce List) -> cờ cyan sáng.
+  const hasFlag = [data.statusFlag, data.smsFlag, data.hangupStatusFlag, data.hangupSmsFlag].some(
+    (v) => str(v) !== '',
+  );
+  if (hasFlag) {
+    const flagTitle = [
+      str(data.statusFlag) || str(data.hangupStatusFlag) ? `Status: ${str(data.statusFlag) || str(data.hangupStatusFlag)}` : '',
+      str(data.smsFlag) || str(data.hangupSmsFlag) ? `SMS: ${str(data.smsFlag) || str(data.hangupSmsFlag)}` : '',
+    ]
+      .filter(Boolean)
+      .join(' / ');
+    icons.push({ key: 'flag', icon: 'gravity-ui:flag', title: flagTitle, color: '#22d3ee' });
   }
   if (type === 'transfer' && str(data.transferNumber))
     icons.push({
       key: 'phone',
       icon: 'lucide:phone-forwarded',
       title: str(data.transferNumber),
-      color: '#0ea5e9',
+      color: '#38bdf8',
     });
   // 分岐ロジック (CS): icon rẽ nhánh + số nhánh đã tạo (chưa tính else その他).
   if (type === 'logic') {
@@ -295,7 +307,7 @@ function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unk
         key: 'branches',
         icon: 'lucide:git-fork',
         title: branches.map((b) => b.name || '（無題）').join(' / '),
-        color: '#f59e0b',
+        color: '#fbbf24',
         text: String(branches.length),
       });
   }

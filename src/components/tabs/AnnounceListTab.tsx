@@ -88,8 +88,16 @@ export function AnnounceListTab() {
     options: { value: string; label: string }[],
   ) => (
     <label className="flex items-center gap-1.5">
-      {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau. */}
-      <span className="inline-flex w-[72px] shrink-0 justify-center whitespace-nowrap rounded-full bg-[var(--bk-surface-2)] px-2 py-0.5 text-[10px] font-bold text-[var(--bk-text-muted)]">
+      {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau.
+          Màu phân biệt 2 loại: Status nền xanh biển sáng trong suốt, SMS Flag nền
+          vàng sáng trong suốt — chữ đậm cùng tông để giữ contrast cả light/dark. */}
+      <span
+        className={`inline-flex w-[72px] shrink-0 justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${
+          key === 'hangupStatusFlag'
+            ? 'bg-sky-400/20 text-sky-600 dark:bg-sky-400/25 dark:text-sky-300'
+            : 'bg-amber-300/25 text-amber-600 dark:bg-amber-300/25 dark:text-amber-300'
+        }`}
+      >
         {label}
       </span>
       <select
@@ -107,8 +115,9 @@ export function AnnounceListTab() {
     </label>
   );
 
-  const statusOptions = settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag}: ${s.name}` }));
-  const smsOptions = settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag}: ${s.type || '—'}` }));
+  // Nhãn option dạng "0 - 途中切断" (flag - tên) theo yêu cầu team CS.
+  const statusOptions = settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
+  const smsOptions = settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }));
 
   return (
     <div className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">

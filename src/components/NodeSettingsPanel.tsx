@@ -606,10 +606,11 @@ function SettingsSelect({
   const t = useT();
   const ir = useFlowStore((s) => s.ir);
   const settings = ensureSettings(ir?.settings);
+  // Nhãn option dạng "0 - 途中切断" (flag - tên) — đồng bộ với tab Announce List.
   const options =
     field.settingsOptions === 'smsFlags'
-      ? settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag}: ${s.type || '—'}` }))
-      : settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag}: ${s.name}` }));
+      ? settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }))
+      : settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
   return (
     <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{t('alUnset')}</option>
