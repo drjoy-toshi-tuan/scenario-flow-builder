@@ -116,7 +116,11 @@ export function AnnounceListTab() {
   );
 
   // Nhãn option dạng "0 - 途中切断" (flag - tên) theo yêu cầu team CS.
-  const statusOptions = settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
+  // Pulldown 状態 (切断時フラグ) chỉ dùng các flag 0,1,2,3,6 theo yêu cầu team CS.
+  const STATUS_FLAG_WHITELIST = new Set([0, 1, 2, 3, 6]);
+  const statusOptions = settings.statuses
+    .filter((s) => STATUS_FLAG_WHITELIST.has(s.flag))
+    .map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
   const smsOptions = settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }));
 
   return (
@@ -157,7 +161,14 @@ export function AnnounceListTab() {
                     {/* 聴取項目: tên node + chấm màu loại */}
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cfg.color }} />
+                        {/* Icon loại node trong huy hiệu TRÒN (thay chấm màu) — màu icon =
+                            màu loại node, nền pha nhẹ cùng màu. */}
+                        <span
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                          style={{ color: cfg.color, background: `color-mix(in srgb, ${cfg.color} 16%, transparent)` }}
+                        >
+                          <Icon icon={cfg.icon} width={13} height={13} />
+                        </span>
                         <span className="font-semibold text-[var(--bk-text)]">{node.label}</span>
                       </div>
                     </td>

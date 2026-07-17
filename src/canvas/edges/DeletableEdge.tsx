@@ -5,6 +5,7 @@ import {
   Position,
   getSmoothStepPath,
   useInternalNode,
+  useReactFlow,
   useStore,
   type EdgeProps,
   type InternalNode,
@@ -75,6 +76,27 @@ function roundedOrthogonalPath(points: { x: number; y: number }[], radius: numbe
   const last = points[points.length - 1];
   d += ` L ${last.x},${last.y}`;
   return d;
+}
+
+// Điểm GẦN NHẤT trên path SVG so với 1 điểm (toạ độ flow) — lấy mẫu theo độ dài cung.
+// Dùng để ghim nhãn điều kiện LÊN đúng dây khi kéo (không cho rời ra ngoài dây).
+function nearestPointOnPath(path: SVGPathElement, pt: { x: number; y: number }): { x: number; y: number } {
+  const total = path.getTotalLength();
+  if (!total) return pt;
+  let best = { x: pt.x, y: pt.y };
+  let bestDist = Infinity;
+  const steps = 160;
+  for (let i = 0; i <= steps; i++) {
+    const p = path.getPointAtLength((total * i) / steps);
+    const dx = p.x - pt.x;
+    const dy = p.y - pt.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) {
+      bestDist = d;
+      best = { x: p.x, y: p.y };
+    }
+  }
+  return best;
 }
 
 // Điểm ở giữa (theo độ dài cung) của đường gấp khúc — để đặt nhãn/nút xoá.
@@ -202,16 +224,19 @@ export function DeletableEdge({
   const alwaysLabel = edgeData?.alwaysLabel === true;
   const labelVisible = alwaysLabel || hovered;
 
-  // ── Stamp điều kiện kéo được ────────────────────────────────────────────────
+  // ── Stamp điều kiện kéo được (GHIM trên dây) ────────────────────────────────
   // Vị trí nhãn = tâm dây + stagger chống chồng (irAdapter tính) + offset người dùng
-  // đã kéo (lưu ở node nguồn) + delta đang kéo dở. Kéo xong commit vào flowStore.
+  // đã kéo (lưu ở node nguồn). Khi kéo, con trỏ được CHIẾU về điểm gần nhất TRÊN dây
+  // -> nhãn trượt DỌC theo dây, không rời ra chỗ khác. Kéo xong commit vào flowStore.
   const stagger = edgeData?.labelStagger ?? { x: 0, y: 0 };
   const savedOffset = edgeData?.labelOffset ?? { x: 0, y: 0 };
-  const zoom = useStore((s) => s.transform[2]);
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
-  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null);
-  const offsetX = savedOffset.x + (dragDelta?.x ?? 0);
-  const offsetY = savedOffset.y + (dragDelta?.y ?? 0);
+  const { screenToFlowPosition } = useReactFlow();
+  const pathRef = useRef<SVGPathElement>(null);
+  const dragging = useRef(false);
+  const latestOffset = useRef<{ x: number; y: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const offsetX = dragOffset ? dragOffset.x : savedOffset.x;
+  const offsetY = dragOffset ? dragOffset.y : savedOffset.y;
 
   const onLabelPointerDown = (e: ReactPointerEvent<HTMLSpanElement>) => {
     // Chỉ stamp luôn-hiện mới kéo được (nhãn hover-only giữ nguyên hành vi cũ).
@@ -219,27 +244,27 @@ export function DeletableEdge({
     e.stopPropagation();
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    setDragDelta({ x: 0, y: 0 });
+    dragging.current = true;
+    latestOffset.current = { x: savedOffset.x, y: savedOffset.y };
+    setDragOffset({ x: savedOffset.x, y: savedOffset.y });
   };
   const onLabelPointerMove = (e: ReactPointerEvent<HTMLSpanElement>) => {
-    if (!dragStart.current) return;
-    // Delta màn hình -> toạ độ flow (chia zoom) để nhãn bám đúng con trỏ mọi mức zoom.
-    setDragDelta({
-      x: (e.clientX - dragStart.current.x) / zoom,
-      y: (e.clientY - dragStart.current.y) / zoom,
-    });
+    if (!dragging.current || !pathRef.current) return;
+    // Con trỏ (toạ độ màn hình) -> toạ độ flow -> chiếu về điểm gần nhất trên dây.
+    const flowPt = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const near = nearestPointOnPath(pathRef.current, flowPt);
+    // Offset = điểm-trên-dây trừ vị trí gốc (tâm dây + stagger) để render đặt đúng chỗ.
+    const off = { x: near.x - (labelX + stagger.x), y: near.y - (labelY + stagger.y) };
+    latestOffset.current = off;
+    setDragOffset(off);
   };
-  const onLabelPointerUp = (e: ReactPointerEvent<HTMLSpanElement>) => {
-    if (!dragStart.current) return;
-    const dx = (e.clientX - dragStart.current.x) / zoom;
-    const dy = (e.clientY - dragStart.current.y) / zoom;
-    dragStart.current = null;
-    setDragDelta(null);
-    // Chỉ commit khi thật sự kéo (tránh ghi offset 0 khi chỉ click vào nhãn).
-    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-      setEdgeLabelOffset(id, { x: savedOffset.x + dx, y: savedOffset.y + dy });
-    }
+  const onLabelPointerUp = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const off = latestOffset.current;
+    latestOffset.current = null;
+    setDragOffset(null);
+    if (off) setEdgeLabelOffset(id, off);
   };
 
   const sourceNode = useInternalNode(source);
@@ -290,8 +315,10 @@ export function DeletableEdge({
   return (
     <>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
-      {/* Path trong suốt, dày — vùng bắt hover rộng hơn để dễ trỏ vào dây. */}
+      {/* Path trong suốt, dày — vùng bắt hover rộng hơn để dễ trỏ vào dây. Cũng là
+          path được LẤY MẪU để chiếu nhãn về đúng dây khi kéo (nearestPointOnPath). */}
       <path
+        ref={pathRef}
         d={edgePath}
         fill="none"
         stroke="transparent"
@@ -318,7 +345,7 @@ export function DeletableEdge({
         >
           {hasLabel && (
             <span
-              className={`edge-label${alwaysLabel ? ' edge-label--draggable' : ''}${dragDelta ? ' edge-label--dragging' : ''}`}
+              className={`edge-label${alwaysLabel ? ' edge-label--draggable' : ''}${dragOffset ? ' edge-label--dragging' : ''}`}
               style={{ opacity: labelVisible ? 1 : 0 }}
               onPointerDown={onLabelPointerDown}
               onPointerMove={onLabelPointerMove}

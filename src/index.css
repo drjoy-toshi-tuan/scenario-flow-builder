@@ -366,10 +366,11 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
   /* Node lùn (chỉ còn tên + dải icon biểu thị) — tên dài xuống dòng (tối đa 2 dòng)
-     thì node tự cao thêm. */
+     thì node tự cao thêm. Cao hơn 1 chút + tên/status xếp dọc có khoảng hở nên tên
+     dài không chèn lên dải status. */
   height: auto;
-  min-height: 56px;
-  padding: 8px 14px;
+  min-height: 64px;
+  padding: 9px 14px;
   /* Nền/viền/bóng chuyển hết sang lớp .bk-cs-skin (bị mask khoét lỗ tại output) —
      root để TRONG SUỐT, nhờ vậy handle là anh em của skin, không bị mask cắt. */
   background: transparent;
@@ -384,9 +385,10 @@ body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  /* Nền node đảo tông (--bk-node-bg) pha nhẹ accent + viền cùng tông accent. */
-  background: color-mix(in srgb, var(--accent) 6%, var(--bk-node-bg));
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--bk-node-bg));
+  /* Nền node đảo tông (--bk-node-bg) pha THÊM màu node (accent) để vẫn trắng/offwhite
+     nhưng ám nhẹ màu loại -> dễ phân biệt. Viền = ĐÚNG màu node (accent) cho node nổi. */
+  background: color-mix(in srgb, var(--accent) 14%, var(--bk-node-bg));
+  border: 1px solid var(--accent);
   box-shadow: var(--bk-shadow);
   pointer-events: none;
 }
@@ -402,7 +404,9 @@ body {
   border-color: transparent;
 }
 .bk-node--cs:hover .bk-cs-skin {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-node-border));
+  /* Viền đã là accent đầy ở trạng thái thường; hover giữ nguyên accent (node nhấc lên
+     nhờ translateY) — không hạ tông viền. */
+  border-color: var(--accent);
 }
 .bk-node--cs.bk-node--selected {
   border-color: transparent;
@@ -427,9 +431,10 @@ body {
   flex-direction: column;
   align-items: stretch;
   align-self: stretch;
-  /* Tên node LUÔN nằm đúng tâm node theo chiều dọc — dải icon biểu thị neo absolute
-     góc dưới phải (xem .bk-cs-indicators) nên không đẩy tên lệch tâm. */
+  /* Tên + dải icon biểu thị xếp DỌC, cả cụm căn giữa node; giữa 2 phần luôn có khoảng
+     hở (gap) nên tên dài (2 dòng) không bao giờ chèn lên dải status. */
   justify-content: center;
+  gap: 6px;
   position: relative;
 }
 /* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
@@ -446,14 +451,13 @@ body {
   overflow: hidden;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
-   Neo ABSOLUTE góc dưới phải để không ảnh hưởng căn giữa dọc của tên node. */
+   Xếp DƯỚI tên node (in-flow, không absolute) căn phải; cách tên bằng gap của
+   .bk-cs-main nên tên dài không chèn lên. */
 .bk-cs-indicators {
-  position: absolute;
-  right: 0;
-  bottom: -3px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  align-self: stretch;
   gap: 9px;
 }
 .bk-cs-ind {
@@ -464,9 +468,9 @@ body {
      đủ tương phản trên nền node đảo tông ở cả light lẫn dark. */
   color: color-mix(in srgb, var(--ind, currentColor) 72%, var(--bk-node-text));
 }
-/* Số lần retry: to ngang cỡ icon (13px) cho dễ đọc. */
+/* Số lần retry: nhỏ hơn icon một chút cho gọn (không lấn át icon vòng lặp). */
 .bk-cs-ind-num {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -713,6 +717,13 @@ body {
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+}
+/* Tên node trong panel setting: cho phép xuống DUY NHẤT 1 dòng (tối đa 2 dòng) — chặn
+   cao thêm bằng max-height; quá 2 dòng thì cuộn trong ô (JS đặt height theo scrollHeight
+   nhưng bị max-height ghim lại). ~2 dòng = 2×1.4em + đệm dọc (py-2 = 16px). */
+.bk-name-autogrow {
+  max-height: calc(2.8em + 16px);
+  overflow-y: auto;
 }
 
 /* Modal cảnh báo thay đổi chưa lưu — phủ mờ trong panel. */

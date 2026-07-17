@@ -82,7 +82,7 @@ export function StatusSettingsTab() {
               title={t('stInfoTitle')}
               className="inline-flex h-5 w-5 items-center justify-center text-[#38bdf8] transition hover:brightness-110"
             >
-              <Icon icon="line-md:question-circle-twotone" width={19} height={19} />
+              <Icon icon="app:question-circle-draw" width={19} height={19} />
             </button>
           </div>
           <table className="w-full max-w-[560px] border-collapse text-sm">

@@ -965,11 +965,11 @@ export function optionGroupsForSource(source: OptionsSource, ir: FlowIR | null):
 }
 
 // ── Nhánh màn CS (シナリオ設計書) ─────────────────────────────────────────────
-// CS: nhánh của node KHÔNG phải logic là danh sách ĐIỀU KIỆN tự do 1 cột (thêm/
-// sửa/xoá được) — kể cả loại vốn có nhánh cố định (announce/interaction/transfer),
-// vì シナリオ設計書 là diagram mô tả, không phải cấu hình chạy máy.
+// CS: chỉ node 聴取 (interaction) cho sửa nhánh điều kiện tự do (theo câu trả lời
+// của người gọi). Announce (chỉ phát rồi 次へ) và Transfer (失敗 / 次へ) có nhánh
+// CỐ ĐỊNH theo nghiệp vụ nên KHÔNG cho chỉnh sửa — hiển thị read-only.
 export function csEditableBranchNode(type: NodeType): boolean {
-  return type === 'announce' || type === 'interaction' || type === 'transfer';
+  return type === 'interaction';
 }
 
 // Danh sách nhánh CS của node: có data.branches -> dùng thẳng; chưa có -> seed từ

@@ -167,8 +167,9 @@ export function GeneralSettingsTab() {
                 <div className="flex flex-col gap-1.5">
                   {DAY_KEYS.map((day) => {
                     const sched = settings.workingDays.find((d) => d.day === day)!;
-                    // T2~T6 bật = xanh lá sáng; T7/CN/NL bật = đỏ tone sáng. Chữ đậm
-                    // tối trên nền sáng -> tương phản tốt ở cả light lẫn dark theme.
+                    // T2~T6 bật = xanh lá hơi ngả cyan (emerald); T7/CN/NL bật = đỏ tone
+                    // sáng. Cả 2 dùng chữ TRẮNG — nền đủ đậm để tương phản tốt (AA cho chữ
+                    // đậm) ở cả light lẫn dark theme.
                     const isRedDay = day === 'sat' || day === 'sun' || day === 'holiday';
                     return (
                       <div key={day} className="flex items-start gap-3">
@@ -188,8 +189,8 @@ export function GeneralSettingsTab() {
                           className={`inline-flex h-9 w-11 shrink-0 items-center justify-center rounded-lg border text-sm font-bold transition ${
                             sched.enabled
                               ? isRedDay
-                                ? 'border-[#f87171] bg-[#f87171] text-[#450a0a]'
-                                : 'border-[#22c55e] bg-[#22c55e] text-[#052e16]'
+                                ? 'border-[#ef4444] bg-[#ef4444] text-white'
+                                : 'border-[#059669] bg-[#059669] text-white'
                               : 'border-[var(--bk-border)] bg-[var(--bk-surface-2)] text-[var(--bk-text-faint)] hover:text-[var(--bk-text)]'
                           }`}
                         >

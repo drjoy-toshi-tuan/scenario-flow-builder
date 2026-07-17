@@ -170,5 +170,46 @@ addCollection({
   },
 });
 
+// Icon fa6-solid bổ sung: check-double (indicator 復唱 trên node CS). Cùng prefix
+// 'fa6-solid' -> GỘP vào fa6SolidSubset đã đăng ký (không ghi đè). Bộ fa6-solid
+// 512x512; icon này khai width 448 riêng (viewBox gốc 448x512).
+addCollection({
+  prefix: 'fa6-solid',
+  width: 512,
+  height: 512,
+  icons: {
+    'check-double': {
+      body: '<path fill="currentColor" d="M342.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L160 178.7l-57.4-57.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l80 80c12.5 12.5 32.8 12.5 45.3 0zm96 128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L160 402.7L54.6 297.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l256-256z"/>',
+      width: 448,
+    },
+  },
+});
+
+// Icon akar-icons (24x24): arrow-cycle (indicator リトライ trên node CS).
+addCollection({
+  prefix: 'akar-icons',
+  width: 24,
+  height: 24,
+  icons: {
+    'arrow-cycle': {
+      body: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M22 12c0 6-4.39 10-9.806 10C7.792 22 4.24 19.665 3 16m-1-4C2 6 6.39 2 11.807 2C16.208 2 19.758 4.335 21 8"/><path d="m7 17l-4-1l-1 4M17 7l4 1l1-4"/></g>',
+    },
+  },
+});
+
+// Icon app: dấu hỏi trong vòng tròn vẽ nét (nút info màn Status Settings). Vòng tròn
+// vẽ viền rồi fill trắng, dấu hỏi "khoét" đen qua mask -> nét chấm hỏi rỗng. Iconify
+// tự thay id mask thành id duy nhất mỗi lần render nên không lo trùng.
+addCollection({
+  prefix: 'app',
+  width: 24,
+  height: 24,
+  icons: {
+    'question-circle-draw': {
+      body: '<path d="M0 0h24v24H0z" fill="none"/><defs><mask id="questionCircleMask"><g stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path fill="#fff" fill-opacity="0" stroke="#fff" stroke-dasharray="60" d="M3 12c0 -4.97 4.03 -9 9 -9c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="60;0"/><animate fill="freeze" attributeName="fill-opacity" begin="0.6s" dur="0.4s" to="1"/></path><path fill="none" stroke="#000" stroke-dasharray="18" stroke-dashoffset="18" d="M9 10c0 -1.66 1.34 -3 3 -3c1.66 0 3 1.34 3 3c0 0.98 -0.47 1.85 -1.2 2.4c-0.73 0.55 -1.3 0.6 -1.8 1.6"><animate fill="freeze" attributeName="stroke-dashoffset" begin="1s" dur="0.3s" to="0"/></path><path fill="none" stroke="#000" stroke-dasharray="4" stroke-dashoffset="4" d="M12 17v0.01"><animate fill="freeze" attributeName="stroke-dashoffset" begin="1.3s" dur="0.2s" to="0"/></path></g></mask></defs><path fill="currentColor" d="M0 0h24v24H0z" mask="url(#questionCircleMask)"/>',
+    },
+  },
+});
+
 // Re-export để cả app import 1 chỗ (đảm bảo addCollection đã chạy trước khi render).
 export { Icon };

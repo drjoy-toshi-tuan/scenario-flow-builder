@@ -200,7 +200,13 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
 
         {/* Tab tràn hết bề rộng panel; tab đang chọn có nền + gạch chân accent. */}
         <div className="bk-tabs">
-          <TabButton label={t('tabGeneral')} active={tab === 'general'} onClick={() => setTab('general')} />
+          {/* CS: tab General gộp luôn Property -> đặt tên "Property Settings / プロパティ設定"
+              (dùng key tabProperty) để đồng bộ với TS sau này. */}
+          <TabButton
+            label={csMode ? t('tabProperty') : t('tabGeneral')}
+            active={tab === 'general'}
+            onClick={() => setTab('general')}
+          />
           {/* CS: General gộp luôn Property -> không có tab Property riêng. */}
           {!csMode && (
             <TabButton
@@ -233,6 +239,9 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
             <CsLogicBranchEditor node={node} />
           ) : csMode && csEditableBranchNode(node.type) ? (
             <CsBranchTab node={node} data={editing.data} />
+          ) : csMode ? (
+            // CS: node có nhánh cố định (announce/transfer…) -> hiển thị read-only.
+            <CsFixedBranchTab node={node} />
           ) : (
             <BranchTab node={node} data={editing.data} />
           ))}
@@ -372,10 +381,12 @@ function GeneralTab({
     <>
       <label className="block">
         <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('nodeName')}</span>
-        <input
-          className={`${inputClass} ${nameError ? '!border-rose-400 focus:!border-rose-400' : ''}`}
+        {/* Tên node: ô tự cao khi text dài (không cho Enter) — cho xuống DUY NHẤT 1 dòng
+            (tối đa 2 dòng, chặn bằng max-height ở .bk-name-autogrow). */}
+        <AutoGrowTextarea
+          className={`${inputClass} bk-autogrow bk-name-autogrow ${nameError ? '!border-rose-400 focus:!border-rose-400' : ''}`}
           value={label}
-          onChange={(e) => setDraftLabel(e.target.value)}
+          onChange={setDraftLabel}
         />
         {nameError && <span className="mt-1 block text-xs text-rose-500">{t(nameError)}</span>}
       </label>
@@ -1001,6 +1012,51 @@ function CsBranchTab({ node, data }: { node: FlowNode; data: Record<string, unkn
         <Icon icon="lucide:plus" width={16} height={16} />
         {t('addCondition')}
       </button>
+    </div>
+  );
+}
+
+// Branch Settings màn CS cho node có nhánh CỐ ĐỊNH (announce: 次へ; transfer: 失敗/次へ):
+// READ-ONLY — chỉ hiện nhãn nhánh + node đích, không sửa/thêm/xoá. 1 cột nhãn +
+// cột NODE căn TRÁI, đồng bộ layout với CsBranchTab.
+function CsFixedBranchTab({ node }: { node: FlowNode }) {
+  const t = useT();
+  const ir = useFlowStore((s) => s.ir);
+  const fixed = BRANCH_SCHEMA[node.type].fixed ?? [];
+
+  const targetInfo = (handleId: string): TargetInfo | null => {
+    const edge = ir?.edges.find((e) => e.source === node.id && (e.sourceHandle ?? 'default') === handleId);
+    if (!edge) return null;
+    const target = ir?.nodes.find((n) => n.id === edge.target);
+    return {
+      label: target?.label ?? edge.target,
+      color: target ? NODE_CONFIG[target.type].color : 'var(--bk-text-faint)',
+    };
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-[var(--bk-text-faint)]">{t('branchFixedNote')}</p>
+      <div className="space-y-2.5">
+        <div className="bk-branch-row bk-branch-head">
+          <div className="bk-branch-cond">{t('branchColCondition')}</div>
+          <span className="bk-branch-arrow-spacer" aria-hidden />
+          <div className="bk-branch-target bk-branch-target--left">{t('branchColNode')}</div>
+        </div>
+        {fixed.map((b) => (
+          <div key={b.id} className="bk-branch-row">
+            <div className="bk-branch-cond">
+              <HoverTip className="bk-branch-fixed" content={b.label ?? ''}>
+                {b.label ?? ''}
+              </HoverTip>
+            </div>
+            <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
+            <div className="bk-branch-target bk-branch-target--left">
+              <BranchTarget info={targetInfo(b.id)} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
