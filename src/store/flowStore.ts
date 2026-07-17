@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import { isModuleNodeType, type FlowIR, type FlowEdge, type FlowNode, type NodeType, type SubFlow } from '../ir/types';
+import {
+  isModuleNodeType,
+  type FlowIR,
+  type FlowEdge,
+  type FlowNode,
+  type NodeType,
+  type ScenarioSettings,
+  type SubFlow,
+} from '../ir/types';
+import { ensureSettings } from '../ir/settings';
 import { fromYaml } from '../ir/fromYaml';
 import { toYaml } from '../ir/toYaml';
 import { layout } from '../ir/layout';
@@ -37,6 +46,10 @@ export interface NodeDraft {
   data: Record<string, unknown>;
 }
 
+// Các tab của màn canvas (dưới header). 'flow' = canvas React Flow; các tab khác
+// là UI bảng/form thường (Announce List / General Settings / Status Settings).
+export type CanvasTab = 'flow' | 'announce' | 'general' | 'status';
+
 interface FlowState {
   // ir.nodes/edges là graph ĐANG MỞ (main flow hoặc 1 sub flow — xem activeFlowId).
   // Khi đang ở sub flow: graph main tạm cất ở mainStash; slot của sub flow trong
@@ -63,6 +76,15 @@ interface FlowState {
   // mở panel này tự đóng các panel kia (cùng 1 ô canvasPanel).
   canvasPanel: 'addNode' | 'flows' | 'controls' | null;
   setCanvasPanel: (panel: 'addNode' | 'flows' | 'controls' | null) => void;
+
+  // Tab đang mở trên màn canvas (dưới header): Flow Diagram / Announce List /
+  // General Settings / Status Settings. Reset về 'flow' khi nạp file mới.
+  canvasTab: CanvasTab;
+  setCanvasTab: (tab: CanvasTab) => void;
+
+  // Cập nhật cấu hình kịch bản (các tab General/Status Settings) — merge patch
+  // trên bản settings đầy đủ (file cũ chưa có -> seed default trước khi vá).
+  setSettings: (patch: Partial<ScenarioSettings>) => void;
 
   // Đang kéo/di chuyển canvas (pan/zoom) -> ẩn thanh công cụ nổi trên node.
   isPanning: boolean;
@@ -282,6 +304,9 @@ export const useFlowStore = create<FlowState>((set, get) => {
     canvasPanel: null,
     setCanvasPanel: (panel) => set({ canvasPanel: panel }),
 
+    canvasTab: 'flow',
+    setCanvasTab: (tab) => set({ canvasTab: tab }),
+
     assembleDoc: () => assembleDoc(),
 
     switchFlow: async (id) => {
@@ -468,10 +493,11 @@ export const useFlowStore = create<FlowState>((set, get) => {
         draft: null,
         pendingSelect: null,
         pendingDelete: null,
-        // Nạp file mới -> về main flow + reset lịch sử Undo/Redo.
+        // Nạp file mới -> về main flow + tab Flow Diagram + reset lịch sử Undo/Redo.
         activeFlowId: 'main',
         mainStash: null,
         canvasPanel: null,
+        canvasTab: 'flow',
         past: [],
         future: [],
         ivr: nextIvr,
@@ -497,6 +523,12 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const { ir } = get();
       if (!ir) return;
       set({ ir: { ...ir, meta: { ...ir.meta, ...patch } } });
+    },
+
+    setSettings: (patch) => {
+      const { ir } = get();
+      if (!ir) return;
+      set({ ir: { ...ir, settings: { ...ensureSettings(ir.settings), ...patch } } });
     },
 
     setNodePositions: (positions) => {

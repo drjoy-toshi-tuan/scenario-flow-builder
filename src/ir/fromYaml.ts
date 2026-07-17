@@ -1,4 +1,5 @@
 import { parse } from 'yaml';
+import { normalizeSettings } from './settings';
 import {
   type FlowIR,
   type FlowNode,
@@ -68,6 +69,7 @@ interface RawFlowFile {
     updatedAt?: string;
     nodes?: RawNode[];
     subflows?: RawSubflow[];
+    settings?: unknown; // cấu hình kịch bản — normalizeSettings tự kiểm kiểu
   };
 }
 
@@ -304,6 +306,10 @@ export function fromYaml(text: string): FlowIR {
     nodes,
     edges,
     ...(subflows.length > 0 ? { subflows } : {}),
+    // Cấu hình kịch bản (General/Status Settings) — normalize để file thiếu field
+    // hoặc bị sửa tay vẫn mở được. File cũ không có settings -> bỏ qua (undefined),
+    // UI tự dùng default qua ensureSettings.
+    ...(flow.settings ? { settings: normalizeSettings(flow.settings) } : {}),
   };
 }
 

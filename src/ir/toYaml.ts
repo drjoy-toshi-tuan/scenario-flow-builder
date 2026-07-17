@@ -174,6 +174,9 @@ export function toYaml(ir: FlowIR): string {
       ...(main.startData ? { startData: main.startData } : {}),
       nodes: main.nodes,
       ...(subflows.length > 0 ? { subflows } : {}),
+      // Cấu hình kịch bản (General/Status Settings) — ghi nguyên khối, round-trip
+      // qua normalizeSettings ở fromYaml.
+      ...(ir.settings ? { settings: ir.settings } : {}),
     },
   };
 

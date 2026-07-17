@@ -4,6 +4,7 @@ import { toYaml } from './toYaml';
 import { layout } from './layout';
 import { parse } from 'yaml';
 import { SYNTHETIC_START_ID } from './types';
+import { normalizeSettings, smsCharCount } from './settings';
 import {
   defaultDataFor,
   sourceHandlesFor,
@@ -1433,5 +1434,47 @@ describe('node Start: Get Header + startData round-trip', () => {
     const out = toYaml(fromYaml(SAMPLE));
     const raw = parse(out) as { flow: Record<string, unknown> };
     expect('startData' in raw.flow).toBe(false);
+  });
+});
+
+// ── ScenarioSettings (General/Status Settings) round-trip ────────────────────
+describe('flow.settings round-trip', () => {
+  it('toYaml ghi settings; fromYaml normalize + đọc lại đủ field', () => {
+    const ir = fromYaml(SAMPLE);
+    ir.settings = normalizeSettings({
+      mainPhone: '03-1234-5678',
+      master050: '050-1111-2222',
+      workingDays: [{ day: 'mon', enabled: true, ranges: [{ from: '09:00', to: '12:00' }] }],
+      statuses: [
+        { name: '対応不要', flag: 5 }, // đổi tên status cố định flag 5
+        { name: '再確認待ち', flag: 21 }, // status thêm tay dải 20
+      ],
+      smsFlags: [{ type: '予約完了', flag: 1, content: 'ご予約ありがとうございます。' }],
+    });
+    const again = fromYaml(toYaml(ir));
+    const s = again.settings!;
+    expect(s.mainPhone).toBe('03-1234-5678');
+    expect(s.master050).toBe('050-1111-2222');
+    // Luôn đủ 8 ngày; thứ 2 giữ khung giờ đã set.
+    expect(s.workingDays).toHaveLength(8);
+    expect(s.workingDays[0]).toEqual({ day: 'mon', enabled: true, ranges: [{ from: '09:00', to: '12:00' }] });
+    // Status cố định: đủ 7 flag 0-6, flag 5 giữ tên người dùng đổi, thêm flag 21.
+    const flags = s.statuses.map((x) => x.flag);
+    expect(flags).toEqual([0, 1, 2, 3, 4, 5, 6, 21]);
+    expect(s.statuses.find((x) => x.flag === 5)!.name).toBe('対応不要');
+    expect(s.statuses.find((x) => x.flag === 5)!.fixed).toBe(true);
+    expect(s.statuses.find((x) => x.flag === 21)!.fixed).toBeUndefined();
+    expect(s.smsFlags).toEqual([{ type: '予約完了', flag: 1, content: 'ご予約ありがとうございます。' }]);
+  });
+
+  it('file không có settings -> ir.settings undefined (không rải block rỗng)', () => {
+    const out = toYaml(fromYaml(SAMPLE));
+    const raw = parse(out) as { flow: Record<string, unknown> };
+    expect('settings' in raw.flow).toBe(false);
+  });
+
+  it('smsCharCount = nội dung + 1 (xuống dòng) + 22 (URL cố định)', () => {
+    expect(smsCharCount('')).toBe(23);
+    expect(smsCharCount('abc')).toBe(26);
   });
 });

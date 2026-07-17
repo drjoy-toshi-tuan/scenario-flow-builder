@@ -20,6 +20,55 @@ export interface FlowIR {
   // Sub Flow: các flow phụ trong cùng file, node Jump trỏ tới theo TÊN. Xử lý tới
   // node cuối (không nối tiếp) của sub flow thì quay lại main flow (logic Brekeke).
   subflows?: SubFlow[];
+  // Cấu hình kịch bản ngoài graph (General Settings / Status Settings) — sửa ở các
+  // tab của màn canvas, lưu kèm file YAML (flow.settings).
+  settings?: ScenarioSettings;
+}
+
+// ── Cấu hình kịch bản (các tab ngoài Flow Diagram) ───────────────────────────
+
+export interface TimeRange {
+  from: string; // "HH:mm"
+  to: string;
+}
+
+export const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'holiday'] as const;
+export type DayKey = (typeof DAY_KEYS)[number];
+
+// 1 ngày làm việc: bật/tắt + các khung giờ (1 ngày có thể 2-4 khung).
+export interface DaySchedule {
+  day: DayKey;
+  enabled: boolean;
+  ranges: TimeRange[];
+}
+
+// 1 dòng 状態 (Status Settings). Các status mặc định fixed=true: không xoá,
+// không đổi flag — chỉ đổi được tên.
+export interface StatusEntry {
+  name: string;
+  flag: number;
+  fixed?: boolean;
+}
+
+// 1 dòng SMSフラグ. Nội dung SMS luôn kèm URL cố định 22 ký tự ở dòng cuối
+// (tag 通話後送信URL — cột 文字数 đếm cả phần này).
+export interface SmsFlagEntry {
+  type: string; // 区分
+  flag: number;
+  content: string; // SMS文言 (chưa gồm URL)
+}
+
+export interface ScenarioSettings {
+  mainPhone: string; // 代表電話（直通電話）
+  master050: string; // 050番号 — môi trường master (本番)
+  demo050: string; // 050番号 — môi trường demo
+  smsNumber: string; // SMS送信番号
+  workingDays: DaySchedule[]; // 稼働曜日 — luôn đủ 8 entry theo DAY_KEYS
+  restPeriod: string; // 稼働休止期間 (freetext)
+  silentDetectionSec: string; // 発話待機時間 (giây)
+  timeoutSec: string; // 無回答待機時間 (giây)
+  statuses: StatusEntry[]; // tab Status Settings — phần 状態
+  smsFlags: SmsFlagEntry[]; // tab Status Settings — phần SMSフラグ
 }
 
 export interface SubFlow {
