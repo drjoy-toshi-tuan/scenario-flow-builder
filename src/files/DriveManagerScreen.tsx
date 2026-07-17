@@ -19,6 +19,7 @@ import {
   renameItem,
   trashItem,
   updateItemDescription,
+  updateItemAppProperties,
   isFolder,
   isYamlName,
   DriveApiError,
@@ -38,7 +39,7 @@ import { PermissionsModal } from './PermissionsModal';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { HoverLabelButton } from '../components/HoverTip';
 import { gdErrorKey } from '../drive/errors';
-import { DRIVE_ROOT_FOLDER_ID, parseVersionFromName, versionFileName } from '../drive/config';
+import { driveRootFolderId, parseVersionFromName, versionFileName } from '../drive/config';
 import { parseFlowMeta, updateFlowMeta } from '../ir/flowMeta';
 import { formatDateTime } from '../ir/ivrProperty';
 
@@ -72,7 +73,13 @@ export interface VersionNode {
   subflowCount?: number;
   // Ghi chú tự do của BẢN NÀY (description của file version trên Drive).
   note?: string;
+  // Môi trường của BẢN NÀY (màn CS) — đọc/ghi qua appProperties.csEnvironment của file
+  // version. Chọn khi tạo/import, sửa được ở nút Edit trên dòng version. undefined = chưa đặt.
+  environment?: 'master' | 'demo';
 }
+
+// Môi trường AI電話 dùng chung cho stamp / select (本番 = master, デモ = demo).
+export type EnvKind = 'master' | 'demo';
 
 export interface ScenarioNode {
   id: string;
@@ -109,10 +116,13 @@ interface DriveActions {
   // Đổi tên folder 病院/シナリオ (chỉ tên folder, không đụng nội dung bên trong).
   onRename?: (id: string, name: string) => void;
   onDelete?: (target: DeleteTarget) => void;
-  onCreateFlow?: (facility: string, scenario: string) => void;
-  onImport?: (facility: string, scenario: string, content: string) => void;
+  // environment: chỉ dùng ở màn CS (gắn môi trường cho バージョン tạo/import).
+  onCreateFlow?: (facility: string, scenario: string, environment?: EnvKind) => void;
+  onImport?: (facility: string, scenario: string, content: string, environment?: EnvKind) => void;
   // Lưu ghi chú của 1 VERSION (ghi vào description file version; rỗng = xoá ghi chú).
   onSaveNote?: (versionFileId: string, note: string) => void;
+  // Đổi môi trường của 1 VERSION (màn CS) — ghi appProperties.csEnvironment của file.
+  onSetVersionEnv?: (versionFileId: string, environment: EnvKind) => void;
   // Đọc subflowCount cho các version của 1 kịch bản (gọi khi vào tầng flow).
   onLoadVersionDetails?: (facilityId: string, scenarioId: string) => void;
 }
@@ -177,6 +187,7 @@ const MANY_VERSIONS: VersionNode[] = Array.from({ length: 24 }, (_, i) => {
     updatedAt: mockDate(v * 3 + (v % 3), v % 2 ? '16:45' : '09:30'),
     author: authors[v % 3],
     subflowCount: v % 4,
+    environment: (v % 2 ? 'master' : 'demo') as 'master' | 'demo',
   };
 });
 
@@ -195,9 +206,9 @@ const MOCK_FACILITIES: FacilityNode[] = [
         appliedMasterAt: '2026-07-12 09:15',
         appliedDemoAt: '2026-07-15 10:05',
         versions: [
-          { fileId: 'm1', v: 3, createdAt: '2026-07-14 18:22', updatedAt: '2026-07-15 10:05', author: 'Tuan Nguyen', subflowCount: 3, note: 'Đang chỉnh lại nhánh xác nhận ngày sinh — CHƯA deploy bản này.' },
-          { fileId: 'm2', v: 2, createdAt: '2026-07-10 09:41', updatedAt: '2026-07-12 14:20', author: 'Tuan Nguyen', subflowCount: 2, note: 'V2 đang chạy thật trên tổng đài. Trước khi deploy bản mới cần xác nhận lại giờ tiếp nhận với bệnh viện.' },
-          { fileId: 'm3', v: 1, createdAt: '2026-07-02 14:05', updatedAt: '2026-07-02 14:05', author: '田中 花子', subflowCount: 0 },
+          { fileId: 'm1', v: 3, createdAt: '2026-07-14 18:22', updatedAt: '2026-07-15 10:05', author: 'Tuan Nguyen', subflowCount: 3, environment: 'demo', note: 'Đang chỉnh lại nhánh xác nhận ngày sinh — CHƯA deploy bản này.' },
+          { fileId: 'm2', v: 2, createdAt: '2026-07-10 09:41', updatedAt: '2026-07-12 14:20', author: 'Tuan Nguyen', subflowCount: 2, environment: 'master', note: 'V2 đang chạy thật trên tổng đài. Trước khi deploy bản mới cần xác nhận lại giờ tiếp nhận với bệnh viện.' },
+          { fileId: 'm3', v: 1, createdAt: '2026-07-02 14:05', updatedAt: '2026-07-02 14:05', author: '田中 花子', subflowCount: 0, environment: 'master' },
         ],
       },
       {
@@ -208,7 +219,7 @@ const MOCK_FACILITIES: FacilityNode[] = [
         appliedDemo: null,
         appliedMasterAt: '2026-07-08 11:35',
         versions: [
-          { fileId: 'm4', v: 1, createdAt: '2026-07-08 11:30', updatedAt: '2026-07-08 11:30', author: '田中 花子', subflowCount: 1 },
+          { fileId: 'm4', v: 1, createdAt: '2026-07-08 11:30', updatedAt: '2026-07-08 11:30', author: '田中 花子', subflowCount: 1, environment: 'master' },
         ],
       },
       {
@@ -218,8 +229,8 @@ const MOCK_FACILITIES: FacilityNode[] = [
         appliedMaster: null,
         appliedDemo: null,
         versions: [
-          { fileId: 'm5', v: 2, createdAt: '2026-07-15 08:12', updatedAt: '2026-07-15 08:12', author: 'Tuan Nguyen', subflowCount: 0 },
-          { fileId: 'm6', v: 1, createdAt: '2026-07-12 16:48', updatedAt: '2026-07-13 09:02', author: '佐藤 健', subflowCount: 0 },
+          { fileId: 'm5', v: 2, createdAt: '2026-07-15 08:12', updatedAt: '2026-07-15 08:12', author: 'Tuan Nguyen', subflowCount: 0, environment: 'demo' },
+          { fileId: 'm6', v: 1, createdAt: '2026-07-12 16:48', updatedAt: '2026-07-13 09:02', author: '佐藤 健', subflowCount: 0, environment: 'master' },
         ],
       },
     ],
@@ -246,7 +257,7 @@ const MOCK_FACILITIES: FacilityNode[] = [
         appliedMaster: null,
         appliedDemo: null,
         versions: [
-          { fileId: 'm7', v: 1, createdAt: '2026-07-11 17:19', updatedAt: '2026-07-11 17:19', author: '田中 花子', subflowCount: 2 },
+          { fileId: 'm7', v: 1, createdAt: '2026-07-11 17:19', updatedAt: '2026-07-11 17:19', author: '田中 花子', subflowCount: 2, environment: 'demo' },
         ],
       },
     ],
@@ -265,8 +276,8 @@ const MOCK_FACILITIES: FacilityNode[] = [
         appliedMasterAt: '2026-07-07 16:00',
         appliedDemoAt: '2026-07-14 20:10',
         versions: [
-          { fileId: 'm8', v: 2, createdAt: '2026-07-14 19:55', updatedAt: '2026-07-14 19:55', author: '田中 花子', subflowCount: 1 },
-          { fileId: 'm9', v: 1, createdAt: '2026-07-06 10:33', updatedAt: '2026-07-07 15:41', author: '田中 花子', subflowCount: 0 },
+          { fileId: 'm8', v: 2, createdAt: '2026-07-14 19:55', updatedAt: '2026-07-14 19:55', author: '田中 花子', subflowCount: 1, environment: 'master' },
+          { fileId: 'm9', v: 1, createdAt: '2026-07-06 10:33', updatedAt: '2026-07-07 15:41', author: '田中 花子', subflowCount: 0, environment: 'demo' },
         ],
       },
     ],
@@ -359,6 +370,7 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
     const v = isYamlName(f.name) ? parseVersionFromName(f.name) : null;
     // File không theo quy ước _V{N}.yaml (thả tay vào folder) -> bỏ qua.
     if (!parent || v == null) continue;
+    const env = f.appProperties?.csEnvironment;
     const node: VersionNode = {
       fileId: f.id,
       v,
@@ -366,6 +378,7 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
       updatedAt: fmtTime(f.modifiedTime),
       author: f.lastModifyingUser?.displayName ?? '',
       note: f.description?.trim() ? f.description : undefined,
+      environment: env === 'master' || env === 'demo' ? env : undefined,
     };
     versByParent.set(parent, [...(versByParent.get(parent) ?? []), node]);
   }
@@ -411,6 +424,9 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
   const showToast = useToast((s) => s.show);
   const loadYaml = useFlowStore((s) => s.loadYaml);
   const openFile = useFileStore((s) => s.openFile);
+  // Màn CS đọc/ghi kho RIÊNG (CS_DRIVE_ROOT_FOLDER_ID) và gắn môi trường theo version.
+  const csMode = useWorkspaceStore((s) => s.mode === 'cs');
+  const rootFolderId = driveRootFolderId(csMode);
 
   const [facilities, setFacilities] = useState<FacilityNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -439,7 +455,7 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     setLoading(true);
     setListErrorKey(null);
     try {
-      const facFolders = (await listChildren(token, [DRIVE_ROOT_FOLDER_ID])).filter(isFolder);
+      const facFolders = (await listChildren(token, [rootFolderId])).filter(isFolder);
       const scenFolders = facFolders.length
         ? (await listChildren(token, facFolders.map((x) => x.id))).filter(isFolder)
         : [];
@@ -472,9 +488,10 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     } finally {
       setLoading(false);
     }
-    // onAuthInvalid là action zustand ổn định — giữ deps [token] (xem FileManagerScreen).
+    // onAuthInvalid là action zustand ổn định — giữ deps [token, rootFolderId]
+    // (đổi bộ phận CS/TS -> đổi kho -> load lại cây). (xem FileManagerScreen).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, rootFolderId]);
 
   useEffect(() => {
     void load();
@@ -691,25 +708,38 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
     }
   };
 
+  // appProperties gắn cho file version khi tạo/import ở màn CS (môi trường của bản đó).
+  const envProps = (environment?: EnvKind): Record<string, string> | undefined =>
+    csMode && environment ? { csEnvironment: environment } : undefined;
+
   // Tạo flow mới: tự dựng cây 施設名/シナリオ名 (tìm-hoặc-tạo folder) rồi ghi V1
   // (folder シナリオ đã tồn tại thì ghi V{max+1}) và mở luôn lên canvas.
-  const createFlow = async (facility: string, scenario: string) => {
+  const createFlow = async (facility: string, scenario: string, environment?: EnvKind) => {
     if (busy) return;
     setBusy(true);
     setActionError(null);
     try {
-      const fac = await ensureFolder(token, DRIVE_ROOT_FOLDER_ID, facility);
+      const fac = await ensureFolder(token, rootFolderId, facility);
       const scen = await ensureFolder(token, fac.id, scenario);
       const existing = await listChildren(token, [scen.id]);
       const maxV = existing.reduce((m, x) => Math.max(m, parseVersionFromName(x.name) ?? 0), 0);
       const now = formatDateTime(new Date());
+      // CS vẽ シナリオ設計書 (không có node Start kỹ thuật) -> seed diagram trống KHÔNG
+      // có start; màn TS giữ flow trống chuẩn (welcome -> goodbye).
       const content = buildBlankFlow({
         facility,
         name: scenario,
         author: user?.name ?? user?.email ?? '',
         createdAt: now,
+        noStart: csMode,
       });
-      const file = await createYamlFile(token, scen.id, versionFileName(scenario, maxV + 1), content);
+      const file = await createYamlFile(
+        token,
+        scen.id,
+        versionFileName(scenario, maxV + 1),
+        content,
+        envProps(environment),
+      );
       await loadYaml(content);
       openFile({
         path: `${facility}/${scenario}`,
@@ -728,18 +758,45 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
   // Import file YAML vào folder bệnh viện/kịch bản đã chọn (tạo mới nếu chưa có),
   // ghi thành V{max+1} (V1 với kịch bản mới). Đồng bộ metadata facility/name theo
   // đích đến để danh sách hiển thị nhất quán với cây folder.
-  const importFlow = async (facility: string, scenario: string, content: string) => {
+  const importFlow = async (
+    facility: string,
+    scenario: string,
+    content: string,
+    environment?: EnvKind,
+  ) => {
     if (busy) return;
     setBusy(true);
     setActionError(null);
     try {
-      const fac = await ensureFolder(token, DRIVE_ROOT_FOLDER_ID, facility);
+      const fac = await ensureFolder(token, rootFolderId, facility);
       const scen = await ensureFolder(token, fac.id, scenario);
       const existing = await listChildren(token, [scen.id]);
       const maxV = existing.reduce((m, x) => Math.max(m, parseVersionFromName(x.name) ?? 0), 0);
       const next = updateFlowMeta(content, { facility, name: scenario });
-      await createYamlFile(token, scen.id, versionFileName(scenario, maxV + 1), next);
+      await createYamlFile(
+        token,
+        scen.id,
+        versionFileName(scenario, maxV + 1),
+        next,
+        envProps(environment),
+      );
       showToast(t('dmImported', { n: maxV + 1 }));
+      await load();
+    } catch (e) {
+      if (!handledAsExpired(e)) setActionError(t(gdErrorKey(e)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Đổi môi trường của 1 バージョン (màn CS) — ghi appProperties.csEnvironment của file.
+  const setVersionEnv = async (versionFileId: string, environment: EnvKind) => {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await updateItemAppProperties(token, versionFileId, { csEnvironment: environment });
+      showToast(t('csEnvSaved'));
       await load();
     } catch (e) {
       if (!handledAsExpired(e)) setActionError(t(gdErrorKey(e)));
@@ -762,9 +819,11 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
         onDuplicate: (_f, s, v) => void duplicateVersion(s, v),
         onRename: (id, name) => void rename(id, name),
         onDelete: (target) => void remove(target),
-        onCreateFlow: (facility, scenario) => void createFlow(facility, scenario),
-        onImport: (facility, scenario, content) => void importFlow(facility, scenario, content),
+        onCreateFlow: (facility, scenario, environment) => void createFlow(facility, scenario, environment),
+        onImport: (facility, scenario, content, environment) =>
+          void importFlow(facility, scenario, content, environment),
         onSaveNote: (versionFileId, note) => void saveNote(versionFileId, note),
+        onSetVersionEnv: (versionFileId, environment) => void setVersionEnv(versionFileId, environment),
         onLoadVersionDetails: (facilityId, scenarioId) => void loadVersionDetails(facilityId, scenarioId),
       }}
       canDelete={role !== 'user'}
@@ -816,6 +875,9 @@ function DriveInner({
   } | null;
 }) {
   const t = useT();
+  // Màn CS quản lý シナリオ設計書 (Flow Diagram): tên riêng, không cột deploy, môi
+  // trường gắn THEO từng バージョン (stamp + sửa được), chọn env khi tạo/import.
+  const csMode = useWorkspaceStore((s) => s.mode === 'cs');
 
   // Vị trí đang đứng trong cây: rỗng = tầng 病院; có facility = tầng シナリオ;
   // có cả scenario = tầng バージョン.
@@ -868,6 +930,11 @@ function DriveInner({
   const [newScenSel, setNewScenSel] = useState<string>(NEW_OPTION);
   const [newScenName, setNewScenName] = useState('');
   const [createErrorKey, setCreateErrorKey] = useState<TKey | null>(null);
+  // Môi trường chọn ở modal tạo mới / import (chỉ màn CS). Mặc định 本番 (master).
+  const [newEnv, setNewEnv] = useState<EnvKind>('master');
+  // Sửa môi trường của 1 バージョン (màn CS): version đang sửa + giá trị đang chọn.
+  const [envTarget, setEnvTarget] = useState<VersionNode | null>(null);
+  const [envDraft, setEnvDraft] = useState<EnvKind>('master');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ kind: 'facility' | 'scenario'; id: string; name: string } | null>(null);
   const [renameName, setRenameName] = useState('');
@@ -907,6 +974,7 @@ function DriveInner({
   const [impFacName, setImpFacName] = useState('');
   const [impScenSel, setImpScenSel] = useState<string>(NEW_OPTION);
   const [impScenName, setImpScenName] = useState('');
+  const [impEnv, setImpEnv] = useState<EnvKind>('master');
   const [importErrorKey, setImportErrorKey] = useState<TKey | null>(null);
   // Lỗi file không hợp lệ (hiện ở banner chung với lỗi hành động).
   const [uploadErrorKey, setUploadErrorKey] = useState<TKey | null>(null);
@@ -930,22 +998,25 @@ function DriveInner({
       return;
     }
     // Tầng flow: đích đến đã xác định (bệnh viện + kịch bản hiện tại) -> import
-    // thẳng, tự đánh version V{max+1}, không cần modal.
-    if (facility && scenario) {
+    // thẳng, tự đánh version V{max+1}, không cần modal. Màn CS VẪN mở modal để còn
+    // chọn môi trường cho bản import (đích cố định sẵn theo path).
+    if (facility && scenario && !csMode) {
       actions.onImport?.(facility.name, scenario.name, content);
       return;
     }
     // Tầng bệnh viện / kịch bản: mở modal chọn đích đến. Prefill: đang đứng trong
-    // bệnh viện -> cố định bệnh viện đó; ngoài ra thử khớp metadata trong file với
-    // folder có sẵn; không khớp -> chế độ "tạo mới" với tên lấy từ metadata.
+    // bệnh viện/kịch bản -> cố định theo path; ngoài ra thử khớp metadata trong file
+    // với folder có sẵn; không khớp -> chế độ "tạo mới" với tên lấy từ metadata.
     const meta = parseFlowMeta(content);
     const metaFac = facilities.find((f) => f.name === meta.facility) ?? null;
     const fac = facility ?? metaFac;
     setImpFacSel(fac?.id ?? NEW_OPTION);
     setImpFacName(meta.facility ?? '');
     const metaScen = fac?.scenarios.find((s) => s.name === meta.name) ?? null;
-    setImpScenSel(metaScen?.id ?? NEW_OPTION);
+    const presetScen = scenario ?? metaScen;
+    setImpScenSel(presetScen?.id ?? NEW_OPTION);
     setImpScenName(meta.name ?? '');
+    setImpEnv('master');
     setImportErrorKey(null);
     setImportContent(content);
   };
@@ -966,7 +1037,7 @@ function DriveInner({
     }
     const content = importContent;
     setImportContent(null);
-    if (content) actions.onImport?.(fac, scen, content);
+    if (content) actions.onImport?.(fac, scen, content, csMode ? impEnv : undefined);
   };
 
   // Bệnh viện đang chọn trong modal tạo mới (khi không đứng sẵn trong 1 bệnh viện).
@@ -979,6 +1050,7 @@ function DriveInner({
     setNewFacName('');
     setNewScenSel(scenario?.id ?? NEW_OPTION);
     setNewScenName('');
+    setNewEnv('master');
     setShowNew(true);
   };
 
@@ -998,7 +1070,7 @@ function DriveInner({
       return;
     }
     setShowNew(false);
-    actions.onCreateFlow?.(fac, scen);
+    actions.onCreateFlow?.(fac, scen, csMode ? newEnv : undefined);
   };
 
   // Mở modal ghi chú của 1 version — prefill nội dung hiện có.
@@ -1014,6 +1086,20 @@ function DriveInner({
     setNoteTarget(null);
     // Nội dung không đổi -> khỏi gọi API.
     if (note !== (target.note ?? '')) actions.onSaveNote?.(target.fileId, note);
+  };
+
+  // Mở modal sửa môi trường của 1 バージョン (màn CS) — prefill env hiện tại (mặc định 本番).
+  const openEnvModal = (ver: VersionNode) => {
+    setEnvDraft(ver.environment ?? 'master');
+    setEnvTarget(ver);
+  };
+
+  const handleSaveEnv = () => {
+    if (!envTarget) return;
+    const target = envTarget;
+    setEnvTarget(null);
+    // Không đổi -> khỏi gọi API.
+    if (envDraft !== target.environment) actions.onSetVersionEnv?.(target.fileId, envDraft);
   };
 
   const toggleSort = (key: string) =>
@@ -1133,8 +1219,17 @@ function DriveInner({
   const pageSlice = <T,>(rows: T[]): T[] =>
     rows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const subtitleKey: TKey =
-    level === 1 ? 'dmSubtitleFacilities' : level === 2 ? 'dmSubtitleScenarios' : 'dmSubtitleVersions';
+  const subtitleKey: TKey = csMode
+    ? level === 1
+      ? 'csDmSubtitleFacilities'
+      : level === 2
+        ? 'csDmSubtitleScenarios'
+        : 'csDmSubtitleVersions'
+    : level === 1
+      ? 'dmSubtitleFacilities'
+      : level === 2
+        ? 'dmSubtitleScenarios'
+        : 'dmSubtitleVersions';
 
   return (
     <div className="relative flex h-full flex-col bg-[var(--bk-bg)]">
@@ -1160,7 +1255,9 @@ function DriveInner({
           {/* Tiêu đề (+ chip prototype khi chạy mock) */}
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-[var(--bk-text)]">{t('fmTitle')}</h1>
+              <h1 className="text-lg font-bold tracking-tight text-[var(--bk-text)]">
+                {t(csMode ? 'csDmTitle' : 'fmTitle')}
+              </h1>
               <p className="text-sm text-[var(--bk-text-muted)]">{t(subtitleKey)}</p>
             </div>
             {mock && (
@@ -1448,7 +1545,12 @@ function DriveInner({
                     <tr className="border-b border-[var(--bk-border)]">
                       {renderSortTh('name', 'colScenario', 'w-[300px] min-w-[240px]')}
                       {renderSortTh('latest', 'colLatestVersion')}
-                      {renderSortTh('applied', 'colAppliedVersion')}
+                      {/* CS: cột 環境 của bản mới nhất (không sort); TS: cột デプロイバージョン */}
+                      {csMode ? (
+                        <th className={th}>{t('colEnvironment')}</th>
+                      ) : (
+                        renderSortTh('applied', 'colAppliedVersion')
+                      )}
                       {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       {renderSortTh('author', 'colAuthor')}
@@ -1476,31 +1578,42 @@ function DriveInner({
                             </span>
                           </td>
                           <td className={`${cell} font-semibold`}>{latest ? `V${latest}` : '—'}</td>
-                          <td className={cell}>
-                            {/* Stamp môi trường + V{N} đang chạy, bố cục giống badge Main|Sub flow
-                                (ngăn bằng gạch đứng); môi trường chưa deploy thì KHÔNG hiện. */}
-                            {s.appliedMaster == null && s.appliedDemo == null ? (
-                              <span className="text-[var(--bk-text-faint)]">—</span>
-                            ) : (
-                              <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--bk-text-muted)]">
-                                {s.appliedMaster != null && (
-                                  <span className="flex items-center gap-1">
-                                    <EnvStamp env="master" />
-                                    <span>V{s.appliedMaster}</span>
-                                  </span>
-                                )}
-                                {s.appliedMaster != null && s.appliedDemo != null && (
-                                  <span aria-hidden className="h-3.5 w-px bg-[var(--bk-border)]" />
-                                )}
-                                {s.appliedDemo != null && (
-                                  <span className="flex items-center gap-1">
-                                    <EnvStamp env="demo" />
-                                    <span>V{s.appliedDemo}</span>
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </td>
+                          {csMode ? (
+                            <td className={cell}>
+                              {/* Môi trường của bản MỚI NHẤT (stamp 本番/デモ). Chưa đặt -> —. */}
+                              {lv?.environment ? (
+                                <EnvStamp env={lv.environment} />
+                              ) : (
+                                <span className="text-[var(--bk-text-faint)]">—</span>
+                              )}
+                            </td>
+                          ) : (
+                            <td className={cell}>
+                              {/* Stamp môi trường + V{N} đang chạy, bố cục giống badge Main|Sub flow
+                                  (ngăn bằng gạch đứng); môi trường chưa deploy thì KHÔNG hiện. */}
+                              {s.appliedMaster == null && s.appliedDemo == null ? (
+                                <span className="text-[var(--bk-text-faint)]">—</span>
+                              ) : (
+                                <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--bk-text-muted)]">
+                                  {s.appliedMaster != null && (
+                                    <span className="flex items-center gap-1">
+                                      <EnvStamp env="master" />
+                                      <span>V{s.appliedMaster}</span>
+                                    </span>
+                                  )}
+                                  {s.appliedMaster != null && s.appliedDemo != null && (
+                                    <span aria-hidden className="h-3.5 w-px bg-[var(--bk-border)]" />
+                                  )}
+                                  {s.appliedDemo != null && (
+                                    <span className="flex items-center gap-1">
+                                      <EnvStamp env="demo" />
+                                      <span>V{s.appliedDemo}</span>
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </td>
+                          )}
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{s.createdAt ?? '—'}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{lv?.updatedAt ?? '—'}</td>
                           <td className={`${cell} text-[var(--bk-text-muted)]`}>{lv?.author ?? '—'}</td>
@@ -1542,8 +1655,10 @@ function DriveInner({
                   <thead>
                     <tr className="border-b border-[var(--bk-border)]">
                       {renderSortTh('v', 'colVersion', 'w-[320px] min-w-[260px]')}
-                      {/* Môi trường đã deploy bản này + ngày giờ deploy (stamp MASTER/DEMO) — không sort */}
-                      <th className={`${th} w-[200px] min-w-[180px]`}>{t('colDeployedEnv')}</th>
+                      {/* CS: 環境 CỦA BẢN NÀY (stamp, sửa được). TS: môi trường đã deploy + ngày giờ. */}
+                      <th className={`${th} w-[200px] min-w-[180px]`}>
+                        {t(csMode ? 'colEnvironment' : 'colDeployedEnv')}
+                      </th>
                       {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       {renderSortTh('author', 'colAuthor')}
@@ -1589,33 +1704,55 @@ function DriveInner({
                               )}
                             </div>
                           </td>
-                          <td className={cell}>
-                            {/* Bản này đang chạy trên môi trường nào + lúc nào (stamp MASTER/DEMO
-                                + yyyy-MM-dd HH:mm) — deploy cả demo lẫn master thì xếp 2 dòng. */}
-                            {!onMaster && !onDemo ? (
-                              <span className="text-[var(--bk-text-faint)]">—</span>
-                            ) : (
-                              <span className="flex flex-col gap-1">
-                                {onMaster && (
-                                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--bk-text-muted)]">
-                                    <EnvStamp env="master" />
-                                    {scenario.appliedMasterAt ?? '—'}
-                                  </span>
-                                )}
-                                {onDemo && (
-                                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--bk-text-muted)]">
-                                    <EnvStamp env="demo" />
-                                    {scenario.appliedDemoAt ?? '—'}
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </td>
+                          {csMode ? (
+                            <td className={cell}>
+                              {/* 環境 CỦA BẢN NÀY — stamp 本番/デモ; chưa đặt -> —. Sửa ở nút Edit. */}
+                              {ver.environment ? (
+                                <EnvStamp env={ver.environment} />
+                              ) : (
+                                <span className="text-[var(--bk-text-faint)]">—</span>
+                              )}
+                            </td>
+                          ) : (
+                            <td className={cell}>
+                              {/* Bản này đang chạy trên môi trường nào + lúc nào (stamp MASTER/DEMO
+                                  + yyyy-MM-dd HH:mm) — deploy cả demo lẫn master thì xếp 2 dòng. */}
+                              {!onMaster && !onDemo ? (
+                                <span className="text-[var(--bk-text-faint)]">—</span>
+                              ) : (
+                                <span className="flex flex-col gap-1">
+                                  {onMaster && (
+                                    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--bk-text-muted)]">
+                                      <EnvStamp env="master" />
+                                      {scenario.appliedMasterAt ?? '—'}
+                                    </span>
+                                  )}
+                                  {onDemo && (
+                                    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--bk-text-muted)]">
+                                      <EnvStamp env="demo" />
+                                      {scenario.appliedDemoAt ?? '—'}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </td>
+                          )}
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.createdAt}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.updatedAt}</td>
                           <td className={`${cell} text-[var(--bk-text-muted)]`}>{ver.author}</td>
                           <td className={cell} onClick={(e) => e.stopPropagation()}>
                             <div className={rowActions}>
+                              {/* CS: sửa 環境 CỦA BẢN NÀY (本番/デモ) — mở modal chọn. */}
+                              {csMode && (
+                                <HoverLabelButton
+                                  label={t('csEditEnvTitle')}
+                                  onClick={() => openEnvModal(ver)}
+                                  disabled={busy || (!mock && !actions.onSetVersionEnv)}
+                                  className={`${rowBtn} hover:text-[#f97316]`}
+                                >
+                                  <Icon key={iconKey(ver.fileId)} icon="line-md:edit-twotone" width={17} height={17} />
+                                </HoverLabelButton>
+                              )}
                               {/* Ghi chú CỦA BẢN NÀY: hover = xem nhanh nội dung
                                   (tooltip); click = mở modal sửa. Đã có ghi chú thì
                                   icon đổi sang bong bóng có dòng chữ. */}
@@ -1735,6 +1872,18 @@ function DriveInner({
               className="mb-4"
             />
 
+            {/* CS: chọn môi trường cho bản đầu tiên (本番/デモ). */}
+            {csMode && (
+              <>
+                <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+                  {t('colEnvironment')}
+                </label>
+                <div className="mb-4">
+                  <EnvPicker value={newEnv} onChange={setNewEnv} />
+                </div>
+              </>
+            )}
+
             {createErrorKey && <div className="mb-3 text-xs text-rose-500">{t(createErrorKey)}</div>}
 
             <div className="flex justify-end gap-2">
@@ -1815,6 +1964,18 @@ function DriveInner({
               onEnter={handleImportConfirm}
               className="mb-4"
             />
+
+            {/* CS: chọn môi trường cho bản import (本番/デモ). */}
+            {csMode && (
+              <>
+                <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
+                  {t('colEnvironment')}
+                </label>
+                <div className="mb-4">
+                  <EnvPicker value={impEnv} onChange={setImpEnv} />
+                </div>
+              </>
+            )}
 
             {importErrorKey && <div className="mb-3 text-xs text-rose-500">{t(importErrorKey)}</div>}
 
@@ -1964,6 +2125,44 @@ function DriveInner({
         </div>
       )}
 
+      {/* Modal: sửa môi trường của 1 バージョン (màn CS). Click ngoài không đóng. */}
+      {envTarget && scenario && (
+        <div className="bk-modal-overlay bk-modal-overlay--fixed" role="dialog" aria-modal="true">
+          <div className="bk-modal">
+            <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
+                <Icon icon="line-md:edit-twotone" width={15} height={15} />
+              </span>
+              {t('csEditEnvTitle')}
+            </div>
+            <p className="mb-3 truncate text-xs text-[var(--bk-text-muted)]">
+              {versionFileName(scenario.name, envTarget.v)}
+            </p>
+
+            <div className="mb-4">
+              <EnvPicker value={envDraft} onChange={setEnvDraft} />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEnvTarget(null)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('btnCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEnv}
+                className="rounded-lg bg-[var(--bk-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                {t('btnSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: 権限管理 — chỉ owner (mở từ menu). */}
       {showPermissions && permissions && (
         <PermissionsModal
@@ -1996,6 +2195,42 @@ function EnvStamp({ env }: { env: 'master' | 'demo' }) {
     >
       {t(master ? 'dmEnvMaster' : 'dmEnvDemo')}
     </span>
+  );
+}
+
+// Chọn môi trường (本番/デモ) — 2 nút gạt, dùng ở modal tạo/import/sửa env màn CS.
+function EnvPicker({ value, onChange }: { value: EnvKind; onChange: (v: EnvKind) => void }) {
+  const t = useT();
+  const opts: { env: EnvKind; color: string }[] = [
+    { env: 'master', color: '#10b981' },
+    { env: 'demo', color: '#f97316' },
+  ];
+  return (
+    <div className="flex gap-2">
+      {opts.map(({ env, color }) => {
+        const on = value === env;
+        return (
+          <button
+            key={env}
+            type="button"
+            onClick={() => onChange(env)}
+            className={[
+              'flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition',
+              on
+                ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-text)]'
+                : 'border-[var(--bk-border)] bg-[var(--bk-surface-2)] text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]',
+            ].join(' ')}
+          >
+            <span
+              className="inline-flex shrink-0 items-center rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-widest text-white"
+              style={{ background: color, fontFamily: "'Space Grotesk', 'Zen Kaku Gothic New', sans-serif" }}
+            >
+              {t(env === 'master' ? 'dmEnvMaster' : 'dmEnvDemo')}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

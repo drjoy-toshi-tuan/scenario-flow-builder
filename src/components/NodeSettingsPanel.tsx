@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useFlowStore } from '../store/flowStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import type { FlowNode, NodeType } from '../ir/types';
-import { NODE_CONFIG } from '../ui/nodeConfig';
+import { NODE_CONFIG, nodeTypeLabel } from '../ui/nodeConfig';
+import { CsLogicBranchEditor } from './CsLogicBranchEditor';
 import {
   PROPERTY_FIELDS,
   BRANCH_SCHEMA,
@@ -83,6 +85,10 @@ export function NodeSettingsPanel() {
 function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }) {
   const t = useT();
   const cfg = NODE_CONFIG[node.type];
+  // Màn CS: nhãn loại tiếng Nhật; node 分岐ロジック dùng editor điều kiện riêng
+  // (không regex, không tab Property) — xem CsLogicBranchEditor.
+  const csMode = useWorkspaceStore((s) => s.mode === 'cs');
+  const csLogic = csMode && node.type === 'logic';
 
   const ir = useFlowStore((s) => s.ir);
   const draft = useFlowStore((s) => s.draft);
@@ -107,7 +113,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
       ? 'nodeNameDuplicate'
       : null;
 
-  const hasProperty = PROPERTY_FIELDS[node.type].length > 0;
+  const hasProperty = !csLogic && PROPERTY_FIELDS[node.type].length > 0;
   const hasBranch = BRANCH_SCHEMA[node.type].mode !== 'none';
 
   const [tab, setTab] = useState<Tab>('general');
@@ -168,10 +174,10 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
             </span>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: cfg.color }}>
-                {cfg.typeLabel}
+                {nodeTypeLabel(node.type, csMode)}
               </div>
               <div className="text-sm font-medium text-[var(--bk-text-muted)]">
-                {t(explainKey(node.type))}
+                {t(csLogic ? 'exCsLogic' : explainKey(node.type))}
               </div>
             </div>
           </div>
@@ -195,7 +201,7 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
             onClick={() => setTab('property')}
           />
           <TabButton
-            label={t('tabBranch')}
+            label={csLogic ? '分岐設定' : t('tabBranch')}
             active={tab === 'branch'}
             disabled={!hasBranch}
             onClick={() => setTab('branch')}
@@ -206,7 +212,8 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {tab === 'general' && <GeneralTab label={editing.label} nameError={nameError} />}
         {tab === 'property' && <PropertyTab node={node} data={editing.data} />}
-        {tab === 'branch' && <BranchTab node={node} data={editing.data} />}
+        {tab === 'branch' &&
+          (csLogic ? <CsLogicBranchEditor node={node} /> : <BranchTab node={node} data={editing.data} />)}
       </div>
 
       {/* Nút LƯU / HỦY ở đáy panel. */}

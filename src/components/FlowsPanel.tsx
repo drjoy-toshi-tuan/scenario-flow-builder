@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import { useFileStore } from '../store/fileStore';
 import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
+import { BrekekeLogo } from '../ui/BrekekeLogo';
 import { FlowGlyph } from '../ui/FlowGlyph';
 import { IvrPropertyModal } from './IvrPropertyModal';
 import { useSaveFlow } from './useSaveFlow';
@@ -86,14 +87,6 @@ export function FlowsPanel() {
 
   const subflows = ir?.subflows ?? [];
 
-  // Icon spinner (SMIL loop) phải GIỮ NGUYÊN element giữa các lần render: nếu để
-  // re-render, Iconify sinh lại các thẻ <animate> (id mới) bên trong <svg> cũ —
-  // begin="0" trỏ vào timeline đã chạy qua 0 nên animation chết hẳn sau lần click đầu.
-  const spinnerIcon = useMemo(
-    () => <Icon icon="svg-spinners:blocks-scale" width={22} height={22} />,
-    [],
-  );
-
   const renameSubflow = useFlowStore((s) => s.renameSubflow);
   const deleteSubflow = useFlowStore((s) => s.deleteSubflow);
 
@@ -127,7 +120,8 @@ export function FlowsPanel() {
         aria-label={t('flowsTitle')}
         title={t('flowsTitle')}
       >
-        {spinnerIcon}
+        {/* Logo app thay cho icon động cũ (icon spinner gây hiểu nhầm đang tải). */}
+        <BrekekeLogo className="h-6 w-6" />
       </button>
 
       {render && (

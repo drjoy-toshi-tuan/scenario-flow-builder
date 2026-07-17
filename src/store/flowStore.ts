@@ -12,7 +12,9 @@ import { ensureSettings } from '../ir/settings';
 import { fromYaml } from '../ir/fromYaml';
 import { toYaml } from '../ir/toYaml';
 import { layout } from '../ir/layout';
-import { NODE_CONFIG } from '../ui/nodeConfig';
+import { nodeTypeLabel } from '../ui/nodeConfig';
+import { CS_ELSE_LABEL } from '../ui/csLogic';
+import { useWorkspaceStore } from './workspaceStore';
 import {
   defaultDataFor,
   readBranches,
@@ -563,7 +565,21 @@ export const useFlowStore = create<FlowState>((set, get) => {
       // id duy nhất theo loại: announce_1, announce_2, …
       const id = uniqueId(type, new Set(ir.nodes.map((n) => n.id)));
       // Tên mặc định "<Tên loại node>_<số>" (bắt đầu từ 1), duy nhất trong flow.
-      const label = uniqueLabel(NODE_CONFIG[type].typeLabel, new Set(ir.nodes.map((n) => n.label)));
+      // Màn CS: tên loại tiếng Nhật (アナウンス_1, 分岐ロジック_1, …).
+      const csMode = useWorkspaceStore.getState().mode === 'cs';
+      const label = uniqueLabel(nodeTypeLabel(type, csMode), new Set(ir.nodes.map((n) => n.label)));
+
+      // Node 分岐ロジック tạo từ màn CS: KHÔNG seed moduleType (Script) như node logic
+      // kỹ thuật — dữ liệu là bộ điều kiện có cấu trúc (data.csConditions, xem ui/csLogic)
+      // + nhánh else その他 (catch-all) sync sẵn vào data.branches.
+      const data: Record<string, unknown> =
+        csMode && type === 'logic'
+          ? {
+              description: '',
+              csConditions: [],
+              branches: [{ id: CATCH_ALL_ID, value: '', label: CS_ELSE_LABEL }],
+            }
+          : defaultDataFor(type);
 
       const node: FlowNode = {
         id,
@@ -571,7 +587,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
         label,
         position,
         // Tham số + nhánh mặc định theo loại node (xem nodeSchema.defaultDataFor).
-        data: defaultDataFor(type),
+        data,
       };
       set({
         ...snapshot(),

@@ -179,19 +179,23 @@ export async function findChildFile(
 }
 
 // Tạo file mới (multipart: metadata + nội dung trong 1 request) với MIME chỉ định.
+// appProperties: key-value riêng của app gắn lên file (vd csEnvironment của CS).
 async function createFileMultipart(
   token: string,
   parentId: string,
   name: string,
   content: string,
   mime: string,
+  appProperties?: Record<string, string>,
 ): Promise<DriveItem> {
   const boundary = 'bk-flow-builder-314159';
+  const metadata: Record<string, unknown> = { name, parents: [parentId], mimeType: mime };
+  if (appProperties && Object.keys(appProperties).length > 0) metadata.appProperties = appProperties;
   const body = [
     `--${boundary}`,
     'Content-Type: application/json; charset=UTF-8',
     '',
-    JSON.stringify({ name, parents: [parentId], mimeType: mime }),
+    JSON.stringify(metadata),
     `--${boundary}`,
     `Content-Type: ${mime}; charset=UTF-8`,
     '',
@@ -213,8 +217,13 @@ async function createFileMultipart(
   return (await res.json()) as DriveItem;
 }
 
-export const createYamlFile = (token: string, parentId: string, name: string, content: string) =>
-  createFileMultipart(token, parentId, name, content, 'application/x-yaml');
+export const createYamlFile = (
+  token: string,
+  parentId: string,
+  name: string,
+  content: string,
+  appProperties?: Record<string, string>,
+) => createFileMultipart(token, parentId, name, content, 'application/x-yaml', appProperties);
 
 export const createJsonFile = (token: string, parentId: string, name: string, content: string) =>
   createFileMultipart(token, parentId, name, content, 'application/json');
@@ -251,6 +260,22 @@ export async function updateItemDescription(token: string, id: string, descripti
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description }),
+    }),
+  );
+}
+
+// Cập nhật appProperties của item (merge — key=null xoá key đó). App dùng để sửa
+// môi trường (csEnvironment) của 1 バージョン trên màn quản lý CS.
+export async function updateItemAppProperties(
+  token: string,
+  id: string,
+  appProperties: Record<string, string | null>,
+): Promise<void> {
+  await ensureOk(
+    await dFetch(token, `${DRIVE_API_BASE}/files/${encodeURIComponent(id)}?${ALL_DRIVES}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appProperties }),
     }),
   );
 }

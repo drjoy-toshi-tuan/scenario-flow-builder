@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { NODE_CONFIG, ADDABLE_NODE_TYPES } from '../ui/nodeConfig';
-import type { NodeType } from '../ir/types';
+import { NODE_CONFIG, ADDABLE_NODE_TYPES, CS_NODE_TYPES, nodeTypeLabel } from '../ui/nodeConfig';
 import { Icon } from '../ui/icons';
 import { useT } from '../ui/i18n';
 
@@ -17,10 +16,6 @@ import { useT } from '../ui/i18n';
 
 // Kiểu dữ liệu dataTransfer khi kéo module từ palette -> canvas.
 export const DND_MIME = 'application/bk-node-type';
-
-// Palette màn CS: bộ node tối giản cho người không kỹ thuật — Start + Announce +
-// Hearing (interaction) + Transfer + Hangup. Màn TS giữ đầy đủ ADDABLE_NODE_TYPES.
-const CS_NODE_TYPES: readonly NodeType[] = ['start', 'announce', 'interaction', 'transfer', 'hangup'];
 
 export function AddModulePanel() {
   // Mở/đóng qua store (canvasPanel) để loại trừ lẫn nhau với panel Main/Sub Flow.
@@ -152,7 +147,9 @@ export function AddModulePanel() {
                 >
                   <Icon icon={cfg.icon} />
                 </span>
-                <span className="text-sm font-medium text-[var(--bk-text)]">{cfg.typeLabel}</span>
+                <span className="text-sm font-medium text-[var(--bk-text)]">
+                  {nodeTypeLabel(type, csMode)}
+                </span>
               </button>
             );
           })}

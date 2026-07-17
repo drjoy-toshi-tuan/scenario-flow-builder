@@ -1,12 +1,17 @@
 import { useFlowStore } from '../store/flowStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import { useT } from '../ui/i18n';
+import { BrekekeLogo } from '../ui/BrekekeLogo';
 import { HeaderMenu } from './HeaderMenu';
 import { FlowsPanel } from './FlowsPanel';
 
 // Thanh công cụ trên cùng: nút Main/Sub Flow + thông tin flow bên trái, menu bên phải.
+// Màn CS: KHÔNG có panel Main/Sub Flow (CS không có khái niệm sub flow) — bên trái
+// chỉ là logo app + tên bệnh viện (trên) + tên scenario (dưới).
 export function Toolbar() {
   const ir = useFlowStore((s) => s.ir);
   const activeFlowId = useFlowStore((s) => s.activeFlowId);
+  const csMode = useWorkspaceStore((s) => s.mode === 'cs');
   const t = useT();
 
   // Dòng trên: 施設名 | tên flow (không có 施設名 -> chỉ tên flow). Đang ở sub flow
@@ -14,8 +19,34 @@ export function Toolbar() {
   const activeSub =
     activeFlowId !== 'main' ? ir?.subflows?.find((s) => s.id === activeFlowId) : undefined;
   const flowName = ir?.meta.name ?? 'Scenario Flow Builder';
-  const title = ir?.meta.facility ? `${ir.meta.facility} | ${flowName}` : flowName;
+  const facility = ir?.meta.facility ?? '';
+  const title = facility ? `${facility} | ${flowName}` : flowName;
   const subCount = ir?.subflows?.length ?? 0;
+
+  if (csMode) {
+    return (
+      <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <BrekekeLogo className="h-9 w-9 shrink-0" />
+          <div>
+            {/* Trên: 施設名 (thiếu thì hiện luôn tên scenario); dưới: tên scenario. */}
+            <div
+              className="max-w-[420px] truncate text-base font-bold text-[var(--bk-text)]"
+              title={facility || flowName}
+            >
+              {facility || flowName}
+            </div>
+            {facility && (
+              <div className="mt-0.5 max-w-[420px] truncate text-[11px] text-[var(--bk-text-muted)]" title={flowName}>
+                {flowName}
+              </div>
+            )}
+          </div>
+        </div>
+        <HeaderMenu />
+      </header>
+    );
+  }
 
   return (
     <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">

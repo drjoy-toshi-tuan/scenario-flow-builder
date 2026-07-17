@@ -15,6 +15,17 @@ export const DRIVE_ROOT_FOLDER_ID =
   (import.meta.env.VITE_DRIVE_ROOT_FOLDER_ID as string | undefined) ||
   '1Fk0B99UkzyJok4So-xFjO5ywfCn57vI2';
 
+// Kho RIÊNG của bộ phận CS — chứa シナリオ設計書 (Flow Diagram do CS vẽ), TÁCH khỏi
+// kho TS ở trên. Cùng cấu trúc 3 tầng 施設 › シナリオ › _V{N}.yaml. Override qua env.
+export const CS_DRIVE_ROOT_FOLDER_ID =
+  (import.meta.env.VITE_CS_DRIVE_ROOT_FOLDER_ID as string | undefined) ||
+  '1wBWvjwCPq7UAwZdlhC_lUJrL-PazMa1T';
+
+// Folder gốc theo bộ phận đang làm việc (CS dùng kho riêng, còn lại dùng kho TS).
+export function driveRootFolderId(csMode: boolean): string {
+  return csMode ? CS_DRIVE_ROOT_FOLDER_ID : DRIVE_ROOT_FOLDER_ID;
+}
+
 // ── Endpoint cấp/gia hạn token Drive trên proxy Vercel (xem proxy-vercel/api/drive-token.js) ──
 // Có URL này => dùng auth-code flow + refresh ngầm (KHÔNG popup mỗi giờ).
 // Không có => rơi về implicit flow cũ (popup GIS mỗi lần token hết hạn).

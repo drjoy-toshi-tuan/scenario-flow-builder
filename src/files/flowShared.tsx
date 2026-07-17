@@ -8,7 +8,15 @@ import { FlowGlyph } from '../ui/FlowGlyph';
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Nội dung flow trống khi "Tạo flow mới" — kèm metadata (施設名/シナリオ名/作成者/日時).
-export function buildBlankFlow(o: { facility: string; name: string; author: string; createdAt: string }): string {
+// noStart (màn CS): シナリオ設計書 KHÔNG có node Start kỹ thuật — bỏ field flow.start
+// (node アナウンス đầu tiên chính là điểm bắt đầu; TS mới ráp Start khi gen YAML chạy).
+export function buildBlankFlow(o: {
+  facility: string;
+  name: string;
+  author: string;
+  createdAt: string;
+  noStart?: boolean;
+}): string {
   const q = (s: string) => JSON.stringify(s ?? ''); // double-quoted scalar an toàn cho YAML
   return [
     'flow:',
@@ -17,7 +25,7 @@ export function buildBlankFlow(o: { facility: string; name: string; author: stri
     `  author: ${q(o.author)}`,
     `  createdAt: ${q(o.createdAt)}`,
     `  updatedAt: ${q(o.createdAt)}`,
-    '  start: welcome',
+    ...(o.noStart ? [] : ['  start: welcome']),
     '  nodes:',
     '    - id: welcome',
     '      type: announce',
