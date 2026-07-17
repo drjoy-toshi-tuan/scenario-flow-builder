@@ -171,8 +171,9 @@ export function PermissionsModal({
   );
 }
 
-// Cặp nút CS/TS gạt bộ phận. KHÔNG dùng SlideToggle vì cần trạng thái "chưa gán"
-// (không bên nào sáng) — SlideToggle luôn coi 1 trong 2 bên là đang chọn.
+// Toggle trượt CS/TS gạt bộ phận — dùng chung style `bk-slide` với toggle
+// Admin/User cho đồng nhất. Khác SlideToggle ở chỗ giữ được trạng thái "chưa
+// gán": khi chưa gán, thumb ẩn (cả 2 bên nhạt) để owner thấy ai còn thiếu.
 function DeptToggle({
   value,
   disabled,
@@ -184,12 +185,15 @@ function DeptToggle({
   onSelect: (d: Department) => void;
   ariaLabel: string;
 }) {
+  const isRight = value === 'ts';
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className="inline-flex overflow-hidden rounded-full border border-[var(--bk-border)] text-[11px] font-semibold"
+      className={`bk-slide ${disabled ? 'pointer-events-none opacity-50' : ''}`}
     >
+      {/* Thumb chỉ hiện khi đã gán — chưa gán thì ẩn để không hiểu nhầm là CS. */}
+      {value && <span className="bk-slide-thumb" data-right={isRight} />}
       {(['cs', 'ts'] as const).map((d) => (
         <button
           key={d}
@@ -198,11 +202,9 @@ function DeptToggle({
           aria-checked={value === d}
           disabled={disabled}
           onClick={() => value !== d && onSelect(d)}
-          className={
-            value === d
-              ? 'bg-[var(--bk-accent)] px-2.5 py-1 text-white'
-              : 'px-2.5 py-1 text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]'
-          }
+          className={`bk-slide-opt cursor-pointer appearance-none border-0 bg-transparent ${
+            value === d ? 'bk-slide-opt--on' : 'hover:text-[var(--bk-text)]'
+          }`}
         >
           {d.toUpperCase()}
         </button>
