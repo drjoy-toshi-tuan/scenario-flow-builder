@@ -349,10 +349,11 @@ body {
    - Điểm đến (target) không cần chấm tròn — mũi tên ở cuối dây là đủ.
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
-  /* Cao tối thiểu 70px, tên dài xuống dòng (tối đa 2 dòng) thì node tự cao thêm. */
+  /* Node lùn (chỉ còn tên + dải icon biểu thị) — tên dài xuống dòng (tối đa 2 dòng)
+     thì node tự cao thêm. */
   height: auto;
-  min-height: 70px;
-  padding: 10px 14px;
+  min-height: 56px;
+  padding: 8px 14px;
   /* Nền/viền/bóng chuyển hết sang lớp .bk-cs-skin (bị mask khoét lỗ tại output) —
      root để TRONG SUỐT, nhờ vậy handle là anh em của skin, không bị mask cắt. */
   background: transparent;
@@ -406,15 +407,14 @@ body {
 .bk-cs-main {
   flex: 1 1 auto;
   min-width: 0;
-  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
   align-self: stretch;
-  /* Padding TRÊN = DƯỚI để tên luôn căn giữa theo chiều dọc của node; phần
-     padding dưới đồng thời chừa chỗ cho dải icon biểu thị (neo absolute) —
-     nhờ vậy dải icon không ảnh hưởng align của tên nhưng vẫn giữ khoảng cách. */
-  padding: 17px 0;
+  /* Cụm (tên + dải icon) căn giữa theo chiều dọc: KHÔNG có icon thì tên nằm đúng
+     tâm node; CÓ icon thì tên tự nhích lên một chút — cân bằng thị giác. */
+  justify-content: center;
+  gap: 5px;
 }
 /* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
    mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ. */
@@ -429,16 +429,12 @@ body {
   overflow: hidden;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
-   Neo góc dưới phải, KHÔNG chiếm dòng riêng (không đẩy tên node lệch tâm). */
+   Dòng riêng dưới tên, căn phải; node không có icon nào thì dòng này không render. */
 .bk-cs-indicators {
-  position: absolute;
-  right: 0;
-  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 9px;
-  min-height: 13px;
 }
 .bk-cs-ind {
   display: inline-flex;

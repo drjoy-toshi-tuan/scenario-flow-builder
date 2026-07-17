@@ -53,6 +53,9 @@ export function GeneralSettingsTab() {
   const ir = useFlowStore((s) => s.ir);
   const setSettings = useFlowStore((s) => s.setSettings);
   const settings = ensureSettings(ir?.settings);
+  // Thứ vừa được bật -> đang chờ chọn chế độ (24H hay khung giờ). Chọn xong thì
+  // chỉ hiển thị KẾT QUẢ (chip 24H hoặc các khung giờ), không hiện bộ chọn nữa.
+  const [choosingDay, setChoosingDay] = useState<DayKey | null>(null);
 
   const patch = (p: Partial<ScenarioSettings>) => setSettings(p);
 
@@ -87,9 +90,13 @@ export function GeneralSettingsTab() {
     </span>
   );
 
-  const field = (label: string, control: ReactNode) => (
+  // labelExtra: phần tử gắn NGAY CẠNH title (vd stamp デモ/本番 của ô 050).
+  const field = (label: string, control: ReactNode, labelExtra?: ReactNode) => (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-semibold text-[var(--bk-text-muted)]">{label}</span>
+      <span className="flex items-center gap-2 text-xs font-semibold text-[var(--bk-text-muted)]">
+        {label}
+        {labelExtra}
+      </span>
       {control}
     </div>
   );
@@ -137,14 +144,16 @@ export function GeneralSettingsTab() {
             'gsGroupPhone',
             <>
               {field(t('gsMainPhone'), phoneField(settings.mainPhone, (v) => patch({ mainPhone: v })))}
-              {/* 050: Demo TRÊN, Master DƯỚI — stamp môi trường cạnh ô nhập. */}
+              {/* 050: Demo TRÊN, Master DƯỚI — stamp môi trường nằm CẠNH title. */}
               {field(
                 t('gs050'),
-                phoneField(settings.demo050, (v) => patch({ demo050: v }), envStamp('demo')),
+                phoneField(settings.demo050, (v) => patch({ demo050: v })),
+                envStamp('demo'),
               )}
               {field(
                 t('gs050'),
-                phoneField(settings.master050, (v) => patch({ master050: v }), envStamp('master')),
+                phoneField(settings.master050, (v) => patch({ master050: v })),
+                envStamp('master'),
               )}
               {field(t('gsSmsNumber'), phoneField(settings.smsNumber, (v) => patch({ smsNumber: v })))}
             </>,
@@ -160,20 +169,18 @@ export function GeneralSettingsTab() {
                     const sched = settings.workingDays.find((d) => d.day === day)!;
                     return (
                       <div key={day} className="flex items-start gap-3">
-                        {/* Stamp thứ: bấm chọn -> sáng lên + hiện chọn 24H / khung giờ */}
+                        {/* Stamp thứ: bấm bật -> hiện bộ chọn 24H / khung giờ; bấm lại -> tắt */}
                         <button
                           type="button"
-                          onClick={() =>
-                            updateDay(day, (d) => ({
-                              ...d,
-                              enabled: !d.enabled,
-                              // Bật ngày chưa có khung giờ (chế độ khung giờ) -> seed 1 khung mặc định.
-                              ranges:
-                                !d.enabled && !d.allDay && d.ranges.length === 0
-                                  ? [{ from: '09:00', to: '17:00' }]
-                                  : d.ranges,
-                            }))
-                          }
+                          onClick={() => {
+                            if (sched.enabled) {
+                              updateDay(day, (d) => ({ ...d, enabled: false }));
+                              setChoosingDay((cur) => (cur === day ? null : cur));
+                            } else {
+                              updateDay(day, (d) => ({ ...d, enabled: true }));
+                              setChoosingDay(day);
+                            }
+                          }}
                           aria-pressed={sched.enabled}
                           className={`mt-0.5 inline-flex h-9 w-11 shrink-0 items-center justify-center rounded-lg border text-sm font-bold transition ${
                             sched.enabled
@@ -186,43 +193,42 @@ export function GeneralSettingsTab() {
 
                         {sched.enabled && (
                           <div className="flex flex-wrap items-center gap-2">
-                            {/* Chọn chế độ: 24H (24時間) hoặc 時間帯 (khung giờ) */}
-                            <span className="inline-flex overflow-hidden rounded-lg border border-[var(--bk-border)]">
-                              {([true, false] as const).map((allDay) => {
-                                const on = (sched.allDay ?? false) === allDay;
-                                return (
+                            {choosingDay === day ? (
+                              // Vừa bật -> hỏi chế độ: 24H (24時間) hay 時間帯 (khung giờ).
+                              // Chọn xong bộ chọn biến mất, chỉ còn kết quả.
+                              <span className="inline-flex overflow-hidden rounded-lg border border-[var(--bk-border)]">
+                                {([true, false] as const).map((allDay) => (
                                   <button
                                     key={String(allDay)}
                                     type="button"
-                                    onClick={() =>
+                                    onClick={() => {
                                       updateDay(day, (d) => ({
                                         ...d,
                                         allDay,
-                                        // Chuyển về chế độ khung giờ mà chưa có khung -> seed mặc định.
+                                        // Chế độ khung giờ mà chưa có khung -> seed 1 khung mặc định.
                                         ranges:
                                           !allDay && d.ranges.length === 0
                                             ? [{ from: '09:00', to: '17:00' }]
                                             : d.ranges,
-                                      }))
-                                    }
-                                    aria-pressed={on}
-                                    className={`px-2.5 py-1 text-xs font-semibold transition ${
-                                      on
-                                        ? 'bg-[var(--bk-accent)] text-white'
-                                        : 'bg-[var(--bk-surface-2)] text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]'
-                                    }`}
+                                      }));
+                                      setChoosingDay(null);
+                                    }}
+                                    className="bg-[var(--bk-surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--bk-text-muted)] transition first:border-r first:border-[var(--bk-border)] hover:bg-[var(--bk-accent)] hover:text-white"
                                   >
                                     {t(allDay ? 'gs24h' : 'gsTimeframe')}
                                   </button>
-                                );
-                              })}
-                            </span>
-
-                            {sched.allDay ? (
-                              // 24H: hiện chip 24H, KHÔNG cho chọn khung giờ.
-                              <span className="inline-flex items-center rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1 text-sm font-bold text-[var(--bk-text)]">
-                                24H
+                                ))}
                               </span>
+                            ) : sched.allDay ? (
+                              // 24H: chip kết quả — bấm để chọn lại chế độ.
+                              <button
+                                type="button"
+                                onClick={() => setChoosingDay(day)}
+                                title={t('gsTimeframe')}
+                                className="inline-flex items-center rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1 text-sm font-bold text-[var(--bk-text)] transition hover:border-[var(--bk-accent)]"
+                              >
+                                24H
+                              </button>
                             ) : (
                               <>
                                 {sched.ranges.map((r, i) => (
