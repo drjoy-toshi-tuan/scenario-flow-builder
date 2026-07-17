@@ -8,11 +8,12 @@ import { useT, type TKey } from '../../ui/i18n';
 // Status Settings. (Clinical Department / Courses sẽ bổ sung sau nếu cần.)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Key i18n prefix "ct" (canvas tab) — "tabGeneral" đã thuộc về tab của panel setting.
 const TABS: { id: CanvasTab; labelKey: TKey; icon: string }[] = [
-  { id: 'flow', labelKey: 'tabFlow', icon: 'lucide:git-fork' },
-  { id: 'announce', labelKey: 'tabAnnounce', icon: 'lucide:volume-2' },
-  { id: 'general', labelKey: 'tabGeneral', icon: 'lucide:layout-dashboard' },
-  { id: 'status', labelKey: 'tabStatus', icon: 'lucide:circle-check' },
+  { id: 'flow', labelKey: 'ctFlow', icon: 'lucide:git-fork' },
+  { id: 'announce', labelKey: 'ctAnnounce', icon: 'lucide:volume-2' },
+  { id: 'general', labelKey: 'ctGeneral', icon: 'lucide:layout-dashboard' },
+  { id: 'status', labelKey: 'ctStatus', icon: 'lucide:circle-check' },
 ];
 
 export function CanvasTabs() {

@@ -349,10 +349,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     pmEmpty: 'Chưa ghi nhận tài khoản nào truy cập.',
     pmSaved: 'Đã cập nhật quyền.',
     // ── Tab màn canvas ──
-    tabFlow: 'Flow Diagram',
-    tabAnnounce: 'Announce List',
-    tabGeneral: 'General Settings',
-    tabStatus: 'Status Settings',
+    ctFlow: 'Flow Diagram',
+    ctAnnounce: 'Announce List',
+    ctGeneral: 'General Settings',
+    ctStatus: 'Status Settings',
     // ── Tab Announce List ──
     alColItem: 'Mục',
     alColReconfirm: 'Re-confirm',
@@ -763,10 +763,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     pmEmpty: 'アクセスしたアカウントはまだありません。',
     pmSaved: '権限を更新しました。',
     // ── Tab màn canvas ──
-    tabFlow: 'シナリオフロー図',
-    tabAnnounce: 'アナウンス一覧',
-    tabGeneral: '基本設定',
-    tabStatus: '通話状態設定',
+    ctFlow: 'シナリオフロー図',
+    ctAnnounce: 'アナウンス一覧',
+    ctGeneral: '基本設定',
+    ctStatus: '通話状態設定',
     // ── Tab Announce List ──
     alColItem: '聴取項目',
     alColReconfirm: '復唱',
