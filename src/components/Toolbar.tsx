@@ -2,6 +2,7 @@ import { useFlowStore } from '../store/flowStore';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useT } from '../ui/i18n';
 import { BrekekeLogo } from '../ui/BrekekeLogo';
+import { WorkspaceStamp } from '../ui/WorkspaceStamp';
 import { HeaderMenu } from './HeaderMenu';
 import { FlowsPanel } from './FlowsPanel';
 
@@ -43,7 +44,10 @@ export function Toolbar() {
             )}
           </div>
         </div>
-        <HeaderMenu />
+        <div className="flex items-center gap-3">
+          <WorkspaceStamp />
+          <HeaderMenu />
+        </div>
       </header>
     );
   }
@@ -75,7 +79,10 @@ export function Toolbar() {
         </div>
       </div>
 
-      <HeaderMenu />
+      <div className="flex items-center gap-3">
+        <WorkspaceStamp />
+        <HeaderMenu />
+      </div>
     </header>
   );
 }

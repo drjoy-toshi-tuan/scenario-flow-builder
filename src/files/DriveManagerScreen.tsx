@@ -5,6 +5,7 @@ import { buildBlankFlow, FlowStructureBadge, isValidFlowYaml } from './flowShare
 import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { BrandLockup } from '../ui/BrandLockup';
+import { WorkspaceStamp } from '../ui/WorkspaceStamp';
 import { useToast } from '../ui/toast';
 import { useAuth } from '../auth/useAuth';
 import { GOOGLE_CLIENT_ID } from '../auth/config';
@@ -1243,11 +1244,14 @@ function DriveInner({
       {/* ── Top bar (đồng bộ FileManagerScreen) ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
         <BrandLockup logoClass="h-8 w-8" textClass="text-xl" />
-        {/* Owner mới có mục "Quản lý quyền" + bộ chuyển màn CS/TS trong menu */}
-        <FileManagerMenu
-          onManagePermissions={permissions ? () => setShowPermissions(true) : undefined}
-          canSwitchMode={permissions != null}
-        />
+        <div className="flex items-center gap-3">
+          <WorkspaceStamp />
+          {/* Owner mới có mục "Quản lý quyền" + bộ chuyển màn CS/TS trong menu */}
+          <FileManagerMenu
+            onManagePermissions={permissions ? () => setShowPermissions(true) : undefined}
+            canSwitchMode={permissions != null}
+          />
+        </div>
       </header>
 
       <main className="relative mx-auto w-full max-w-[88rem] flex-1 overflow-auto p-6">

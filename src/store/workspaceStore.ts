@@ -23,9 +23,11 @@ function modeFromHash(): WorkspaceMode | null {
 }
 
 function writeHash(mode: WorkspaceMode) {
+  // pathname + hash (KHÔNG kèm location.search): URL luôn ở dạng gọn `/base/#/ts`,
+  // đồng thời DỌN mọi query string rác cũ (vd `?ts` — không code nào đọc).
   // replaceState thay vì gán location.hash: không rải lịch sử back/forward
   // (và không phát lại sự kiện hashchange -> không lặp vô hạn).
-  history.replaceState(null, '', `#/${mode}`);
+  history.replaceState(null, '', `${window.location.pathname}#/${mode}`);
 }
 
 interface WorkspaceState {
@@ -55,6 +57,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ mode: department, locked: department });
   },
 }));
+
+// Dọn URL ngay khi nạp app: nếu còn query string rác (vd `?ts` cũ) thì viết lại
+// về dạng gọn `/base/#/<mode>`. Chỉ đụng history khi thật sự có query để tránh
+// thao tác thừa (và không phá luồng khác — không code nào đọc location.search).
+if (window.location.search) {
+  writeHash(useWorkspaceStore.getState().mode);
+}
 
 // Người dùng sửa hash trực tiếp trên URL:
 //   - Đã khoá bộ phận -> hash sai tự nhảy về đúng bộ phận (không cho vượt màn).
