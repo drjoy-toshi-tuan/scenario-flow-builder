@@ -9,6 +9,7 @@ interface ToggleOption {
   key: string;
   icon?: string; // tên icon Iconify (tuỳ chọn)
   label?: string; // nhãn chữ (tuỳ chọn)
+  title?: string; // tooltip khi hover ĐÚNG lựa chọn này (vd cờ VN -> "Tiếng Việt")
 }
 
 interface SlideToggleProps {
@@ -40,7 +41,7 @@ export function SlideToggle({ value, options, onChange, title, ariaLabel, disabl
       {options.map((opt, i) => {
         const on = i === 0 ? !isRight : isRight;
         return (
-          <span key={opt.key} className={`bk-slide-opt ${on ? 'bk-slide-opt--on' : ''}`}>
+          <span key={opt.key} title={opt.title} className={`bk-slide-opt ${on ? 'bk-slide-opt--on' : ''}`}>
             {opt.icon && <Icon icon={opt.icon} width={15} height={15} />}
             {opt.label && <span>{opt.label}</span>}
           </span>

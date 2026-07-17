@@ -4,9 +4,14 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import type { FlowNode, NodeType } from '../ir/types';
 import { NODE_CONFIG, nodeTypeLabel } from '../ui/nodeConfig';
 import { CsLogicBranchEditor } from './CsLogicBranchEditor';
+import { ensureSettings } from '../ir/settings';
 import {
   PROPERTY_FIELDS,
+  propertyFieldsFor,
+  csEditableBranchNode,
+  csBranchesOf,
   BRANCH_SCHEMA,
+  type DataBranch,
   readBranches,
   readPairs,
   readClinicalDepartments,
@@ -113,7 +118,9 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
       ? 'nodeNameDuplicate'
       : null;
 
-  const hasProperty = !csLogic && PROPERTY_FIELDS[node.type].length > 0;
+  // Màn CS: KHÔNG còn tab Property riêng — field property hiển thị ngay trong
+  // tab General (gộp làm 1); TS giữ 3 tab như cũ.
+  const hasProperty = !csMode && !csLogic && PROPERTY_FIELDS[node.type].length > 0;
   const hasBranch = BRANCH_SCHEMA[node.type].mode !== 'none';
 
   const [tab, setTab] = useState<Tab>('general');
@@ -194,12 +201,15 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
         {/* Tab tràn hết bề rộng panel; tab đang chọn có nền + gạch chân accent. */}
         <div className="bk-tabs">
           <TabButton label={t('tabGeneral')} active={tab === 'general'} onClick={() => setTab('general')} />
-          <TabButton
-            label={t('tabProperty')}
-            active={tab === 'property'}
-            disabled={!hasProperty}
-            onClick={() => setTab('property')}
-          />
+          {/* CS: General gộp luôn Property -> không có tab Property riêng. */}
+          {!csMode && (
+            <TabButton
+              label={t('tabProperty')}
+              active={tab === 'property'}
+              disabled={!hasProperty}
+              onClick={() => setTab('property')}
+            />
+          )}
           <TabButton
             label={csLogic ? '分岐設定' : t('tabBranch')}
             active={tab === 'branch'}
@@ -210,10 +220,22 @@ function PanelContent({ node, onClose }: { node: FlowNode; onClose: () => void }
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {tab === 'general' && <GeneralTab label={editing.label} nameError={nameError} />}
+        {tab === 'general' && (
+          <>
+            {/* CS: bỏ ô Mô tả; field property hiển thị ngay dưới Tên node. */}
+            <GeneralTab label={editing.label} nameError={nameError} showDescription={!csMode} />
+            {csMode && !csLogic && <PropertyTab node={node} data={editing.data} />}
+          </>
+        )}
         {tab === 'property' && <PropertyTab node={node} data={editing.data} />}
         {tab === 'branch' &&
-          (csLogic ? <CsLogicBranchEditor node={node} /> : <BranchTab node={node} data={editing.data} />)}
+          (csLogic ? (
+            <CsLogicBranchEditor node={node} />
+          ) : csMode && csEditableBranchNode(node.type) ? (
+            <CsBranchTab node={node} data={editing.data} />
+          ) : (
+            <BranchTab node={node} data={editing.data} />
+          ))}
       </div>
 
       {/* Nút LƯU / HỦY ở đáy panel. */}
@@ -330,7 +352,16 @@ function TabButton({
 }
 
 // ── General ─────────────────────────────────────────────────────────────────
-function GeneralTab({ label, nameError }: { label: string; nameError: TKey | null }) {
+function GeneralTab({
+  label,
+  nameError,
+  showDescription = true,
+}: {
+  label: string;
+  nameError: TKey | null;
+  // Màn CS: General gộp Property và BỎ ô mô tả.
+  showDescription?: boolean;
+}) {
   const t = useT();
   const setDraftLabel = useFlowStore((s) => s.setDraftLabel);
   const setDraftField = useFlowStore((s) => s.setDraftField);
@@ -348,16 +379,18 @@ function GeneralTab({ label, nameError }: { label: string; nameError: TKey | nul
         />
         {nameError && <span className="mt-1 block text-xs text-rose-500">{t(nameError)}</span>}
       </label>
-      <label className="block">
-        <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('description')}</span>
-        <input
-          type="text"
-          className={inputClass}
-          placeholder={t('descriptionPlaceholder')}
-          value={description}
-          onChange={(e) => setDraftField('description', e.target.value)}
-        />
-      </label>
+      {showDescription && (
+        <label className="block">
+          <span className="text-xs font-medium text-[var(--bk-text-muted)]">{t('description')}</span>
+          <input
+            type="text"
+            className={inputClass}
+            placeholder={t('descriptionPlaceholder')}
+            value={description}
+            onChange={(e) => setDraftField('description', e.target.value)}
+          />
+        </label>
+      )}
     </>
   );
 }
@@ -365,7 +398,8 @@ function GeneralTab({ label, nameError }: { label: string; nameError: TKey | nul
 // ── Property ──────────────────────────────────────────────────────────────────
 function PropertyTab({ node, data }: { node: FlowNode; data: Record<string, unknown> }) {
   const t = useT();
-  const fields = PROPERTY_FIELDS[node.type].filter((f) => !f.showIf || f.showIf(data));
+  const csMode = useWorkspaceStore((s) => s.mode === 'cs');
+  const fields = propertyFieldsFor(node.type, csMode).filter((f) => !f.showIf || f.showIf(data));
   // Interaction có Template -> các tham số bị mẫu ÉP giá trị + khoá (không cho sửa).
   const locks = node.type === 'interaction' ? templateLocks(data) : {};
   if (fields.length === 0) {
@@ -533,6 +567,13 @@ function FieldControl({
           </div>
         </div>
       );
+    case 'settingsSelect':
+      return (
+        <label className="block">
+          {label}
+          <SettingsSelect field={field} value={value} onChange={set} />
+        </label>
+      );
     case 'code':
       // Script (Logic) có AI Generate -> AiEditableField (loading + typing + giải thích).
       if (field.aiGenerate) {
@@ -549,6 +590,36 @@ function FieldControl({
     case 'collapsibleTextarea':
       return <CollapsibleField field={field} value={value} onChange={set} />;
   }
+}
+
+// Pulldown option động từ tab Status Settings (状態 / SMSフラグ) — dùng cho
+// Status/SMS Flag của node Transfer/Hangup màn CS. Value lưu là SỐ flag (chuỗi).
+function SettingsSelect({
+  field,
+  value,
+  onChange,
+}: {
+  field: PropertyField;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const t = useT();
+  const ir = useFlowStore((s) => s.ir);
+  const settings = ensureSettings(ir?.settings);
+  const options =
+    field.settingsOptions === 'smsFlags'
+      ? settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag}: ${s.type || '—'}` }))
+      : settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag}: ${s.name}` }));
+  return (
+    <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{t('alUnset')}</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 // Textarea dài -> ẩn/hiện bằng nút bấm (giống cơ chế mở panel thêm node).
@@ -842,6 +913,95 @@ function DepartmentsEditor({ data }: { data: Record<string, unknown> }) {
 interface TargetInfo {
   label: string;
   color: string;
+}
+
+// Branch Settings màn CS (node KHÔNG phải logic): 1 cột ĐIỀU KIỆN (chữ thường,
+// không cú pháp ^$, không tách Value/Label) + cột NODE căn TRÁI. Thêm/sửa/xoá
+// điều kiện tự do; hàng else (default) không xoá được.
+function CsBranchTab({ node, data }: { node: FlowNode; data: Record<string, unknown> }) {
+  const t = useT();
+  const ir = useFlowStore((s) => s.ir);
+  const setDraftField = useFlowStore((s) => s.setDraftField);
+  const branches = csBranchesOf(node.type, data);
+  const write = (list: DataBranch[]) => setDraftField('branches', list);
+
+  const setCondition = (id: string, text: string) =>
+    write(
+      branches.map((b) => (b.id === id ? { ...b, label: text.replace(/[\r\n]+/g, ' ') } : b)),
+    );
+  const add = () => {
+    const used = new Set(branches.map((b) => b.id));
+    let i = 0;
+    let id = `b${i}`;
+    while (used.has(id)) id = `b${++i}`;
+    write([...branches, { id, value: '' }]);
+  };
+  const remove = (id: string) => {
+    if (id === CATCH_ALL_ID) return; // nhánh else luôn giữ
+    write(branches.filter((b) => b.id !== id));
+  };
+
+  // Đích của 1 nhánh = target của edge xuất phát từ handle đó (IR đã commit).
+  const targetInfo = (handleId: string): TargetInfo | null => {
+    const edge = ir?.edges.find((e) => e.source === node.id && (e.sourceHandle ?? 'default') === handleId);
+    if (!edge) return null;
+    const target = ir?.nodes.find((n) => n.id === edge.target);
+    return {
+      label: target?.label ?? edge.target,
+      color: target ? NODE_CONFIG[target.type].color : 'var(--bk-text-faint)',
+    };
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2.5">
+        <div className="bk-branch-row bk-branch-head">
+          <div className="bk-branch-cond">{t('branchColCondition')}</div>
+          <span className="bk-branch-arrow-spacer" aria-hidden />
+          <div className="bk-branch-target bk-branch-target--left">{t('branchColNode')}</div>
+          <span className="bk-branch-del-spacer" aria-hidden />
+        </div>
+        {branches.map((b) => (
+          <div key={b.id} className="bk-branch-row">
+            <div className="bk-branch-cond">
+              <input
+                type="text"
+                className={`${inputClass} !mt-0 w-full`}
+                value={b.label ?? ''}
+                placeholder={t('branchConditionCsPlaceholder')}
+                onChange={(e) => setCondition(b.id, e.target.value)}
+              />
+            </div>
+            <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
+            <div className="bk-branch-target bk-branch-target--left">
+              <BranchTarget info={targetInfo(b.id)} />
+            </div>
+            {b.id === CATCH_ALL_ID ? (
+              <span className="bk-branch-del-spacer" aria-hidden />
+            ) : (
+              <button
+                type="button"
+                onClick={() => remove(b.id)}
+                title={t('deleteBranch')}
+                aria-label={t('deleteBranch')}
+                className="bk-branch-del"
+              >
+                <Icon icon="lucide:trash-2" width={16} height={16} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={add}
+        className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--bk-border)] px-3 py-2 text-sm font-medium text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+      >
+        <Icon icon="lucide:plus" width={16} height={16} />
+        {t('addCondition')}
+      </button>
+    </div>
+  );
 }
 
 function BranchTab({ node, data }: { node: FlowNode; data: Record<string, unknown> }) {

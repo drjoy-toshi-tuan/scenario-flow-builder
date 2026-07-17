@@ -406,12 +406,15 @@ body {
 .bk-cs-main {
   flex: 1 1 auto;
   min-width: 0;
+  position: relative;
   display: flex;
-  flex-direction: column;
-  /* Tên bám mép trên, icon biểu thị bám mép dưới -> 2 dòng tách xa nhau. */
+  align-items: center;
+  justify-content: center;
   align-self: stretch;
-  justify-content: space-between;
-  gap: 4px;
+  /* Padding TRÊN = DƯỚI để tên luôn căn giữa theo chiều dọc của node; phần
+     padding dưới đồng thời chừa chỗ cho dải icon biểu thị (neo absolute) —
+     nhờ vậy dải icon không ảnh hưởng align của tên nhưng vẫn giữ khoảng cách. */
+  padding: 17px 0;
 }
 /* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
    mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ. */
@@ -425,8 +428,12 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators). */
+/* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
+   Neo góc dưới phải, KHÔNG chiếm dòng riêng (không đẩy tên node lệch tâm). */
 .bk-cs-indicators {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -470,6 +477,11 @@ body {
 /* Điểm đến: ẩn chấm tròn (mũi tên cuối dây thay thế) — vẫn nối dây vào được. */
 .bk-node--cs .react-flow__handle.bk-handle.target {
   opacity: 0;
+}
+
+/* Icon đồng hồ/lịch của input time: theme tối invert lại cho khỏi đen xì. */
+.dark input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.75);
 }
 
 /* Nội dung panel setting fade/slide nhẹ khi đổi sang module khác. */
@@ -566,6 +578,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+}
+/* Màn CS: cột NODE căn TRÁI theo yêu cầu team CS. */
+.bk-branch-target--left,
+.bk-branch-head .bk-branch-target.bk-branch-target--left {
+  justify-content: flex-start;
 }
 /* Hàng tiêu đề cột (VALUE / LABEL / NODE) — chữ nhỏ, mờ, IN HOA. */
 .bk-branch-head {

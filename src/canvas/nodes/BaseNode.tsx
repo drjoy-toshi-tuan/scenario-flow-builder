@@ -3,7 +3,7 @@ import { Handle, NodeToolbar, Position, useStore, type NodeProps } from '@xyflow
 import type { RFNodeData } from '../irAdapter';
 import type { NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
-import { PROPERTY_FIELDS, type PropertyField } from '../../ui/nodeSchema';
+import { propertyFieldsFor, type PropertyField } from '../../ui/nodeSchema';
 import { csBranchSentence, readCsBranches } from '../../ui/csLogic';
 import { Icon } from '../../ui/icons';
 import { useFlowStore } from '../../store/flowStore';
@@ -168,12 +168,10 @@ export function makeNode(nodeType: NodeType) {
         {showTarget && <Handle type="target" position={Position.Top} className="bk-handle" />}
 
         {csMode ? (
-          // CS: icon loại (tile trái) + cột 2 DÒNG — dòng trên: TÊN node căn giữa
-          // (font to); dòng dưới: dải icon biểu thị cấu hình căn PHẢI.
+          // CS: KHÔNG icon loại (nhận diện bằng màu accent trái) — TÊN node căn giữa
+          // cả ngang lẫn dọc; dải icon biểu thị cấu hình neo góc dưới phải (không
+          // ảnh hưởng căn giữa của tên, vẫn chừa khoảng cách — xem CSS).
           <div className="bk-node-body bk-node-body--cs">
-            <div className="bk-node-icon">
-              <Icon icon={cfg.icon} />
-            </div>
             <div className="bk-cs-main">
               <div className="bk-node-name bk-node-name--cs" title={d.label}>
                 {d.label}
@@ -271,15 +269,16 @@ function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unk
         title: str(data.reconfirmAnnounce) || 'Re-confirm',
         color: '#f59e0b',
       });
-    // Retry: hiện số lần (default 2) — icon vòng lặp + con số nhỏ.
+    // Retry: hiện số lần (default 2) — icon vòng lặp + con số nhỏ. Retry = 0 thì ẩn.
     const retry = str(data.retryCount) || '2';
-    icons.push({
-      key: 'retry',
-      icon: 'lucide:refresh-cw',
-      title: str(data.retryAnnounce),
-      color: '#6366f1',
-      text: retry,
-    });
+    if (retry !== '0')
+      icons.push({
+        key: 'retry',
+        icon: 'lucide:refresh-cw',
+        title: str(data.retryAnnounce),
+        color: '#6366f1',
+        text: retry,
+      });
   }
   if (type === 'transfer' && str(data.transferNumber))
     icons.push({
@@ -329,7 +328,7 @@ function hasPreviewContent(type: NodeType, data: Record<string, unknown>, cs = f
   if (cs && type === 'logic') {
     return readCsBranches(data).length > 0 || pickDescription(data) !== null;
   }
-  const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
+  const fields = propertyFieldsFor(type, cs).filter((f) => !f.showIf || f.showIf(data));
   return fields.length > 0 || pickDescription(data) !== null;
 }
 
@@ -341,7 +340,7 @@ function hasPreviewContent(type: NodeType, data: Record<string, unknown>, cs = f
 function NodePreview({ type, data, cs = false }: { type: NodeType; data: Record<string, unknown>; cs?: boolean }) {
   const t = useT();
   const ir = useFlowStore((s) => s.ir);
-  const fields = cs && type === 'logic' ? [] : PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
+  const fields = cs && type === 'logic' ? [] : propertyFieldsFor(type, cs).filter((f) => !f.showIf || f.showIf(data));
   const description = pickDescription(data);
   // 分岐ロジック (CS): mỗi nhánh 1 dòng "tên nhánh — câu điều kiện tự sinh".
   const csBranches = cs && type === 'logic' ? readCsBranches(data) : [];

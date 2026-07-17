@@ -1,4 +1,5 @@
 import type { NodeType } from '../ir/types';
+import { useLang } from './i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cấu hình hiển thị theo NodeType: icon (Iconify/lucide), nhãn loại, màu accent.
@@ -30,8 +31,9 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
 };
 
 // ── Màn CS (#/cs) ──
-// Bộ node CS dùng TÊN TIẾNG NHẬT cố định (không theo ngôn ngữ UI) — spec từ team CS.
-// Chỉ các loại trong CS_NODE_TYPES mới có nhãn; loại khác không xuất hiện ở màn CS.
+// Bộ node CS có tên theo NGÔN NGỮ UI: tiếng Nhật theo spec team CS; tiếng Việt
+// dùng tên tiếng Anh quen thuộc (Announce/Hearing/…). Chỉ các loại trong
+// CS_NODE_TYPES mới có nhãn; loại khác không xuất hiện ở màn CS.
 // CS KHÔNG có node Start: シナリオ設計書 là diagram luồng, node đầu tiên chính là
 // điểm bắt đầu (TS mới ráp node Start kỹ thuật khi gen YAML).
 export const CS_TYPE_LABELS: Partial<Record<NodeType, string>> = {
@@ -42,9 +44,23 @@ export const CS_TYPE_LABELS: Partial<Record<NodeType, string>> = {
   hangup: '終話',
 };
 
-// Nhãn loại node theo màn: CS lấy tên tiếng Nhật (fallback tên chuẩn nếu thiếu).
+export const CS_TYPE_LABELS_VI: Partial<Record<NodeType, string>> = {
+  announce: 'Announce',
+  interaction: 'Hearing',
+  logic: 'Logic',
+  transfer: 'Transfer',
+  hangup: 'Hangup',
+};
+
+// Nhãn loại node theo màn: CS lấy tên theo ngôn ngữ UI hiện tại (fallback tên
+// chuẩn nếu thiếu). Đọc lang qua getState — component gọi hàm này đều đã
+// subscribe ngôn ngữ (useT) nên tự re-render khi đổi.
 export function nodeTypeLabel(type: NodeType, csMode: boolean): string {
-  return (csMode ? CS_TYPE_LABELS[type] : undefined) ?? NODE_CONFIG[type].typeLabel;
+  if (csMode) {
+    const labels = useLang.getState().lang === 'ja' ? CS_TYPE_LABELS : CS_TYPE_LABELS_VI;
+    if (labels[type]) return labels[type];
+  }
+  return NODE_CONFIG[type].typeLabel;
 }
 
 // Palette màn CS: bộ node tối giản cho người không kỹ thuật — vẽ luồng kịch bản +

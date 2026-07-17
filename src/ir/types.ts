@@ -39,6 +39,8 @@ export type DayKey = (typeof DAY_KEYS)[number];
 export interface DaySchedule {
   day: DayKey;
   enabled: boolean;
+  // true = hoạt động 24H (24時間) — không dùng khung giờ; false/thiếu = theo khung giờ.
+  allDay?: boolean;
   ranges: TimeRange[];
 }
 

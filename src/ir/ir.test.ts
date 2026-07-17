@@ -1473,8 +1473,8 @@ describe('flow.settings round-trip', () => {
     expect('settings' in raw.flow).toBe(false);
   });
 
-  it('smsCharCount = nội dung + 1 (xuống dòng) + 22 (URL cố định)', () => {
-    expect(smsCharCount('')).toBe(23);
-    expect(smsCharCount('abc')).toBe(26);
+  it('smsCharCount = nội dung + 22 (URL cố định — KHÔNG cộng ký tự xuống dòng)', () => {
+    expect(smsCharCount('')).toBe(22);
+    expect(smsCharCount('abc')).toBe(25);
   });
 });
