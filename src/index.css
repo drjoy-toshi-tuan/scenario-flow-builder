@@ -584,6 +584,10 @@ body {
   border: none;
 }
 .bk-tab {
+  /* Chia đều bề rộng panel: 2 tab -> mỗi tab 1/2, 3 tab -> mỗi tab 1/3.
+     flex:1 1 0 để các tab bằng nhau bất kể độ dài chữ; text căn giữa. */
+  flex: 1 1 0;
+  text-align: center;
   padding: 8px 16px;
   border-radius: 10px 10px 0 0;
   font-size: 12.5px;
