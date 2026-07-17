@@ -263,6 +263,7 @@ export function FlowCanvas() {
 
   return (
     <ReactFlow
+      className={csMode ? 'bk-flow--cs' : undefined}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}

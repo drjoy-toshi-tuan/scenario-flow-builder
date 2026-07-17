@@ -27,8 +27,8 @@
   --bk-text-faint: #94a3b8;
   --bk-canvas: #f4f6fa;
   --bk-dot: #cbd5e1;
-  /* Dây nối TỐI hơn nền canvas sáng -> nhìn rõ đường đi của flow. */
-  --bk-edge: #55617a;
+  /* Màn TS: màu dây như PR #98. Màn CS đậm hơn (đảo tông) — xem .bk-flow--cs. */
+  --bk-edge: #94a3b8;
   --bk-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 20px rgba(15, 23, 42, 0.08);
   /* Node trên canvas: ĐẢO tông so với theme để tương phản mạnh với nền canvas —
      theme light dùng node TỐI (hơi đen) chữ trắng offwhite; theme dark dùng node
@@ -57,7 +57,7 @@
   --bk-text-faint: #7c8290;
   --bk-canvas: #14161d;
   --bk-dot: #3a4050;
-  --bk-edge: #b4bdd1; /* dây nối SÁNG hơn để nổi rõ trên nền canvas tối */
+  --bk-edge: #8a92a6; /* dây nối sáng rõ trên dark mode (PR #98, màn TS) */
   --bk-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
   /* Node đảo tông trên dark theme: nền offwhite hơi ngả xám, chữ hơi đen. */
   --bk-node-bg: #e8eaef;
@@ -274,9 +274,10 @@ body {
   flex-direction: column;
   justify-content: center;
   border-radius: 18px;
-  /* Nền/viền/chữ node dùng nhóm token --bk-node-* (đảo tông so với theme). */
-  background: var(--bk-node-bg);
-  border: 1px solid var(--bk-node-border);
+  /* Màn TS: node theo surface như trước (PR #98). Biến thể đảo tông + accent chỉ
+     áp cho màn CS (xem .bk-node--cs / .bk-cs-skin). */
+  background: var(--bk-surface);
+  border: 1px solid var(--bk-border);
   box-shadow: var(--bk-shadow);
   padding: 12px 14px 12px 16px;
   /* KHÔNG dùng overflow:hidden ở đây — nó sẽ cắt handle (điểm nối) thành nửa
@@ -294,7 +295,7 @@ body {
 }
 .bk-node:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-node-border));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-border));
 }
 .bk-node--selected {
   border-color: var(--accent);
@@ -314,14 +315,13 @@ body {
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
-  /* Pha accent với màu chữ node -> nhãn loại luôn đọc được trên nền node đảo tông. */
-  color: color-mix(in srgb, var(--accent) 72%, var(--bk-node-text));
+  color: var(--accent);
   line-height: 1.2;
 }
 .bk-node-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--bk-node-text);
+  color: var(--bk-text);
   line-height: 1.3;
   margin-top: 1px;
   white-space: nowrap;
@@ -330,7 +330,7 @@ body {
 }
 .bk-node-desc {
   font-size: 11.5px;
-  color: var(--bk-node-text-muted);
+  color: var(--bk-text-muted);
   line-height: 1.35;
   margin-top: 4px;
   display: -webkit-box;
@@ -339,7 +339,7 @@ body {
   overflow: hidden;
 }
 .bk-node-desc--empty {
-  color: color-mix(in srgb, var(--bk-node-text-muted) 75%, transparent);
+  color: var(--bk-text-faint);
   font-style: italic;
 }
 .bk-node-icon {
@@ -351,10 +351,9 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 21px;
-  /* Icon loại node: pha accent với màu chữ node để đủ tương phản trên nền đảo tông. */
-  color: color-mix(in srgb, var(--accent) 72%, var(--bk-node-text));
-  background: color-mix(in srgb, var(--accent) 16%, var(--bk-node-bg));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -441,6 +440,9 @@ body {
    mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ.
    Font hạ nhẹ (17 -> 15) để chừa khoảng thở với dải icon neo góc dưới. */
 .bk-node-name--cs {
+  /* CS: nền node đảo tông (--bk-node-bg) -> tên dùng màu chữ đảo tông tương ứng.
+     (Base .bk-node-name đã trả về --bk-text cho màn TS.) */
+  color: var(--bk-node-text);
   text-align: center;
   font-size: 15px;
   white-space: normal;
@@ -490,6 +492,10 @@ body {
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--bk-node-bg));
   clip-path: inset(-1px -1px 50% -1px);
   pointer-events: none;
+}
+/* CS: chấm nối "rỗng" theo nền node đảo tông (--bk-node-bg) để liền mạch với card. */
+.bk-node--cs .react-flow__handle.bk-handle {
+  background: var(--bk-node-bg);
 }
 /* Chấm output CS: nhỏ (9px), nằm HẲN trong node ngay trên mép đáy — lọt giữa
    miệng hõm khoét. (Trục: bottom càng ÂM càng đẩy RA NGOÀI; 0 = sát mép trong.) */
@@ -1479,10 +1485,10 @@ body {
    Lưu ý: KHÔNG đụng `transform` vì React Flow dùng nó để canh vị trí handle. */
 .react-flow__handle.bk-handle {
   /* Mọi handle (in & out) cùng kích thước — lấy chuẩn của handle input.
-     Nền chấm = nền node (đảo tông) để chấm "rỗng" liền mạch với card. */
+     Nền chấm = nền card node để chấm "rỗng" liền mạch (TS: surface). */
   width: 12px;
   height: 12px;
-  background: var(--bk-node-bg);
+  background: var(--bk-surface);
   border: 2px solid var(--accent);
   border-radius: 9999px;
   transition: box-shadow 0.12s ease, background 0.12s ease;
@@ -1526,17 +1532,30 @@ body {
   transform: translateY(-50%);
 }
 .edge-label {
-  /* Nhãn điều kiện theo cùng quy tắc đảo tông của node: light = chip tối chữ sáng,
-     dark = chip sáng chữ tối -> nổi rõ trên nền canvas ở cả 2 theme. */
-  background: var(--bk-node-bg);
+  /* Màn TS: chip nhãn theo surface như PR #98. Màn CS đảo tông — xem .bk-flow--cs. */
+  background: var(--bk-surface);
   padding: 1px 6px;
   border-radius: 6px;
-  border: 1px solid var(--bk-node-border);
-  color: var(--bk-node-text);
+  border: 1px solid var(--bk-border);
+  color: var(--bk-text-muted);
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 500;
   /* Nhãn chỉ hiện khi hover vào dây (opacity điều khiển trong DeletableEdge). */
   transition: opacity 0.15s ease;
+}
+/* Màn CS (#/cs): dây đậm hơn + chip nhãn đảo tông (light = chip tối chữ sáng, dark =
+   chip sáng chữ tối) cho nổi rõ trên canvas — chỉ áp trong canvas CS. */
+.bk-flow--cs {
+  --bk-edge: #55617a;
+}
+.dark .bk-flow--cs {
+  --bk-edge: #b4bdd1;
+}
+.bk-flow--cs .edge-label {
+  background: var(--bk-node-bg);
+  border-color: var(--bk-node-border);
+  color: var(--bk-node-text);
+  font-weight: 600;
 }
 /* Stamp điều kiện luôn-hiện (logic/transfer/hearing màn CS): kéo được để tự sắp
    chỗ khi nhiều dây chập nhau — con trỏ grab/grabbing báo hiệu kéo được. */
