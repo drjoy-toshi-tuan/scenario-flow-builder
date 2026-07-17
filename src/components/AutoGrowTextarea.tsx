@@ -11,9 +11,17 @@ interface AutoGrowTextareaProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  // true: CHO PHÉP xuống dòng cứng (Enter) — vẫn tự cao theo nội dung (vd SMS文言).
+  allowNewlines?: boolean;
 }
 
-export function AutoGrowTextarea({ value, onChange, placeholder, className }: AutoGrowTextareaProps) {
+export function AutoGrowTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+  allowNewlines = false,
+}: AutoGrowTextareaProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   // Đặt lại chiều cao theo nội dung mỗi khi value đổi.
@@ -31,10 +39,13 @@ export function AutoGrowTextarea({ value, onChange, placeholder, className }: Au
       className={className}
       value={value}
       placeholder={placeholder}
-      // Gộp mọi xuống dòng thành khoảng trắng -> vẫn là "1 dòng logic".
-      onChange={(e) => onChange(e.target.value.replace(/[\r\n]+/g, ' '))}
+      // Mặc định gộp mọi xuống dòng thành khoảng trắng -> vẫn là "1 dòng logic";
+      // allowNewlines thì giữ nguyên (Enter xuống dòng, chiều cao tự tăng).
+      onChange={(e) =>
+        onChange(allowNewlines ? e.target.value : e.target.value.replace(/[\r\n]+/g, ' '))
+      }
       onKeyDown={(e) => {
-        if (e.key === 'Enter') e.preventDefault();
+        if (!allowNewlines && e.key === 'Enter') e.preventDefault();
       }}
     />
   );

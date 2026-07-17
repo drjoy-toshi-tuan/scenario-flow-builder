@@ -13,7 +13,7 @@ export interface DriveItem {
   mimeType: string;
   createdTime: string; // RFC3339 — 作成日時
   modifiedTime: string; // RFC3339 — 更新日時
-  lastModifyingUser?: { displayName?: string }; // 作成者/người sửa cuối
+  lastModifyingUser?: { displayName?: string; photoLink?: string }; // 作成者/người sửa cuối (kèm avatar)
   parents?: string[];
   // Key-value riêng của app trên item (vd appliedVersion do bot deploy ghi).
   appProperties?: Record<string, string>;
@@ -22,7 +22,7 @@ export interface DriveItem {
 }
 
 // Các field xin từ API (khớp DriveItem — xin đúng thứ cần cho nhẹ).
-const ITEM_FIELDS = 'id,name,mimeType,createdTime,modifiedTime,lastModifyingUser(displayName),parents,appProperties,description';
+const ITEM_FIELDS = 'id,name,mimeType,createdTime,modifiedTime,lastModifyingUser(displayName,photoLink),parents,appProperties,description';
 
 export class DriveApiError extends Error {
   constructor(

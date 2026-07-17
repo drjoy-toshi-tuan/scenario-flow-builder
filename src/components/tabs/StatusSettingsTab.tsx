@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { ensureSettings, smsCharCount } from '../../ir/settings';
+import { ensureSettings, smsCharCount, SMS_WARN_LIMIT } from '../../ir/settings';
 import type { SmsFlagEntry, StatusEntry } from '../../ir/types';
 import { Icon } from '../../ui/icons';
+import { AutoGrowTextarea } from '../AutoGrowTextarea';
 import { useT } from '../../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ export function StatusSettingsTab() {
               type="button"
               onClick={() => setShowInfo(true)}
               title={t('stInfoTitle')}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--bk-border)] text-[11px] font-bold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#38bdf8] text-[11px] font-bold text-white shadow-sm transition hover:brightness-110"
             >
               i
             </button>
@@ -109,14 +110,23 @@ export function StatusSettingsTab() {
                     ) : (
                       <input
                         type="number"
-                        min={0}
+                        min={6}
+                        max={99}
                         value={s.flag}
                         onChange={(e) =>
                           setStatuses(
                             settings.statuses.map((x, j) => (j === i ? { ...x, flag: Number(e.target.value) } : x)),
                           )
                         }
-                        className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-sm text-[var(--bk-text)]"
+                        onBlur={() =>
+                          // Giới hạn cho chọn 6~99 — blur thì kẹp về trong dải.
+                          setStatuses(
+                            settings.statuses.map((x, j) =>
+                              j === i && !x.fixed ? { ...x, flag: Math.min(99, Math.max(6, x.flag)) } : x,
+                            ),
+                          )
+                        }
+                        className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-center text-sm text-[var(--bk-text)]"
                       />
                     )}
                   </td>
@@ -147,7 +157,7 @@ export function StatusSettingsTab() {
                 <th className="w-40 px-2 py-2">{t('stColType')}</th>
                 <th className="w-24 px-2 py-2">{t('stColFlag')}</th>
                 <th className="px-2 py-2">{t('stColContent')}</th>
-                <th className="w-20 px-2 py-2 text-right">{t('stColChars')}</th>
+                <th className="w-24 px-2 py-2 text-center">{t('stColChars')}</th>
                 <th className="w-10 px-2 py-2" />
               </tr>
             </thead>
@@ -162,35 +172,63 @@ export function StatusSettingsTab() {
                   <td className="px-2 py-1.5">
                     <input
                       type="number"
-                      min={0}
+                      min={1}
+                      max={99}
                       value={s.flag}
                       onChange={(e) =>
                         setSmsFlags(
                           settings.smsFlags.map((x, j) => (j === i ? { ...x, flag: Number(e.target.value) } : x)),
                         )
                       }
-                      className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-sm text-[var(--bk-text)]"
+                      onBlur={() =>
+                        // Giới hạn 1~99 — blur thì kẹp về trong dải.
+                        setSmsFlags(
+                          settings.smsFlags.map((x, j) =>
+                            j === i ? { ...x, flag: Math.min(99, Math.max(1, x.flag)) } : x,
+                          ),
+                        )
+                      }
+                      className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-center text-sm text-[var(--bk-text)]"
                     />
                   </td>
                   <td className="px-2 py-1.5">
-                    <textarea
-                      value={s.content}
-                      onChange={(e) =>
-                        setSmsFlags(
-                          settings.smsFlags.map((x, j) => (j === i ? { ...x, content: e.target.value } : x)),
-                        )
-                      }
-                      rows={3}
-                      className="w-full resize-y rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--bk-text)]"
-                    />
-                    {/* Tag URL cố định — luôn gắn ở dòng cuối SMS, dài đúng 22 ký tự.
-                        Nền theo token surface-2 nên tự đạt contrast ở cả light/dark. */}
-                    <span className="mt-1 inline-flex items-center rounded-md bg-[var(--bk-surface-2)] px-2 py-1 font-mono text-[11px] font-semibold text-[var(--bk-text)]">
-                      通話後送信URL
-                    </span>
+                    {/* Ô SMS文言: textbox tự cao theo nội dung (Enter xuống dòng được).
+                        Tag 通話後送信URL (22 ký tự) nằm NGAY TRONG ô, luôn là dòng cuối —
+                        chỉ hiện khi đã nhập nội dung. */}
+                    <div className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5">
+                      <AutoGrowTextarea
+                        allowNewlines
+                        value={s.content}
+                        onChange={(v) =>
+                          setSmsFlags(
+                            settings.smsFlags.map((x, j) => (j === i ? { ...x, content: v } : x)),
+                          )
+                        }
+                        className="block w-full resize-none bg-transparent text-sm leading-relaxed text-[var(--bk-text)] outline-none"
+                      />
+                      {s.content.trim() !== '' && (
+                        <div className="mt-1 border-t border-dashed border-[var(--bk-border)] pt-1">
+                          <span className="inline-flex items-center rounded-md bg-[var(--bk-surface-2)] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--bk-text)]">
+                            通話後送信URL
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-2 py-2.5 text-right text-sm font-semibold text-[var(--bk-text-muted)]">
-                    {smsCharCount(s.content)}
+                  <td className="px-2 py-2.5 text-center text-sm font-semibold text-[var(--bk-text-muted)]">
+                    {(() => {
+                      const count = smsCharCount(s.content);
+                      const over = count > SMS_WARN_LIMIT; // từ 71 ký tự trở đi -> cảnh báo
+                      return (
+                        <span
+                          className={`inline-flex items-center justify-center gap-1 ${over ? 'text-amber-500' : ''}`}
+                          title={over ? t('stSmsTooLong') : undefined}
+                        >
+                          {over && <Icon icon="lucide:triangle-alert" width={14} height={14} />}
+                          {count}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <button

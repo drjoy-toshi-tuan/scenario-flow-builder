@@ -23,6 +23,8 @@ import {
   moduleTypeOf,
   BRANCH_SCHEMA,
   CATCH_ALL_ID,
+  csEditableBranchNode,
+  csBranchesOf,
   MODULE_DEFAULT_BRANCHES,
   MODULE_FIXED_BRANCHES,
   LOGIC_MODULE_CDEPT,
@@ -938,10 +940,17 @@ export const useFlowStore = create<FlowState>((set, get) => {
       const node = ir.nodes.find((n) => n.id === selectedNodeId);
       if (!node) return;
 
-      const editable = BRANCH_SCHEMA[node.type].mode === 'editable';
+      // Màn CS: node không phải logic cũng có nhánh điều kiện tự do (đè bộ fixed).
+      const csFree =
+        useWorkspaceStore.getState().mode === 'cs' && csEditableBranchNode(node.type);
+      const editable = BRANCH_SCHEMA[node.type].mode === 'editable' || csFree;
       // Nhánh hiệu lực (CMR sinh từ Pair) — cũng persist vào data.branches khi lưu
       // để toYaml/round-trip có nguồn sự thật đầy đủ.
-      const branches = editable ? effectiveBranches(node.type, draft.data) : [];
+      const branches = csFree
+        ? csBranchesOf(node.type, draft.data)
+        : editable
+          ? effectiveBranches(node.type, draft.data)
+          : [];
       const branchIds = new Set(branches.map((b) => b.id));
       const valueByHandle = new Map(branches.map((b) => [b.id, b.value]));
       const labelByHandle = new Map(branches.map((b) => [b.id, (b.label ?? '').trim()]));

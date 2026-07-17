@@ -68,6 +68,7 @@ export interface VersionNode {
   createdAt: string; // yyyy-MM-dd HH:mm — Drive createdTime
   updatedAt: string; // yyyy-MM-dd HH:mm — Drive modifiedTime (lưu đè -> tự nhảy)
   author: string; // lastModifyingUser
+  authorPhoto?: string; // ảnh đại diện Google của lastModifyingUser (photoLink)
   // Số Sub Flow của bản này (đọc từ nội dung YAML — lazy khi vào tầng flow,
   // vì mỗi version có thể khác nhau). undefined = chưa đọc xong.
   subflowCount?: number;
@@ -377,6 +378,7 @@ function buildTree(fac: DriveItem[], scen: DriveItem[], files: DriveItem[]): Fac
       createdAt: fmtTime(f.createdTime),
       updatedAt: fmtTime(f.modifiedTime),
       author: f.lastModifyingUser?.displayName ?? '',
+      authorPhoto: f.lastModifyingUser?.photoLink || undefined,
       note: f.description?.trim() ? f.description : undefined,
       environment: env === 'master' || env === 'demo' ? env : undefined,
     };
@@ -918,10 +920,11 @@ function DriveInner({
   // Phụ thuộc `scenario` (object) để refetch phần thiếu sau khi Làm mới;
   // loadVersionDetails không setState khi không còn gì thiếu nên không lặp.
   useEffect(() => {
-    if (facility && scenario) actions.onLoadVersionDetails?.(facility.id, scenario.id);
+    // Màn CS không hiển thị badge Main/Sub flow -> khỏi đọc nội dung từng file.
+    if (facility && scenario && !csMode) actions.onLoadVersionDetails?.(facility.id, scenario.id);
     // actions được tạo lại mỗi render nhưng hành vi ổn định — không đưa vào deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facility, scenario]);
+  }, [facility, scenario, csMode]);
 
   // Modal tạo flow mới (chọn/tạo folder như modal import) / xác nhận xoá / đổi tên folder.
   const [showNew, setShowNew] = useState(false);
@@ -1279,7 +1282,7 @@ function DriveInner({
                   : 'font-medium text-[var(--bk-accent)] hover:bg-[var(--bk-accent-soft)]'
               }`}
             >
-              {t('dmRootCrumb')}
+              {t(csMode ? 'csDmRootCrumb' : 'dmRootCrumb')}
             </button>
             {facility && (
               <>
@@ -1314,7 +1317,7 @@ function DriveInner({
               className="flex items-center gap-1.5 rounded-lg bg-[#16a34a] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
             >
               <Icon icon="line-md:plus" width={17} height={17} />
-              {t('fmNew')}
+              {t(csMode ? 'csDmNew' : 'fmNew')}
             </button>
             {/* Import file YAML -> modal chọn/tạo folder bệnh viện + kịch bản */}
             <button
@@ -1324,7 +1327,7 @@ function DriveInner({
               className="flex items-center gap-1.5 rounded-lg bg-[var(--bk-accent)] px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95 disabled:pointer-events-none disabled:opacity-60"
             >
               <Icon icon="line-md:upload-loop" width={17} height={17} />
-              {t('dmImport')}
+              {t(csMode ? 'csDmImport' : 'dmImport')}
             </button>
             <button
               type="button"
@@ -1616,7 +1619,9 @@ function DriveInner({
                           )}
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{s.createdAt ?? '—'}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{lv?.updatedAt ?? '—'}</td>
-                          <td className={`${cell} text-[var(--bk-text-muted)]`}>{lv?.author ?? '—'}</td>
+                          <td className={`${cell} text-[var(--bk-text-muted)]`}>
+                            <AuthorCell name={lv?.author} photo={lv?.authorPhoto} />
+                          </td>
                           <td className={cell} onClick={(e) => e.stopPropagation()}>
                             <div className={rowActions}>
                               {/* Sửa = đổi tên folder kịch bản */}
@@ -1690,13 +1695,14 @@ function DriveInner({
                               <span className="truncate text-xs text-[var(--bk-text-faint)]">
                                 {versionFileName(scenario.name, ver.v)}
                               </span>
-                              {/* Cấu trúc flow CỦA BẢN NÀY: Main | Sub · số lượng (ẩn khi chưa đọc xong). */}
-                              {ver.subflowCount !== undefined && (
+                              {/* Cấu trúc flow CỦA BẢN NÀY: Main | Sub · số lượng (ẩn khi chưa đọc
+                                  xong). Màn CS không cần thông tin này -> ẩn hẳn. */}
+                              {!csMode && ver.subflowCount !== undefined && (
                                 <FlowStructureBadge subflowCount={ver.subflowCount} />
                               )}
                               {isLatest && (
                                 <span
-                                  className="inline-flex shrink-0 items-center text-[#b026ff]"
+                                  className="inline-flex shrink-0 items-center text-[#38bdf8]"
                                   title={t('dmLatestBadge')}
                                 >
                                   <Icon icon="mdi:new-box" width={20} height={20} />
@@ -1739,7 +1745,9 @@ function DriveInner({
                           )}
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.createdAt}</td>
                           <td className={`${cell} whitespace-nowrap text-[var(--bk-text-muted)]`}>{ver.updatedAt}</td>
-                          <td className={`${cell} text-[var(--bk-text-muted)]`}>{ver.author}</td>
+                          <td className={`${cell} text-[var(--bk-text-muted)]`}>
+                            <AuthorCell name={ver.author} photo={ver.authorPhoto} />
+                          </td>
                           <td className={cell} onClick={(e) => e.stopPropagation()}>
                             <div className={rowActions}>
                               {/* CS: sửa 環境 CỦA BẢN NÀY (本番/デモ) — mở modal chọn. */}
@@ -2198,16 +2206,14 @@ function EnvStamp({ env }: { env: 'master' | 'demo' }) {
   );
 }
 
-// Chọn môi trường (本番/デモ) — 2 nút gạt, dùng ở modal tạo/import/sửa env màn CS.
+// Chọn môi trường — 2 nút gạt, dùng ở modal tạo/import/sửa env màn CS.
+// Chữ thường (không stamp); デモ bên trái, 本番 bên phải theo yêu cầu CS.
 function EnvPicker({ value, onChange }: { value: EnvKind; onChange: (v: EnvKind) => void }) {
   const t = useT();
-  const opts: { env: EnvKind; color: string }[] = [
-    { env: 'master', color: '#10b981' },
-    { env: 'demo', color: '#f97316' },
-  ];
+  const opts: EnvKind[] = ['demo', 'master'];
   return (
     <div className="flex gap-2">
-      {opts.map(({ env, color }) => {
+      {opts.map((env) => {
         const on = value === env;
         return (
           <button
@@ -2215,22 +2221,39 @@ function EnvPicker({ value, onChange }: { value: EnvKind; onChange: (v: EnvKind)
             type="button"
             onClick={() => onChange(env)}
             className={[
-              'flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition',
+              'flex flex-1 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold transition',
               on
                 ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-text)]'
                 : 'border-[var(--bk-border)] bg-[var(--bk-surface-2)] text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]',
             ].join(' ')}
           >
-            <span
-              className="inline-flex shrink-0 items-center rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-widest text-white"
-              style={{ background: color, fontFamily: "'Space Grotesk', 'Zen Kaku Gothic New', sans-serif" }}
-            >
-              {t(env === 'master' ? 'dmEnvMaster' : 'dmEnvDemo')}
-            </span>
+            {t(env === 'master' ? 'ivrEnvMaster' : 'ivrEnvDemo')}
           </button>
         );
       })}
     </div>
+  );
+}
+
+// Người tạo/sửa cuối: avatar Google (photoLink) + tên; không có ảnh -> icon mặt.
+function AuthorCell({ name, photo }: { name?: string; photo?: string }) {
+  if (!name) return <span className="text-[var(--bk-text-faint)]">—</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {photo ? (
+        <img
+          src={photo}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="h-6 w-6 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--bk-surface-2)] text-[var(--bk-text-faint)]">
+          <Icon icon="lucide:circle-user-round" width={16} height={16} />
+        </span>
+      )}
+      <span className="truncate">{name}</span>
+    </span>
   );
 }
 

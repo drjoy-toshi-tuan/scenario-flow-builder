@@ -22,7 +22,8 @@ export type FieldKind =
   | 'pairs' // danh sách Pair (2 ô text + dấu ×) của Context Match Router
   | 'departments' // danh sách set (List khoa khám -> Tên output) của Clinical Department Classifier
   | 'time' // giờ HH:mm:ss — chỉ nhận chữ số, tự chèn ':' theo format
-  | 'yesno'; // checkbox 2 lựa chọn あり / なし
+  | 'yesno' // checkbox 2 lựa chọn あり / なし
+  | 'settingsSelect'; // pulldown option động từ tab Status Settings (xem settingsOptions)
 
 // Nguồn option động cho searchSelect (tính từ IR hiện tại, xem optionsForSource).
 export type OptionsSource =
@@ -50,6 +51,8 @@ export interface PropertyField {
   language?: 'js' | 'json'; // cho kind 'code' — mặc định 'js'
   // Nút "AIで生成・修正" cạnh ô nhập (script của Logic / prompt của OpenAI).
   aiGenerate?: 'script' | 'prompt';
+  // Nguồn option của kind 'settingsSelect' — bảng tương ứng trong tab Status Settings.
+  settingsOptions?: 'statuses' | 'smsFlags';
   // Chỉ hiển thị khi điều kiện đúng (vd Voice Type chỉ hiện khi Input Type là STT).
   showIf?: (data: Record<string, unknown>) => boolean;
 }
@@ -295,6 +298,13 @@ function reconfirmOn(data: Record<string, unknown>): boolean {
   return data.reconfirm === 'yes';
 }
 
+// Retry Announce chỉ hiện khi Retry Count khác 0 (chưa nhập -> mặc định 2 -> hiện).
+// Áp dụng cho MỌI node có cặp Retry Count / Retry Announce (cả màn TS lẫn CS).
+function retryOn(data: Record<string, unknown>): boolean {
+  const v = data.retryCount;
+  return String(v ?? '').trim() !== '0';
+}
+
 // ── Template (テンプレート) của node Interaction ──────────────────────────────
 // Chọn 1 mẫu -> tự set + KHOÁ các tham số bên dưới (không cho chỉnh sửa). Giá trị
 // '' (=－) nghĩa là không chọn template, mọi tham số sửa tự do như bình thường.
@@ -376,8 +386,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     { key: 'reconfirm', labelKey: 'fReconfirm', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
     { key: 'reconfirmAnnounce', labelKey: 'fReconfirmAnnounce', kind: 'autoText', showIf: reconfirmOn },
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
-    // Retry Announce luôn nằm ngay dưới Retry Count.
-    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText' },
+    // Retry Announce luôn nằm ngay dưới Retry Count (ẩn khi Retry Count = 0).
+    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: retryOn },
   ],
   nexus: [
     { key: 'saveContext', labelKey: 'fSaveContext', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
@@ -465,7 +475,7 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     },
     // Retry Count / Retry Announce (bộ đôi quen thuộc) — luôn ở CUỐI danh sách CDC.
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2', showIf: moduleIsCdc },
-    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: moduleIsCdc },
+    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: (d) => moduleIsCdc(d) && retryOn(d) },
 
     // ── Clinical Department Classifier ──
     // module tham chiếu: nhận node Interaction + context (giống Module Result Binder).
@@ -518,8 +528,8 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
     // Prompt đứng đầu, sau đó mới tới Retry Count / Retry Announce.
     { key: 'prompt', labelKey: 'fPrompt', kind: 'textarea', rows: 6, aiGenerate: 'prompt' },
     { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
-    // Retry Announce luôn nằm ngay dưới Retry Count.
-    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText' },
+    // Retry Announce luôn nằm ngay dưới Retry Count (ẩn khi Retry Count = 0).
+    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: retryOn },
   ],
   faq: [{ key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' }],
   transfer: [
@@ -538,6 +548,49 @@ export const PROPERTY_FIELDS: Record<NodeType, PropertyField[]> = {
   // Hangup: câu 終話 (announce chào kết thúc) phát trước khi cúp máy.
   hangup: [{ key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' }],
 };
+
+// ── Bộ field RIÊNG của màn CS (シナリオ設計書) ─────────────────────────────────
+// Panel CS gộp General = Property (1 tab), field tinh gọn theo spec team CS:
+//   - Hearing (聴取): bỏ Template / Voice Type / Word List.
+//   - Transfer (転送): Announce lên đầu, bỏ Kiểu nối máy, thêm cờ lưu Dr.JOY trước
+//     khi nối máy + Status/SMS Flag (option từ tab Status Settings).
+//   - Hangup (終話): thêm Status/SMS Flag (option từ tab Status Settings).
+// Loại không khai báo ở đây dùng bộ chuẩn PROPERTY_FIELDS.
+export const CS_PROPERTY_FIELDS: Partial<Record<NodeType, PropertyField[]>> = {
+  interaction: [
+    { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
+    { key: 'inputType', labelKey: 'fInputType', kind: 'select', options: INPUT_TYPE_OPTIONS, default: 'STT' },
+    { key: 'reconfirm', labelKey: 'fReconfirm', kind: 'yesno', options: YESNO_OPTIONS, default: 'no' },
+    { key: 'reconfirmAnnounce', labelKey: 'fReconfirmAnnounce', kind: 'autoText', showIf: reconfirmOn },
+    { key: 'retryCount', labelKey: 'fRetryCount', kind: 'number', default: '2' },
+    { key: 'retryAnnounce', labelKey: 'fRetryAnnounce', kind: 'autoText', showIf: retryOn },
+  ],
+  transfer: [
+    { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
+    { key: 'transferNumber', labelKey: 'fTransferNumber', kind: 'text' },
+    // Lưu data cuộc gọi lên Dr.JOY NGAY trước khi nối máy (không đợi cuộc gọi nối
+    // máy kết thúc mới lưu như mặc định) — あり/なし.
+    {
+      key: 'saveDrjoyBeforeTransfer',
+      labelKey: 'fSaveDrjoyBeforeTransfer',
+      kind: 'yesno',
+      options: YESNO_OPTIONS,
+      default: 'no',
+    },
+    { key: 'statusFlag', labelKey: 'fStatusSelect', kind: 'settingsSelect', settingsOptions: 'statuses' },
+    { key: 'smsFlag', labelKey: 'fSmsFlag', kind: 'settingsSelect', settingsOptions: 'smsFlags' },
+  ],
+  hangup: [
+    { key: 'announce', labelKey: 'fAnnounce', kind: 'autoText' },
+    { key: 'statusFlag', labelKey: 'fStatusSelect', kind: 'settingsSelect', settingsOptions: 'statuses' },
+    { key: 'smsFlag', labelKey: 'fSmsFlag', kind: 'settingsSelect', settingsOptions: 'smsFlags' },
+  ],
+};
+
+// Bộ field theo màn: CS dùng bộ riêng (nếu có), còn lại dùng bộ chuẩn.
+export function propertyFieldsFor(type: NodeType, csMode: boolean): PropertyField[] {
+  return (csMode ? CS_PROPERTY_FIELDS[type] : undefined) ?? PROPERTY_FIELDS[type];
+}
 
 // Nhánh cố định: VALUE (name, hiển thị ^name$); LABEL mặc định là 次へ / 失敗 —
 // cũng là nhãn hiện trên dây.
@@ -911,20 +964,48 @@ export function optionGroupsForSource(source: OptionsSource, ir: FlowIR | null):
   }
 }
 
+// ── Nhánh màn CS (シナリオ設計書) ─────────────────────────────────────────────
+// CS: nhánh của node KHÔNG phải logic là danh sách ĐIỀU KIỆN tự do 1 cột (thêm/
+// sửa/xoá được) — kể cả loại vốn có nhánh cố định (announce/interaction/transfer),
+// vì シナリオ設計書 là diagram mô tả, không phải cấu hình chạy máy.
+export function csEditableBranchNode(type: NodeType): boolean {
+  return type === 'announce' || type === 'interaction' || type === 'transfer';
+}
+
+// Danh sách nhánh CS của node: có data.branches -> dùng thẳng; chưa có -> seed từ
+// bộ cố định của schema (GIỮ id handle 'failed'/'default' để dây cũ không lệch).
+export function csBranchesOf(type: NodeType, data: Record<string, unknown>): DataBranch[] {
+  if (Array.isArray(data.branches) && (data.branches as unknown[]).length > 0) {
+    return readBranches(data);
+  }
+  const fixed = BRANCH_SCHEMA[type].fixed ?? [];
+  if (fixed.length > 0) {
+    return fixed.map((f) => {
+      const b: DataBranch = { id: f.id, value: '' };
+      if (f.label) b.label = f.label;
+      return b;
+    });
+  }
+  return [{ id: CATCH_ALL_ID, value: '' }];
+}
+
 // Handle output (chấm nối dây ở đáy node) suy ra TỪ IR:
 //   - none      -> [] (không có output)
-//   - fixed     -> danh sách cố định theo schema
+//   - fixed     -> danh sách cố định theo schema (màn CS: theo điều kiện tự do)
 //   - editable  -> theo nhánh hiệu lực (CMR sinh từ Pair; còn lại data.branches)
 // irAdapter dùng hàm này để render handle; panel dùng để biết số nhánh.
-export function sourceHandlesFor(node: FlowNode): BranchDescriptor[] {
+export function sourceHandlesFor(node: FlowNode, cs = false): BranchDescriptor[] {
   const schema = BRANCH_SCHEMA[node.type];
   if (schema.mode === 'none') return [];
-  if (schema.mode === 'fixed') return schema.fixed ?? [];
-  // Nhãn trên dây/handle: ưu tiên label do người dùng đặt, fallback về value.
-  return effectiveBranches(node.type, node.data).map((b) => ({
+  const toHandle = (b: DataBranch): BranchDescriptor => ({
     id: b.id,
     label: b.label?.trim() || b.value || undefined,
-  }));
+  });
+  // CS: nhánh điều kiện tự do của node không phải logic (đè lên bộ fixed).
+  if (cs && csEditableBranchNode(node.type)) return csBranchesOf(node.type, node.data).map(toHandle);
+  if (schema.mode === 'fixed') return schema.fixed ?? [];
+  // Nhãn trên dây/handle: ưu tiên label do người dùng đặt, fallback về value.
+  return effectiveBranches(node.type, node.data).map(toHandle);
 }
 
 // Sinh dữ liệu mặc định khi thêm node mới (tham số + nhánh tự do nếu có).

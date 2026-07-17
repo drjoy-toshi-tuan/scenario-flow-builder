@@ -1,15 +1,19 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { ensureSettings } from '../../ir/settings';
 import { DAY_KEYS, type DayKey, type DaySchedule, type ScenarioSettings } from '../../ir/types';
+import { formatJapanesePhone, stripPhone } from '../../ui/phoneFormat';
 import { Icon } from '../../ui/icons';
 import { useT, type TKey } from '../../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab "General Settings / 基本設定" — form cấu hình kịch bản, chia 4 nhóm:
-//   1. 基本情報   : 施設名 / シナリオ名 (ghi vào ir.meta)
-//   2. 電話番号   : 代表電話 / 050 (Master・Demo, có stamp môi trường) / SMS送信番号
-//   3. 稼働スケジュール: 稼働曜日 (stamp thứ + khung giờ, thêm/xoá) / 稼働休止期間
+//   1. 基本情報   : 施設名 / シナリオ名 — CHỈ XEM (đổi tên ở màn quản lý file).
+//   2. 電話番号   : 代表電話 / 050 (Demo trên・Master dưới, stamp デモ/本番) / SMS送信番号.
+//      Ô số điện thoại: gõ số trần, blur tự chèn hyphen theo 市外局番 (xem
+//      ui/phoneFormat.ts), focus lại thì bỏ hyphen để sửa.
+//   3. 稼働スケジュール: 稼働曜日 — mỗi thứ chọn 24H (24時間) hoặc 時間帯 (khung giờ,
+//      thêm/xoá được) / 稼働休止期間.
 //   4. 応答タイミング : 発話待機時間 / 無回答待機時間 (giây)
 // Mọi thay đổi ghi thẳng vào IR (ir.settings) -> lưu kèm YAML.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,12 +29,33 @@ const DAY_LABEL_KEY: Record<DayKey, TKey> = {
   holiday: 'dayHoliday',
 };
 
+// Ô số điện thoại: focus -> hiện số trần để sửa; blur -> tự chèn hyphen.
+function PhoneInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={focused ? stripPhone(value) : value}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        onChange(formatJapanesePhone(value));
+      }}
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+      className="w-full max-w-[420px] rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-3 py-2 text-sm text-[var(--bk-text)]"
+    />
+  );
+}
+
 export function GeneralSettingsTab() {
   const t = useT();
   const ir = useFlowStore((s) => s.ir);
-  const setMeta = useFlowStore((s) => s.setMeta);
   const setSettings = useFlowStore((s) => s.setSettings);
   const settings = ensureSettings(ir?.settings);
+  // Thứ vừa được bật -> đang chờ chọn chế độ (24H hay khung giờ). Chọn xong thì
+  // chỉ hiển thị KẾT QUẢ (chip 24H hoặc các khung giờ), không hiện bộ chọn nữa.
+  const [choosingDay, setChoosingDay] = useState<DayKey | null>(null);
 
   const patch = (p: Partial<ScenarioSettings>) => setSettings(p);
 
@@ -38,28 +63,40 @@ export function GeneralSettingsTab() {
     patch({ workingDays: settings.workingDays.map((d) => (d.day === day ? up(d) : d)) });
   };
 
-  const input = (value: string, onChange: (v: string) => void, extra?: ReactNode) => (
+  // Ô chỉ xem (施設名/シナリオ名 — không cho sửa ở tab này).
+  const readonlyBox = (value: string) => (
+    <div className="w-full max-w-[420px] cursor-not-allowed rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-sm text-[var(--bk-text-muted)]">
+      {value || '—'}
+    </div>
+  );
+
+  const phoneField = (value: string, onChange: (v: string) => void, extra?: ReactNode) => (
     <div className="flex items-center gap-2">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full max-w-[420px] rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-3 py-2 text-sm text-[var(--bk-text)]"
-      />
+      <PhoneInput value={value} onChange={onChange} />
       {extra}
     </div>
   );
 
-  // Stamp môi trường cạnh ô 050 (Master xanh / Demo cam — khớp màu badge màn quản lý flow).
-  const stamp = (labelKey: TKey, cls: string) => (
-    <span className={`inline-flex shrink-0 rounded-md px-2 py-1 text-[10px] font-bold text-white ${cls}`}>
-      {t(labelKey)}
+  // Stamp môi trường cạnh ô 050 — dùng ĐÚNG stamp デモ/本番 (DEM/MAS) của màn quản lý.
+  const envStamp = (env: 'master' | 'demo') => (
+    <span
+      className="inline-flex shrink-0 items-center rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-widest text-white"
+      style={{
+        background: env === 'master' ? '#10b981' : '#f97316',
+        fontFamily: "'Space Grotesk', 'Zen Kaku Gothic New', sans-serif",
+      }}
+    >
+      {t(env === 'master' ? 'dmEnvMaster' : 'dmEnvDemo')}
     </span>
   );
 
-  const field = (label: string, control: ReactNode) => (
+  // labelExtra: phần tử gắn NGAY CẠNH title (vd stamp デモ/本番 của ô 050).
+  const field = (label: string, control: ReactNode, labelExtra?: ReactNode) => (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-semibold text-[var(--bk-text-muted)]">{label}</span>
+      <span className="flex items-center gap-2 text-xs font-semibold text-[var(--bk-text-muted)]">
+        {label}
+        {labelExtra}
+      </span>
       {control}
     </div>
   );
@@ -98,24 +135,27 @@ export function GeneralSettingsTab() {
           {group(
             'gsGroupBasic',
             <>
-              {field(t('gsFacility'), input(ir?.meta.facility ?? '', (v) => setMeta({ facility: v })))}
-              {field(t('gsScenario'), input(ir?.meta.name ?? '', (v) => setMeta({ name: v })))}
+              {field(t('gsFacility'), readonlyBox(ir?.meta.facility ?? ''))}
+              {field(t('gsScenario'), readonlyBox(ir?.meta.name ?? ''))}
             </>,
           )}
 
           {group(
             'gsGroupPhone',
             <>
-              {field(t('gsMainPhone'), input(settings.mainPhone, (v) => patch({ mainPhone: v })))}
+              {field(t('gsMainPhone'), phoneField(settings.mainPhone, (v) => patch({ mainPhone: v })))}
+              {/* 050: Demo TRÊN, Master DƯỚI — stamp môi trường nằm CẠNH title. */}
               {field(
                 t('gs050'),
-                input(settings.master050, (v) => patch({ master050: v }), stamp('stampMaster', 'bg-emerald-500')),
+                phoneField(settings.demo050, (v) => patch({ demo050: v })),
+                envStamp('demo'),
               )}
               {field(
                 t('gs050'),
-                input(settings.demo050, (v) => patch({ demo050: v }), stamp('stampDemo', 'bg-orange-400')),
+                phoneField(settings.master050, (v) => patch({ master050: v })),
+                envStamp('master'),
               )}
-              {field(t('gsSmsNumber'), input(settings.smsNumber, (v) => patch({ smsNumber: v })))}
+              {field(t('gsSmsNumber'), phoneField(settings.smsNumber, (v) => patch({ smsNumber: v })))}
             </>,
           )}
 
@@ -129,17 +169,18 @@ export function GeneralSettingsTab() {
                     const sched = settings.workingDays.find((d) => d.day === day)!;
                     return (
                       <div key={day} className="flex items-start gap-3">
-                        {/* Stamp thứ: bấm chọn -> sáng lên + hiện phần khung giờ */}
+                        {/* Stamp thứ: bấm bật -> hiện bộ chọn 24H / khung giờ; bấm lại -> tắt */}
                         <button
                           type="button"
-                          onClick={() =>
-                            updateDay(day, (d) => ({
-                              ...d,
-                              enabled: !d.enabled,
-                              // Bật ngày chưa có khung giờ -> seed 1 khung mặc định.
-                              ranges: !d.enabled && d.ranges.length === 0 ? [{ from: '09:00', to: '17:00' }] : d.ranges,
-                            }))
-                          }
+                          onClick={() => {
+                            if (sched.enabled) {
+                              updateDay(day, (d) => ({ ...d, enabled: false }));
+                              setChoosingDay((cur) => (cur === day ? null : cur));
+                            } else {
+                              updateDay(day, (d) => ({ ...d, enabled: true }));
+                              setChoosingDay(day);
+                            }
+                          }}
                           aria-pressed={sched.enabled}
                           className={`mt-0.5 inline-flex h-9 w-11 shrink-0 items-center justify-center rounded-lg border text-sm font-bold transition ${
                             sched.enabled
@@ -152,56 +193,98 @@ export function GeneralSettingsTab() {
 
                         {sched.enabled && (
                           <div className="flex flex-wrap items-center gap-2">
-                            {sched.ranges.map((r, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1"
+                            {choosingDay === day ? (
+                              // Vừa bật -> hỏi chế độ: 24H (24時間) hay 時間帯 (khung giờ).
+                              // Chọn xong bộ chọn biến mất, chỉ còn kết quả.
+                              <span className="inline-flex overflow-hidden rounded-lg border border-[var(--bk-border)]">
+                                {([true, false] as const).map((allDay) => (
+                                  <button
+                                    key={String(allDay)}
+                                    type="button"
+                                    onClick={() => {
+                                      updateDay(day, (d) => ({
+                                        ...d,
+                                        allDay,
+                                        // Chế độ khung giờ mà chưa có khung -> seed 1 khung mặc định.
+                                        ranges:
+                                          !allDay && d.ranges.length === 0
+                                            ? [{ from: '09:00', to: '17:00' }]
+                                            : d.ranges,
+                                      }));
+                                      setChoosingDay(null);
+                                    }}
+                                    className="bg-[var(--bk-surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--bk-text-muted)] transition first:border-r first:border-[var(--bk-border)] hover:bg-[var(--bk-accent)] hover:text-white"
+                                  >
+                                    {t(allDay ? 'gs24h' : 'gsTimeframe')}
+                                  </button>
+                                ))}
+                              </span>
+                            ) : sched.allDay ? (
+                              // 24H: chip kết quả — bấm để chọn lại chế độ.
+                              <button
+                                type="button"
+                                onClick={() => setChoosingDay(day)}
+                                title={t('gsTimeframe')}
+                                className="inline-flex items-center rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1 text-sm font-bold text-[var(--bk-text)] transition hover:border-[var(--bk-accent)]"
                               >
-                                <input
-                                  type="time"
-                                  value={r.from}
-                                  onChange={(e) =>
-                                    updateDay(day, (d) => ({
-                                      ...d,
-                                      ranges: d.ranges.map((x, j) => (j === i ? { ...x, from: e.target.value } : x)),
-                                    }))
-                                  }
-                                  className="bg-transparent text-sm text-[var(--bk-text)]"
-                                />
-                                <span className="text-[var(--bk-text-faint)]">〜</span>
-                                <input
-                                  type="time"
-                                  value={r.to}
-                                  onChange={(e) =>
-                                    updateDay(day, (d) => ({
-                                      ...d,
-                                      ranges: d.ranges.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)),
-                                    }))
-                                  }
-                                  className="bg-transparent text-sm text-[var(--bk-text)]"
-                                />
+                                24H
+                              </button>
+                            ) : (
+                              <>
+                                {sched.ranges.map((r, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1"
+                                  >
+                                    <input
+                                      type="time"
+                                      value={r.from}
+                                      title={t('gsFromTime')}
+                                      onChange={(e) =>
+                                        updateDay(day, (d) => ({
+                                          ...d,
+                                          ranges: d.ranges.map((x, j) => (j === i ? { ...x, from: e.target.value } : x)),
+                                        }))
+                                      }
+                                      className="bg-transparent text-sm text-[var(--bk-text)]"
+                                    />
+                                    <span className="text-[var(--bk-text-faint)]">〜</span>
+                                    <input
+                                      type="time"
+                                      value={r.to}
+                                      title={t('gsToTime')}
+                                      onChange={(e) =>
+                                        updateDay(day, (d) => ({
+                                          ...d,
+                                          ranges: d.ranges.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)),
+                                        }))
+                                      }
+                                      className="bg-transparent text-sm text-[var(--bk-text)]"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        updateDay(day, (d) => ({ ...d, ranges: d.ranges.filter((_, j) => j !== i) }))
+                                      }
+                                      className="ml-0.5 text-[var(--bk-text-faint)] transition hover:text-rose-500"
+                                    >
+                                      <Icon icon="lucide:x" width={13} height={13} />
+                                    </button>
+                                  </span>
+                                ))}
+                                {/* 1 ngày có thể 2-4 khung giờ -> thêm được khung */}
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    updateDay(day, (d) => ({ ...d, ranges: d.ranges.filter((_, j) => j !== i) }))
+                                    updateDay(day, (d) => ({ ...d, ranges: [...d.ranges, { from: '', to: '' }] }))
                                   }
-                                  className="ml-0.5 text-[var(--bk-text-faint)] transition hover:text-rose-500"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[var(--bk-border)] px-2 py-1 text-xs text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
                                 >
-                                  <Icon icon="lucide:x" width={13} height={13} />
+                                  <Icon icon="lucide:plus" width={12} height={12} />
+                                  {t('gsAddRange')}
                                 </button>
-                              </span>
-                            ))}
-                            {/* 1 ngày có thể 2-4 khung giờ -> thêm được khung */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updateDay(day, (d) => ({ ...d, ranges: [...d.ranges, { from: '', to: '' }] }))
-                              }
-                              className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[var(--bk-border)] px-2 py-1 text-xs text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
-                            >
-                              <Icon icon="lucide:plus" width={12} height={12} />
-                              {t('gsAddRange')}
-                            </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>

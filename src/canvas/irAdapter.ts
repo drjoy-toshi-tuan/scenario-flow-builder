@@ -49,7 +49,7 @@ export function irToReactFlow(ir: FlowIR, opts?: { cs?: boolean }): { nodes: Nod
   // -> thêm/bớt nhánh trong panel làm số chấm nối tăng/giảm ngay, kể cả khi chưa nối dây.
   const handlesByNode = new Map<string, { id: string; label?: string }[]>();
   for (const n of ir.nodes) {
-    handlesByNode.set(n.id, sourceHandlesFor(n));
+    handlesByNode.set(n.id, sourceHandlesFor(n, cs));
   }
 
   const nodes: Node[] = ir.nodes.map((n) => {

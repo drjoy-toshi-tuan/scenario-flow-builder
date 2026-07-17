@@ -64,12 +64,11 @@ export function InterfaceMenu() {
             <SlideToggle
               value={lang}
               options={[
-                { key: 'vi', icon: 'twemoji:flag-vietnam' },
-                { key: 'ja', icon: 'twemoji:flag-japan' },
+                { key: 'vi', icon: 'twemoji:flag-vietnam', title: 'Tiếng Việt' },
+                { key: 'ja', icon: 'twemoji:flag-japan', title: '日本語' },
               ]}
               onChange={(k) => setLang(k as 'vi' | 'ja')}
               ariaLabel="Language"
-              title={lang === 'vi' ? 'Tiếng Việt' : '日本語'}
             />
           </div>
           <div className="bk-menu-row">
