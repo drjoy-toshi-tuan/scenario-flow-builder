@@ -517,12 +517,16 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
         if (!cancelled) {
           setMembers(log.members);
           setAdmins(log.admins);
-          // Route theo bộ phận: member có department -> vào đúng màn (#/cs | #/ts).
-          // Chỉ áp khi URL chưa chỉ định rõ (hash thắng) — xem workspaceStore.
+          // Route theo bộ phận (BẮT BUỘC): member có department -> KHOÁ vào đúng màn
+          // (#/cs | #/ts), ghi đè cả hash URL đang trỏ sai bộ phận — xem workspaceStore.
+          // Ngoại lệ owner: quản trị & hỗ trợ CẢ 2 team nên không khoá (tự do #/cs↔#/ts).
           const me = user?.email
             ? log.members.find((m) => m.email.toLowerCase() === user.email.toLowerCase())
             : undefined;
-          if (me?.department) useWorkspaceStore.getState().applyDepartment(me.department);
+          const isOwner = resolveRole(user?.email, { admins: log.admins }) === 'owner';
+          if (me?.department && !isOwner) {
+            useWorkspaceStore.getState().applyDepartment(me.department);
+          }
         }
       } catch {
         // bỏ qua — phân quyền là tiện ích, không phải điều kiện dùng app
@@ -1245,8 +1249,11 @@ function DriveInner({
       {/* ── Top bar (đồng bộ FileManagerScreen) ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
         <BrandLockup logoClass="h-8 w-8" textClass="text-xl" />
-        {/* Owner mới có mục "Quản lý quyền" trong menu */}
-        <FileManagerMenu onManagePermissions={permissions ? () => setShowPermissions(true) : undefined} />
+        {/* Owner mới có mục "Quản lý quyền" + bộ chuyển màn CS/TS trong menu */}
+        <FileManagerMenu
+          onManagePermissions={permissions ? () => setShowPermissions(true) : undefined}
+          canSwitchMode={permissions != null}
+        />
       </header>
 
       <main className="relative mx-auto w-full max-w-[88rem] flex-1 overflow-auto p-6">
