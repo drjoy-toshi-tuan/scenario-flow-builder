@@ -244,6 +244,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     exInteraction: 'Nhận phím bấm (DTMF) hoặc giọng nói từ người gọi',
     exNexus: 'Rẽ nhánh theo điều kiện',
     exLogic: 'Xử lý logic (script, ráp kết quả, so khớp context, null check)',
+    // Node 分岐ロジック của màn CS (editor điều kiện, không regex).
+    exCsLogic: 'Tạo nhánh rẽ theo điều kiện (số gọi đến, giờ nhận cuộc gọi, kết quả node trước…)',
     exClassifier: 'Phân loại dữ liệu (ngày khám, khoa khám, số gọi đến, giờ gọi)',
     exNormalization: 'Chuẩn hoá / xác nhận lại dữ liệu (số điện thoại, ngày sinh)',
     exOpenai: 'Gọi mô hình AI (LLM) để xử lý hội thoại',
@@ -658,6 +660,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     exInteraction: '発信者のプッシュ（DTMF）や音声を受け取る',
     exNexus: '条件で分岐する',
     exLogic: 'ロジック処理（スクリプト・結果バインド・コンテキスト照合・Nullチェック）',
+    // Node 分岐ロジック của màn CS (editor điều kiện, không regex).
+    exCsLogic: '条件で分岐を作成（発信元電話番号・受電時刻・前のノードの結果など）',
     exClassifier: '分類処理（診療日・診療科・着信番号・発信時刻）',
     exNormalization: '正規化・復唱（電話番号・生年月日）',
     exOpenai: 'AI（LLM）で会話を処理する',

@@ -4,6 +4,7 @@ import type { RFNodeData } from '../irAdapter';
 import type { NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
 import { PROPERTY_FIELDS, type PropertyField } from '../../ui/nodeSchema';
+import { csBranchSentence, readCsBranches } from '../../ui/csLogic';
 import { Icon } from '../../ui/icons';
 import { useFlowStore } from '../../store/flowStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -107,7 +108,7 @@ export function makeNode(nodeType: NodeType) {
         {/* Hover / chọn node -> xem nhanh các property đang set (bên phải node).
             Node không có property nào cũng không có mô tả (vd hangup) thì KHÔNG hiện
             preview — tránh card "không có tham số" vô nghĩa. */}
-        {hasPreviewContent(nodeType, d.nodeData) && (
+        {hasPreviewContent(nodeType, d.nodeData, csMode) && (
           <NodeToolbar
             isVisible={hovered && !isPanning}
             position={Position.Right}
@@ -115,7 +116,7 @@ export function makeNode(nodeType: NodeType) {
             align="start"
           >
             <div onMouseEnter={showPreview} onMouseLeave={hidePreview}>
-              <NodePreview type={nodeType} data={d.nodeData} />
+              <NodePreview type={nodeType} data={d.nodeData} cs={csMode} />
             </div>
           </NodeToolbar>
         )}
@@ -289,6 +290,18 @@ function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unk
       title: str(data.transferNumber),
       color: '#0ea5e9',
     });
+  // 分岐ロジック (CS): icon rẽ nhánh + số nhánh đã tạo (chưa tính else その他).
+  if (type === 'logic') {
+    const branches = readCsBranches(data);
+    if (branches.length > 0)
+      icons.push({
+        key: 'branches',
+        icon: 'lucide:git-fork',
+        title: branches.map((b) => b.name || '（無題）').join(' / '),
+        color: '#f59e0b',
+        text: String(branches.length),
+      });
+  }
 
   if (icons.length === 0) return null;
   return (
@@ -325,7 +338,12 @@ function pickContent(type: NodeType, data: Record<string, unknown>): string | nu
 
 // Preview có gì để hiện không: còn ít nhất 1 property (đang set/áp default) hoặc có
 // mô tả. Node như hangup không có field nào & không mô tả -> false, ẩn hẳn preview.
-function hasPreviewContent(type: NodeType, data: Record<string, unknown>): boolean {
+// 分岐ロジック ở màn CS: preview là danh sách CÂU ĐIỀU KIỆN (không phải field kỹ thuật
+// Module/Script) — chỉ hiện khi đã tạo nhánh hoặc có mô tả.
+function hasPreviewContent(type: NodeType, data: Record<string, unknown>, cs = false): boolean {
+  if (cs && type === 'logic') {
+    return readCsBranches(data).length > 0 || pickDescription(data) !== null;
+  }
   const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
   return fields.length > 0 || pickDescription(data) !== null;
 }
@@ -335,10 +353,13 @@ function hasPreviewContent(type: NodeType, data: Record<string, unknown>): boole
 // prompt…) cắt 1 dòng + "…" cho vừa bề rộng card (xử lý bằng CSS text-ellipsis).
 // Chỉ render khi hasPreviewContent = true (component cha đã gác) nên không cần
 // nhánh "không có tham số" nữa.
-function NodePreview({ type, data }: { type: NodeType; data: Record<string, unknown> }) {
+function NodePreview({ type, data, cs = false }: { type: NodeType; data: Record<string, unknown>; cs?: boolean }) {
   const t = useT();
-  const fields = PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
+  const ir = useFlowStore((s) => s.ir);
+  const fields = cs && type === 'logic' ? [] : PROPERTY_FIELDS[type].filter((f) => !f.showIf || f.showIf(data));
   const description = pickDescription(data);
+  // 分岐ロジック (CS): mỗi nhánh 1 dòng "tên nhánh — câu điều kiện tự sinh".
+  const csBranches = cs && type === 'logic' ? readCsBranches(data) : [];
 
   return (
     <div className="bk-node-preview">
@@ -351,6 +372,17 @@ function NodePreview({ type, data }: { type: NodeType; data: Record<string, unkn
           </HoverTip>
         </div>
       )}
+      {csBranches.map((b) => {
+        const sentence = csBranchSentence(b, ir);
+        return (
+          <div key={b.id} className="bk-node-preview-row">
+            <span className="bk-node-preview-key">{b.name || '（無題）'}</span>
+            <HoverTip className="bk-node-preview-val" content={sentence}>
+              {sentence}
+            </HoverTip>
+          </div>
+        );
+      })}
       {fields.map((f) => {
         const val = formatFieldValue(f, data, t);
         return (

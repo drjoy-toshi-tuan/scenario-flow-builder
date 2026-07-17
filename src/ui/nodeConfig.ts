@@ -29,6 +29,34 @@ export const NODE_CONFIG: Record<NodeType, NodeVisual> = {
   hangup: { icon: 'lucide:phone-off', typeLabel: 'Hangup', color: '#f43f5e', showSource: false },
 };
 
+// ── Màn CS (#/cs) ──
+// Bộ node CS dùng TÊN TIẾNG NHẬT cố định (không theo ngôn ngữ UI) — spec từ team CS.
+// Chỉ các loại trong CS_NODE_TYPES mới có nhãn; loại khác không xuất hiện ở màn CS.
+export const CS_TYPE_LABELS: Partial<Record<NodeType, string>> = {
+  start: 'スタート',
+  announce: 'アナウンス',
+  interaction: '聴取',
+  logic: '分岐ロジック',
+  transfer: '転送',
+  hangup: '終話',
+};
+
+// Nhãn loại node theo màn: CS lấy tên tiếng Nhật (fallback tên chuẩn nếu thiếu).
+export function nodeTypeLabel(type: NodeType, csMode: boolean): string {
+  return (csMode ? CS_TYPE_LABELS[type] : undefined) ?? NODE_CONFIG[type].typeLabel;
+}
+
+// Palette màn CS: bộ node tối giản cho người không kỹ thuật — vẽ luồng kịch bản +
+// rẽ nhánh, không module kỹ thuật (nexus/openai/save/jump…).
+export const CS_NODE_TYPES: readonly NodeType[] = [
+  'start',
+  'announce',
+  'interaction',
+  'logic',
+  'transfer',
+  'hangup',
+];
+
 // Loại có thể thêm qua "Thêm node". 'start' chỉ được thêm 1 lần (xem AddModulePanel).
 // Save nằm ngay dưới Transfer trong menu thêm node.
 export const ADDABLE_NODE_TYPES: readonly NodeType[] = [
