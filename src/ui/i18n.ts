@@ -39,6 +39,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     csSecFlow: 'Cài đặt file thiết kế',
     mLanguage: 'Ngôn ngữ',
     mTheme: 'Giao diện',
+    // Chuyển màn CS/TS (chỉ owner) — owner không bị khoá theo bộ phận.
+    mScreen: 'Màn hình',
+    screenCs: 'Màn CS (thiết kế)',
+    screenTs: 'Màn TS (kỹ thuật)',
     ivrProperty: 'Cài đặt IVR Property',
     // Modal IVR Property
     ivrFacility: 'Tên bệnh viện',
@@ -486,6 +490,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     csSecFlow: '設計書設定',
     mLanguage: '言語',
     mTheme: 'テーマ',
+    // 画面切替 CS/TS（オーナーのみ）— オーナーは部署による固定を受けない。
+    mScreen: '画面',
+    screenCs: 'CS画面（設計）',
+    screenTs: 'TS画面（技術）',
     ivrProperty: 'IVRプロパティ設定',
     // Modal IVR Property
     ivrFacility: '施設名',

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useTheme } from '../ui/theme';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import { useLang, useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { SlideToggle } from '../components/SlideToggle';
@@ -16,9 +17,12 @@ import { MenuToggleIcon } from '../components/MenuToggleIcon';
 
 export function FileManagerMenu({
   onManagePermissions,
+  canSwitchMode = false,
 }: {
   // Chỉ truyền khi người dùng là OWNER (màn Drive) -> hiện mục "Quản lý quyền".
   onManagePermissions?: () => void;
+  // OWNER: hiện bộ chuyển màn CS/TS (owner không bị khoá theo bộ phận nên đổi tự do).
+  canSwitchMode?: boolean;
 } = {}) {
   const [open, setOpen] = useState(false);
   const [render, setRender] = useState(false);
@@ -41,6 +45,8 @@ export function FileManagerMenu({
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { lang, setLang } = useLang();
+  const mode = useWorkspaceStore((s) => s.mode);
+  const setMode = useWorkspaceStore((s) => s.setMode);
   const t = useT();
 
   return (
@@ -95,6 +101,22 @@ export function FileManagerMenu({
               title={theme === 'dark' ? t('themeDark') : t('themeLight')}
             />
           </div>
+          {/* Chuyển màn CS/TS — chỉ owner (không bị khoá theo bộ phận). */}
+          {canSwitchMode && (
+            <div className="bk-menu-row">
+              <span className="bk-menu-row-label">{t('mScreen')}</span>
+              <SlideToggle
+                value={mode}
+                options={[
+                  { key: 'cs', icon: 'lucide:pencil', title: t('screenCs') },
+                  { key: 'ts', icon: 'lucide:file-code', title: t('screenTs') },
+                ]}
+                onChange={(k) => setMode(k as 'cs' | 'ts')}
+                ariaLabel={t('mScreen')}
+                title={mode === 'cs' ? t('screenCs') : t('screenTs')}
+              />
+            </div>
+          )}
 
           {/* ── Quản lý quyền (chỉ owner) ── */}
           {onManagePermissions && (

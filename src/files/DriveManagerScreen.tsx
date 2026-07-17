@@ -1243,8 +1243,11 @@ function DriveInner({
       {/* ── Top bar (đồng bộ FileManagerScreen) ── */}
       <header className="flex items-center justify-between border-b border-[var(--bk-border)] bg-[var(--bk-surface)] px-4 py-2.5">
         <BrandLockup logoClass="h-8 w-8" textClass="text-xl" />
-        {/* Owner mới có mục "Quản lý quyền" trong menu */}
-        <FileManagerMenu onManagePermissions={permissions ? () => setShowPermissions(true) : undefined} />
+        {/* Owner mới có mục "Quản lý quyền" + bộ chuyển màn CS/TS trong menu */}
+        <FileManagerMenu
+          onManagePermissions={permissions ? () => setShowPermissions(true) : undefined}
+          canSwitchMode={permissions != null}
+        />
       </header>
 
       <main className="relative mx-auto w-full max-w-[88rem] flex-1 overflow-auto p-6">
