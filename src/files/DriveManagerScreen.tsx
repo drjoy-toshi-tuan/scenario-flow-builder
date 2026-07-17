@@ -145,6 +145,11 @@ const PAGE_SIZES = [20, 50] as const;
 // Giá trị select "tạo mới" trong modal import (không đụng id thật của Drive).
 const NEW_OPTION = '__new__';
 
+// UI môi trường (CS) tạm ẩn theo yêu cầu team — bật lại bằng cách đổi thành true.
+// Giữ nguyên toàn bộ helper (EnvStamp / EnvPicker / envProps / setVersionEnv…) để
+// có thể khôi phục nhanh; chỉ chặn phần render UI môi trường ở màn CS.
+const CS_SHOW_ENVIRONMENT = false;
+
 // Style input/select trong modal (dùng chung nhiều field).
 const FIELD_CLS =
   'w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-bg)] px-3 py-2 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]';
@@ -1044,7 +1049,8 @@ function DriveInner({
     }
     const content = importContent;
     setImportContent(null);
-    if (content) actions.onImport?.(fac, scen, content, csMode ? impEnv : undefined);
+    if (content)
+      actions.onImport?.(fac, scen, content, csMode && CS_SHOW_ENVIRONMENT ? impEnv : undefined);
   };
 
   // Bệnh viện đang chọn trong modal tạo mới (khi không đứng sẵn trong 1 bệnh viện).
@@ -1077,7 +1083,7 @@ function DriveInner({
       return;
     }
     setShowNew(false);
-    actions.onCreateFlow?.(fac, scen, csMode ? newEnv : undefined);
+    actions.onCreateFlow?.(fac, scen, csMode && CS_SHOW_ENVIRONMENT ? newEnv : undefined);
   };
 
   // Mở modal ghi chú của 1 version — prefill nội dung hiện có.
@@ -1557,7 +1563,7 @@ function DriveInner({
                       {renderSortTh('latest', 'colLatestVersion')}
                       {/* CS: cột 環境 của bản mới nhất (không sort); TS: cột デプロイバージョン */}
                       {csMode ? (
-                        <th className={th}>{t('colEnvironment')}</th>
+                        CS_SHOW_ENVIRONMENT ? <th className={th}>{t('colEnvironment')}</th> : null
                       ) : (
                         renderSortTh('applied', 'colAppliedVersion')
                       )}
@@ -1589,14 +1595,16 @@ function DriveInner({
                           </td>
                           <td className={`${cell} font-semibold`}>{latest ? `V${latest}` : '—'}</td>
                           {csMode ? (
-                            <td className={cell}>
-                              {/* Môi trường của bản MỚI NHẤT (stamp 本番/デモ). Chưa đặt -> —. */}
-                              {lv?.environment ? (
-                                <EnvStamp env={lv.environment} />
-                              ) : (
-                                <span className="text-[var(--bk-text-faint)]">—</span>
-                              )}
-                            </td>
+                            CS_SHOW_ENVIRONMENT ? (
+                              <td className={cell}>
+                                {/* Môi trường của bản MỚI NHẤT (stamp 本番/デモ). Chưa đặt -> —. */}
+                                {lv?.environment ? (
+                                  <EnvStamp env={lv.environment} />
+                                ) : (
+                                  <span className="text-[var(--bk-text-faint)]">—</span>
+                                )}
+                              </td>
+                            ) : null
                           ) : (
                             <td className={cell}>
                               {/* Stamp môi trường + V{N} đang chạy, bố cục giống badge Main|Sub flow
@@ -1668,9 +1676,11 @@ function DriveInner({
                     <tr className="border-b border-[var(--bk-border)]">
                       {renderSortTh('v', 'colVersion', 'w-[320px] min-w-[260px]')}
                       {/* CS: 環境 CỦA BẢN NÀY (stamp, sửa được). TS: môi trường đã deploy + ngày giờ. */}
-                      <th className={`${th} w-[200px] min-w-[180px]`}>
-                        {t(csMode ? 'colEnvironment' : 'colDeployedEnv')}
-                      </th>
+                      {(!csMode || CS_SHOW_ENVIRONMENT) && (
+                        <th className={`${th} w-[200px] min-w-[180px]`}>
+                          {t(csMode ? 'colEnvironment' : 'colDeployedEnv')}
+                        </th>
+                      )}
                       {renderSortTh('createdAt', 'colCreatedAt')}
                       {renderSortTh('updatedAt', 'colUpdatedAt')}
                       {renderSortTh('author', 'colAuthor')}
@@ -1718,14 +1728,16 @@ function DriveInner({
                             </div>
                           </td>
                           {csMode ? (
-                            <td className={cell}>
-                              {/* 環境 CỦA BẢN NÀY — stamp 本番/デモ; chưa đặt -> —. Sửa ở nút Edit. */}
-                              {ver.environment ? (
-                                <EnvStamp env={ver.environment} />
-                              ) : (
-                                <span className="text-[var(--bk-text-faint)]">—</span>
-                              )}
-                            </td>
+                            CS_SHOW_ENVIRONMENT ? (
+                              <td className={cell}>
+                                {/* 環境 CỦA BẢN NÀY — stamp 本番/デモ; chưa đặt -> —. Sửa ở nút Edit. */}
+                                {ver.environment ? (
+                                  <EnvStamp env={ver.environment} />
+                                ) : (
+                                  <span className="text-[var(--bk-text-faint)]">—</span>
+                                )}
+                              </td>
+                            ) : null
                           ) : (
                             <td className={cell}>
                               {/* Bản này đang chạy trên môi trường nào + lúc nào (stamp MASTER/DEMO
@@ -1758,7 +1770,7 @@ function DriveInner({
                           <td className={cell} onClick={(e) => e.stopPropagation()}>
                             <div className={rowActions}>
                               {/* CS: sửa 環境 CỦA BẢN NÀY (本番/デモ) — mở modal chọn. */}
-                              {csMode && (
+                              {csMode && CS_SHOW_ENVIRONMENT && (
                                 <HoverLabelButton
                                   label={t('csEditEnvTitle')}
                                   onClick={() => openEnvModal(ver)}
@@ -1888,7 +1900,7 @@ function DriveInner({
             />
 
             {/* CS: chọn môi trường cho bản đầu tiên (本番/デモ). */}
-            {csMode && (
+            {csMode && CS_SHOW_ENVIRONMENT && (
               <>
                 <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
                   {t('colEnvironment')}
@@ -1981,7 +1993,7 @@ function DriveInner({
             />
 
             {/* CS: chọn môi trường cho bản import (本番/デモ). */}
-            {csMode && (
+            {csMode && CS_SHOW_ENVIRONMENT && (
               <>
                 <label className="mb-1 block text-xs font-semibold text-[var(--bk-text-muted)]">
                   {t('colEnvironment')}

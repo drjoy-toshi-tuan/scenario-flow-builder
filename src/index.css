@@ -274,30 +274,49 @@ body {
   flex-direction: column;
   justify-content: center;
   border-radius: 18px;
-  /* Màn TS: node theo surface như trước (PR #98). Biến thể đảo tông + accent chỉ
-     áp cho màn CS (xem .bk-node--cs / .bk-cs-skin). */
+  /* Nền/viền/bóng CHUYỂN sang lớp .bk-node-skin (bị mask khoét lỗ tại output) — root để
+     TRONG SUỐT, nhờ vậy handle/notch là ANH EM của skin, không bị mask cắt. Cơ chế khoét
+     áp cho cả TS lẫn CS; MÀU node thì giữ khác nhau: TS = surface (PR #98) trên .bk-node-skin,
+     CS = đảo tông + accent trên .bk-cs-skin. */
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  padding: 12px 14px 12px 16px;
+  /* KHÔNG dùng overflow:hidden ở đây — nó sẽ cắt handle (điểm nối) thành nửa
+     hình tròn. Thanh accent bên trái vẽ trên skin nên tự bo góc theo card. */
+  transition: transform 0.12s ease;
+}
+/* Thanh accent trái đã chuyển sang .bk-node-skin::before -> bỏ ::before trên root. */
+.bk-node::before {
+  content: none;
+}
+/* Skin TS: giữ NGUYÊN look node của PR #98 (nền surface + viền thường + thanh accent
+   trái 4px), chỉ THÊM mask khoét lỗ tròn tại mỗi output ở mép đáy (đối ứng "khoét node"
+   của màn CS sang TS). */
+.bk-node-skin {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: var(--bk-surface);
   border: 1px solid var(--bk-border);
   box-shadow: var(--bk-shadow);
-  padding: 12px 14px 12px 16px;
-  /* KHÔNG dùng overflow:hidden ở đây — nó sẽ cắt handle (điểm nối) thành nửa
-     hình tròn. Thanh accent bên trái tự bo góc theo card. */
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+  pointer-events: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.bk-node::before {
+.bk-node-skin::before {
   content: '';
   position: absolute;
   inset: 0;
-  /* Bo GIỐNG card để dải accent bên trái ôm đúng góc bo, không bị lòi ra ngoài. */
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent) 0 4px, transparent 4px);
-  pointer-events: none;
 }
 .bk-node:hover {
   transform: translateY(-1px);
+}
+.bk-node:not(.bk-node--cs):hover .bk-node-skin {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-border));
 }
-.bk-node--selected {
+.bk-node:not(.bk-node--cs).bk-node--selected .bk-node-skin {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--bk-shadow);
 }
@@ -305,6 +324,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Nâng nội dung lên trên lớp skin (positioned) — không nâng thì skin vẽ đè mất. */
+  position: relative;
+  z-index: 1;
 }
 .bk-node-text {
   min-width: 0;
@@ -365,11 +387,11 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
   /* Node lùn (chỉ còn tên + dải icon biểu thị) — tên dài xuống dòng (tối đa 2 dòng)
-     thì node tự cao thêm. Cao hơn 1 chút + tên/status xếp dọc có khoảng hở nên tên
-     dài không chèn lên dải status. */
+     thì node tự cao thêm. Cao hơn 1 chút: TÊN căn giữa theo chiều dọc node, còn dải
+     status neo hẳn xuống ĐÁY (grid 1fr/auto) nên luôn chừa khoảng hở với tên. */
   height: auto;
-  min-height: 64px;
-  padding: 9px 14px;
+  min-height: 76px;
+  padding: 10px 14px;
   /* Nền/viền/bóng chuyển hết sang lớp .bk-cs-skin (bị mask khoét lỗ tại output) —
      root để TRONG SUỐT, nhờ vậy handle là anh em của skin, không bị mask cắt. */
   background: transparent;
@@ -422,24 +444,28 @@ body {
   gap: 10px;
   position: relative;
   z-index: 1;
+  /* Body chiếm HẾT chiều cao node -> .bk-cs-main mới có "khoảng dư" để căn giữa tên
+     và neo status xuống đáy. */
+  flex: 1 1 auto;
+  align-self: stretch;
 }
 .bk-cs-main {
   flex: 1 1 auto;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
   align-self: stretch;
-  /* Tên + dải icon biểu thị xếp DỌC, cả cụm căn giữa node; giữa 2 phần luôn có khoảng
-     hở (gap) nên tên dài (2 dòng) không bao giờ chèn lên dải status. */
-  justify-content: center;
-  gap: 6px;
+  /* 2 hàng: (1fr) vùng TÊN — căn giữa theo chiều dọc node; (auto) dải status — neo
+     xuống ĐÁY node. Nhờ vậy tên luôn ở giữa còn status luôn ở dưới, cách nhau 1 khoảng
+     rõ ràng (không bao giờ chạm nhau, kể cả khi tên xuống 2 dòng). */
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
   position: relative;
 }
-/* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
-   mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ.
-   Font hạ nhẹ (17 -> 15) để chừa khoảng thở với dải icon neo góc dưới. */
+/* Tên node: căn GIỮA theo chiều dọc trong vùng 1fr; DÀI thì xuống dòng (tối đa 2 dòng)
+   rồi mới cắt "…" — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ. */
 .bk-node-name--cs {
+  /* Căn GIỮA theo chiều dọc trong vùng 1fr của grid .bk-cs-main. */
+  align-self: center;
   /* CS: nền node đảo tông (--bk-node-bg) -> tên dùng màu chữ đảo tông tương ứng.
      (Base .bk-node-name đã trả về --bk-text cho màn TS.) */
   color: var(--bk-node-text);
@@ -453,13 +479,13 @@ body {
   overflow: hidden;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
-   Xếp DƯỚI tên node (in-flow, không absolute) căn phải; cách tên bằng gap của
-   .bk-cs-main nên tên dài không chèn lên. */
+   Neo xuống ĐÁY node (hàng auto của grid) căn phải; cách tên bằng khoảng dư của vùng
+   1fr nên tên (kể cả 2 dòng) không bao giờ chèn lên dải status. */
 .bk-cs-indicators {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  align-self: stretch;
+  align-self: end;
   gap: 9px;
 }
 .bk-cs-ind {
@@ -493,19 +519,27 @@ body {
   clip-path: inset(-1px -1px 50% -1px);
   pointer-events: none;
 }
-/* CS: chấm nối "rỗng" theo nền node đảo tông (--bk-node-bg) để liền mạch với card. */
+/* TS: cung hõm ôm theo viền surface nhạt (PR #98) — không dùng accent như CS để giữ
+   đúng tông node TS. */
+.bk-node:not(.bk-node--cs) .bk-cs-notch {
+  border-color: var(--bk-border);
+}
+/* CS: chấm nối "rỗng" theo nền node đảo tông (--bk-node-bg) để liền mạch với card.
+   (TS dùng nền --bk-surface từ rule .react-flow__handle.bk-handle chung — PR #98.) */
 .bk-node--cs .react-flow__handle.bk-handle {
   background: var(--bk-node-bg);
 }
-/* Chấm output CS: nhỏ (9px), nằm HẲN trong node ngay trên mép đáy — lọt giữa
-   miệng hõm khoét. (Trục: bottom càng ÂM càng đẩy RA NGOÀI; 0 = sát mép trong.) */
-.bk-node--cs .react-flow__handle.bk-handle.react-flow__handle-bottom {
+/* Chấm output: nhỏ (9px), nằm HẲN trong node ngay trên mép đáy — lọt giữa miệng hõm
+   khoét. Áp cho CẢ 2 màn (đối ứng "khoét" của CS sang TS). (Trục: bottom càng ÂM càng
+   đẩy RA NGOÀI; 0 = sát mép trong.) */
+.bk-node .react-flow__handle.bk-handle.react-flow__handle-bottom {
   width: 9px;
   height: 9px;
   bottom: 0;
 }
-/* Điểm đến: ẩn chấm tròn (mũi tên cuối dây thay thế) — vẫn nối dây vào được. */
-.bk-node--cs .react-flow__handle.bk-handle.target {
+/* Điểm đến: ẩn chấm tròn (mũi tên cuối dây thay thế) — vẫn nối dây vào được. Áp cho
+   cả 2 màn để "tiếp điểm" của dây là mũi tên (giống màn CS). */
+.bk-node .react-flow__handle.bk-handle.target {
   opacity: 0;
 }
 
@@ -537,27 +571,31 @@ body {
 .bk-panel-header {
   background: var(--bk-surface-2);
 }
+/* Tab panel setting kiểu TAB TRÌNH DUYỆT (giống dải tab canvas) — bo góc TRÊN, viền
+   quanh trừ đáy; tab đang chọn "khoét" liền vào vùng nội dung bên dưới bằng cách đè
+   lên đường border đáy của header (margin-bottom: -1px) và mang đúng nền nội dung. */
 .bk-tabs {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 4px;
-  margin: 0 12px;
-  padding: 0 0 10px;
+  margin: 0;
+  padding: 4px 12px 0;
   background: transparent;
   border: none;
 }
 .bk-tab {
-  flex: 1 1 0;
-  padding: 8px 8px;
-  border-radius: 9px;
+  padding: 8px 16px;
+  border-radius: 10px 10px 0 0;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--bk-text-muted);
   background: transparent;
   border: 1px solid transparent;
+  border-bottom: none;
+  margin-bottom: -1px;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 /* Hover chỉ áp cho tab CHƯA chọn (loại .bk-tab--active) để không đè màu accent. */
 .bk-tab:not(.bk-tab--disabled):not(.bk-tab--active):hover {
@@ -568,12 +606,6 @@ body {
   color: var(--bk-accent);
   background: var(--bk-surface);
   border-color: var(--bk-border);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.08);
-}
-.dark .bk-tab--active,
-.dark .bk-tab--active:hover {
-  background: var(--bk-surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 .bk-tab--disabled {
   opacity: 0.4;

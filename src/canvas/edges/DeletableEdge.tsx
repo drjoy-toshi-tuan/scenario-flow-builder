@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -213,6 +213,7 @@ export function DeletableEdge({
   data,
   markerEnd,
   style,
+  selected,
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const removeEdge = useFlowStore((s) => s.removeEdge);
@@ -222,7 +223,8 @@ export function DeletableEdge({
   const edgeData = data as RFEdgeData | undefined;
   // Node condition/script: nhãn giá trị nhánh luôn hiện; các node khác chỉ hiện khi hover.
   const alwaysLabel = edgeData?.alwaysLabel === true;
-  const labelVisible = alwaysLabel || hovered;
+  // Nhãn hiện khi: luôn-hiện (stamp) · hover · hoặc dây đang được CHỌN (bấm vào dây).
+  const labelVisible = alwaysLabel || hovered || selected === true;
 
   // ── Stamp điều kiện kéo được (GHIM trên dây) ────────────────────────────────
   // Vị trí nhãn = tâm dây + stagger chống chồng (irAdapter tính) + offset người dùng
@@ -312,6 +314,27 @@ export function DeletableEdge({
     });
   }
 
+  // ── Giữ nhãn LUÔN bám dây khi node di chuyển ────────────────────────────────
+  // Vị trí MONG MUỐN của nhãn = tâm dây + stagger + offset người dùng đã kéo. Khi
+  // node di chuyển, đường dây (edgePath) đổi -> offset (vector tuyệt đối từ tâm dây)
+  // trở nên cũ và có thể văng nhãn RA NGOÀI dây. Với nhãn ĐÃ ĐƯỢC KÉO (có offset),
+  // ta chiếu điểm mong muốn về điểm gần nhất TRÊN dây rồi render ở đó -> nhãn không
+  // bao giờ rời khỏi dây. Nhãn chưa kéo (chỉ có stagger chống chồng) giữ nguyên hành
+  // vi cũ. Đang kéo thì dùng thẳng điểm kéo (vốn đã nằm trên dây).
+  const wantX = labelX + stagger.x + offsetX;
+  const wantY = labelY + stagger.y + offsetY;
+  const hasUserOffset = savedOffset.x !== 0 || savedOffset.y !== 0;
+  const [snapped, setSnapped] = useState<{ x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    if (dragging.current || !pathRef.current || !hasUserOffset) {
+      setSnapped(null);
+      return;
+    }
+    setSnapped(nearestPointOnPath(pathRef.current, { x: wantX, y: wantY }));
+  }, [edgePath, wantX, wantY, hasUserOffset]);
+  const posX = !dragOffset && snapped ? snapped.x : wantX;
+  const posY = !dragOffset && snapped ? snapped.y : wantY;
+
   return (
     <>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
@@ -338,7 +361,7 @@ export function DeletableEdge({
         <div
           className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
           style={{
-            transform: `translate(-50%, -50%) translate(${labelX + stagger.x + offsetX}px, ${labelY + stagger.y + offsetY}px)`,
+            transform: `translate(-50%, -50%) translate(${posX}px, ${posY}px)`,
           }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
@@ -359,7 +382,7 @@ export function DeletableEdge({
             title={t('deleteEdgeTitle')}
             aria-label={t('deleteEdgeTitle')}
             className="edge-trash"
-            style={{ opacity: hovered ? 1 : 0 }}
+            style={{ opacity: hovered || selected ? 1 : 0 }}
             onClick={(e) => {
               e.stopPropagation();
               removeEdge(id);

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { ensureSettings } from '../../ir/settings';
+import { computeInheritedFlags } from '../../ir/statusFlow';
 import type { FlowNode, NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
 import { Icon } from '../../ui/icons';
@@ -70,7 +71,7 @@ export function AnnounceListTab() {
         onClick={() => setNodeData(node.id, { [key]: on ? 'no' : 'yes' })}
         className={`inline-flex h-7 w-7 items-center justify-center rounded-lg border transition ${
           on
-            ? 'border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+            ? 'border-emerald-500 bg-emerald-500/90 text-white shadow-sm dark:border-emerald-500 dark:bg-emerald-500/80'
             : 'border-[var(--bk-border)] text-[var(--bk-text-faint)] hover:text-[var(--bk-text)]'
         }`}
         aria-pressed={on}
@@ -81,20 +82,30 @@ export function AnnounceListTab() {
   };
 
   const dash = <span className="text-[var(--bk-text-faint)]">ー</span>;
+  // Status/SMS flag kế thừa từ node phía trên (tự fill) — ô chưa chọn sẽ hiện flag kế thừa.
+  const inheritedFlags = useMemo(() => computeInheritedFlags(ir), [ir]);
   const chipSelect = (
     node: FlowNode,
     key: 'hangupStatusFlag' | 'hangupSmsFlag',
     label: string,
     options: { value: string; label: string }[],
-  ) => (
+  ) => {
+    const inheritedValue =
+      key === 'hangupStatusFlag'
+        ? inheritedFlags.get(node.id)?.statusFlag
+        : inheritedFlags.get(node.id)?.smsFlag;
+    const inheritedLabel = inheritedValue
+      ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
+      : '';
+    return (
     <label className="flex items-center gap-1.5">
       {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau.
-          Màu phân biệt 2 loại: Status nền xanh biển sáng trong suốt, SMS Flag nền
+          Màu phân biệt 2 loại: Status nền xanh emerald sáng trong suốt, SMS Flag nền
           vàng sáng trong suốt — chữ đậm cùng tông để giữ contrast cả light/dark. */}
       <span
         className={`inline-flex w-[72px] shrink-0 justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${
           key === 'hangupStatusFlag'
-            ? 'bg-sky-400/20 text-sky-600 dark:bg-sky-400/25 dark:text-sky-300'
+            ? 'bg-emerald-400/20 text-emerald-600 dark:bg-emerald-400/25 dark:text-emerald-300'
             : 'bg-amber-300/25 text-amber-600 dark:bg-amber-300/25 dark:text-amber-300'
         }`}
       >
@@ -105,7 +116,8 @@ export function AnnounceListTab() {
         onChange={(e) => setNodeData(node.id, { [key]: e.target.value })}
         className="w-full min-w-0 flex-1 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-1.5 py-1 text-xs text-[var(--bk-text)]"
       >
-        <option value="">ー</option>
+        {/* Ô rỗng: có flag kế thừa từ node phía trên -> hiện "継承: <flag>" (đang tự fill). */}
+        <option value="">{inheritedValue ? `${t('flagInherit')}: ${inheritedLabel}` : 'ー'}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -113,7 +125,8 @@ export function AnnounceListTab() {
         ))}
       </select>
     </label>
-  );
+    );
+  };
 
   // Nhãn option dạng "0 - 途中切断" (flag - tên) theo yêu cầu team CS.
   // Pulldown 状態 (切断時フラグ) chỉ dùng các flag 0,1,2,3,6 theo yêu cầu team CS.

@@ -396,6 +396,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     alStatusChip: 'Status',
     alSmsChip: 'SMS Flag',
     alUnset: 'Chưa chọn',
+    // Status/SMS flag kế thừa từ node phía trên (tự fill) — hiện ở option "Chưa chọn".
+    flagInherit: 'Kế thừa',
     alEmpty: 'Flow chưa có node nào có announce.',
     // ── Tab General Settings ──
     gsGroupBasic: 'Thông tin cơ bản',
@@ -847,6 +849,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     alStatusChip: '状態',
     alSmsChip: 'SMSフラグ',
     alUnset: '未選択',
+    // 上流ノードから継承した状態/SMSフラグ（自動フィル）— 「未選択」オプションに表示。
+    flagInherit: '継承',
     alEmpty: 'アナウンスを持つノードがまだありません。',
     // ── Tab General Settings ──
     gsGroupBasic: '基本情報',

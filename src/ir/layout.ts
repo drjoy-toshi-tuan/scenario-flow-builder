@@ -68,11 +68,22 @@ function buildTree(
   // nhánh thì quay về xếp dọc xuống dưới.
   const freshCount = edges.filter((e) => !visited.has(e.target)).length;
   const continueSide = mode === 'side' && freshCount === 1;
-  for (const edge of edges) {
+  // Phân loại theo trạng thái visited TẠI THỜI ĐIỂM vào node (giữ nguyên thứ tự khai báo).
+  const classified = edges.map((edge) => ({
+    edge,
+    toSide: continueSide || (mode === 'down' && edge.sourceHandle === 'failed'),
+  }));
+  // Giành nhánh NGANG (side/failed) TRƯỚC nhánh dọc: khi 2 node xếp dọc cùng nối tới 1
+  // node nằm NGANG bên cạnh, node ngang đó phải nằm cùng hàng với node TRÊN CÙNG (nông
+  // nhất) — node nông được duyệt trước nên giành node ngang trước khi con ở dưới kịp
+  // giành (nếu duyệt dọc trước, con dưới đi sâu rồi kéo node ngang tụt xuống hàng dưới).
+  for (const { edge } of classified.filter((c) => c.toSide)) {
     if (visited.has(edge.target)) continue;
-    const toSide = continueSide || (mode === 'down' && edge.sourceHandle === 'failed');
-    if (toSide) node.side.push(buildTree(edge.target, 'side', outgoing, visited));
-    else node.down.push(buildTree(edge.target, 'down', outgoing, visited));
+    node.side.push(buildTree(edge.target, 'side', outgoing, visited));
+  }
+  for (const { edge } of classified.filter((c) => !c.toSide)) {
+    if (visited.has(edge.target)) continue;
+    node.down.push(buildTree(edge.target, 'down', outgoing, visited));
   }
   return node;
 }

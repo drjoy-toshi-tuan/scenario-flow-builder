@@ -5,6 +5,7 @@ import type { FlowNode, NodeType } from '../ir/types';
 import { NODE_CONFIG, nodeTypeLabel } from '../ui/nodeConfig';
 import { CsLogicBranchEditor } from './CsLogicBranchEditor';
 import { ensureSettings } from '../ir/settings';
+import { computeInheritedFlags } from '../ir/statusFlow';
 import {
   PROPERTY_FIELDS,
   propertyFieldsFor,
@@ -582,7 +583,7 @@ function FieldControl({
       return (
         <label className="block">
           {label}
-          <SettingsSelect field={field} value={value} onChange={set} />
+          <SettingsSelect field={field} value={value} onChange={set} node={node} />
         </label>
       );
     case 'code':
@@ -609,10 +610,12 @@ function SettingsSelect({
   field,
   value,
   onChange,
+  node,
 }: {
   field: PropertyField;
   value: string;
   onChange: (v: string) => void;
+  node: FlowNode;
 }) {
   const t = useT();
   const ir = useFlowStore((s) => s.ir);
@@ -622,9 +625,20 @@ function SettingsSelect({
     field.settingsOptions === 'smsFlags'
       ? settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }))
       : settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
+  // Status/SMS flag KẾ THỪA từ node phía trên (tự fill): khi node chưa tự đặt flag, ô
+  // "chưa chọn" hiển thị flag kế thừa để người dùng biết giá trị mặc định đang áp dụng.
+  const inherited = useMemo(() => computeInheritedFlags(ir), [ir]);
+  const inheritedValue =
+    field.settingsOptions === 'smsFlags'
+      ? inherited.get(node.id)?.smsFlag
+      : inherited.get(node.id)?.statusFlag;
+  const inheritedLabel = inheritedValue
+    ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
+    : '';
   return (
     <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{t('alUnset')}</option>
+      {/* Ô rỗng: nếu có flag kế thừa từ thượng nguồn -> hiện "継承: <flag>" (đang tự fill). */}
+      <option value="">{inheritedValue ? `${t('flagInherit')}: ${inheritedLabel}` : t('alUnset')}</option>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}

@@ -62,13 +62,13 @@ export function makeNode(nodeType: NodeType) {
       hideTimer.current = setTimeout(() => setHovered(false), 180);
     };
 
-    // CS: vị trí (%) các điểm output — dùng chung cho lỗ mask trên "skin" và cung hõm.
-    const outPositions =
-      csMode && showSource
-        ? handles && handles.length > 0
-          ? handles.map((h, i) => ({ key: h.id, left: ((i + 1) / (handles.length + 1)) * 100 }))
-          : [{ key: 'default', left: 50 }]
-        : [];
+    // Vị trí (%) các điểm output — dùng chung cho lỗ mask trên "skin" và cung hõm.
+    // Áp cho CẢ 2 màn (CS lẫn TS): node đều có output "khoét" vào cạnh đáy.
+    const outPositions = showSource
+      ? handles && handles.length > 0
+        ? handles.map((h, i) => ({ key: h.id, left: ((i + 1) / (handles.length + 1)) * 100 }))
+        : [{ key: 'default', left: 50 }]
+      : [];
     // Mask khoét lỗ THẬT trên skin (nền + viền node): mỗi output 1 lỗ tròn tại mép
     // đáy — viền node tự ĐỨT đúng tại mép lỗ nên khớp hình học với cung hõm.
     const skinMask =
@@ -77,6 +77,14 @@ export function makeNode(nodeType: NodeType) {
             .map((p) => `radial-gradient(circle at ${p.left}% 100%, transparent 7px, #000 8px)`)
             .join(', ')
         : undefined;
+    const maskStyle: CSSProperties | undefined = skinMask
+      ? ({
+          maskImage: skinMask,
+          maskComposite: 'intersect',
+          WebkitMaskImage: skinMask,
+          WebkitMaskComposite: 'source-in',
+        } as CSSProperties)
+      : undefined;
 
     return (
       <div
@@ -85,24 +93,11 @@ export function makeNode(nodeType: NodeType) {
         onMouseEnter={showPreview}
         onMouseLeave={hidePreview}
       >
-        {/* CS: lớp "skin" mang nền + viền + bóng của node, bị mask khoét lỗ tại các
-            output. Root node để trong suốt (xem CSS) — nhờ vậy handle/notch là anh em
-            của skin, KHÔNG bị mask cắt mất. */}
-        {csMode && (
-          <span
-            className="bk-cs-skin"
-            style={
-              skinMask
-                ? ({
-                    maskImage: skinMask,
-                    maskComposite: 'intersect',
-                    WebkitMaskImage: skinMask,
-                    WebkitMaskComposite: 'source-in',
-                  } as CSSProperties)
-                : undefined
-            }
-          />
-        )}
+        {/* Lớp "skin" mang nền + viền + bóng của node, bị mask khoét lỗ tại các output.
+            Root node để trong suốt (xem CSS) — nhờ vậy handle/notch là anh em của skin,
+            KHÔNG bị mask cắt mất. CS và TS dùng 2 class skin riêng (khác màu nền/viền)
+            nhưng CÙNG cơ chế khoét lỗ. */}
+        <span className={csMode ? 'bk-cs-skin' : 'bk-node-skin'} style={maskStyle} />
         {/* Hover / chọn node -> xem nhanh các property đang set (bên phải node).
             Node không có property nào cũng không có mô tả (vd hangup) thì KHÔNG hiện
             preview — tránh card "không có tham số" vô nghĩa. */}
