@@ -4,9 +4,12 @@ import { useTheme } from '../ui/theme';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useLang, useT } from '../ui/i18n';
 import { Icon } from '../ui/icons';
+import { RoleBadge } from '../ui/RoleBadge';
 import { SlideToggle } from '../components/SlideToggle';
 import { MenuBrandHeader } from '../components/MenuBrandHeader';
 import { MenuToggleIcon } from '../components/MenuToggleIcon';
+import { usePermStore } from '../store/permStore';
+import { resolveRole } from '../drive/permissions';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Menu dọc cho màn Quản lý file (giống HeaderMenu ở canvas: nút icon -> panel
@@ -43,6 +46,9 @@ export function FileManagerMenu({
   }, [open]);
 
   const { user, signOut } = useAuth();
+  // Quyền của user (owner/admin/user) để hiện badge dưới tên trong menu tài khoản.
+  const admins = usePermStore((s) => s.admins);
+  const role = resolveRole(user?.email, { admins });
   const { theme, setTheme } = useTheme();
   const { lang, setLang } = useLang();
   const mode = useWorkspaceStore((s) => s.mode);
@@ -108,8 +114,9 @@ export function FileManagerMenu({
               <SlideToggle
                 value={mode}
                 options={[
-                  { key: 'cs', icon: 'lucide:pencil', title: t('screenCs') },
-                  { key: 'ts', icon: 'lucide:file-code', title: t('screenTs') },
+                  // Icon màn hình có chữ CS/TS; khi active tô đúng màu bộ phận (CS xanh / TS cam).
+                  { key: 'cs', icon: 'app:screen-cs', title: t('screenCs'), activeColor: '#3b82f6' },
+                  { key: 'ts', icon: 'app:screen-ts', title: t('screenTs'), activeColor: '#ff8c30' },
                 ]}
                 onChange={(k) => setMode(k as 'cs' | 'ts')}
                 ariaLabel={t('mScreen')}
@@ -140,10 +147,19 @@ export function FileManagerMenu({
           {/* ── Tài khoản / Đăng xuất ── */}
           <div className="bk-menu-sep" />
           <div className="bk-menu-account">
-            {user?.picture && <img src={user.picture} alt="" className="h-7 w-7 rounded-full" />}
-            <span className="min-w-0 flex-1 truncate text-xs text-[var(--bk-text-muted)]" title={user?.email}>
-              {user?.name}
-            </span>
+            {user?.picture && <img src={user.picture} alt="" className="h-9 w-9 rounded-full" />}
+            {/* Tên (trên) + badge quyền (dưới) — 2 dòng canh giữa theo chiều cao avatar. */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+              {/* Tên: Noto Sans JP 600 — ưu tiên tiếng Nhật (氏名), nét gọn dày. */}
+              <span
+                className="truncate text-xs font-semibold text-[var(--bk-text)]"
+                style={{ fontFamily: "'Noto Sans JP', 'Noto Sans', sans-serif" }}
+                title={user?.email}
+              >
+                {user?.name}
+              </span>
+              <RoleBadge role={role} />
+            </div>
             <button
               type="button"
               className="bk-menu-logout"

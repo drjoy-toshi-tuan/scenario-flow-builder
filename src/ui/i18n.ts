@@ -41,8 +41,11 @@ const DICT: Record<Lang, Record<string, string>> = {
     mTheme: 'Giao diện',
     // Chuyển màn CS/TS (chỉ owner) — owner không bị khoá theo bộ phận.
     mScreen: 'Màn hình',
-    screenCs: 'Màn CS (thiết kế)',
-    screenTs: 'Màn TS (kỹ thuật)',
+    screenCs: 'Màn hình CS',
+    screenTs: 'Màn hình TS',
+    // Tooltip stamp bộ phận trên header (giữ nguyên thuật ngữ Working Screen).
+    workScreenCs: 'CS Working Screen',
+    workScreenTs: 'TS Working Screen',
     ivrProperty: 'Cài đặt IVR Property',
     // Modal IVR Property
     ivrFacility: 'Tên bệnh viện',
@@ -494,8 +497,11 @@ const DICT: Record<Lang, Record<string, string>> = {
     mTheme: 'テーマ',
     // 画面切替 CS/TS（オーナーのみ）— オーナーは部署による固定を受けない。
     mScreen: '画面',
-    screenCs: 'CS画面（設計）',
-    screenTs: 'TS画面（技術）',
+    screenCs: 'CS作業画面',
+    screenTs: 'TS作業画面',
+    // Tooltip stamp bộ phận trên header.
+    workScreenCs: 'CS作業画面',
+    workScreenTs: 'TS作業画面',
     ivrProperty: 'IVRプロパティ設定',
     // Modal IVR Property
     ivrFacility: '施設名',

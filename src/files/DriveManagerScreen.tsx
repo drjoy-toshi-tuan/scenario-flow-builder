@@ -38,6 +38,7 @@ import {
 } from '../drive/permissions';
 import { PermissionsModal } from './PermissionsModal';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { usePermStore } from '../store/permStore';
 import { HoverLabelButton } from '../components/HoverTip';
 import { gdErrorKey } from '../drive/errors';
 import { driveRootFolderId, parseVersionFromName, versionFileName } from '../drive/config';
@@ -448,6 +449,12 @@ function DriveLoaded({ token, onAuthInvalid }: { token: string; onAuthInvalid: (
   const [permError, setPermError] = useState<string | null>(null);
   // Owner nhận diện qua email cố định nên KHÔNG phụ thuộc file quyền đọc được hay chưa.
   const role = resolveRole(user?.email, { admins });
+
+  // Mirror danh sách admin sang store dùng chung để HeaderMenu (canvas) hiện được
+  // badge quyền mà không phải đọc lại file phân quyền.
+  useEffect(() => {
+    usePermStore.getState().setAdmins(admins);
+  }, [admins]);
 
   // Token bị Drive từ chối giữa chừng (hết hạn/thu quyền) -> về panel kết nối.
   const handledAsExpired = (e: unknown): boolean => {
