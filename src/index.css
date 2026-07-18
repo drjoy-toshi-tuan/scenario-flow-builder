@@ -480,7 +480,7 @@ body {
   text-align: center;
   /* CS: tên to hơn nửa cỡ + đậm hơn màn TS (base .bk-node-name: 14px/600) — tên là
      thông tin chính duy nhất trên node CS nên cho nổi hẳn. */
-  font-size: 15.5px;
+  font-size: 16px;
   font-weight: 700;
   white-space: normal;
   overflow-wrap: anywhere;
