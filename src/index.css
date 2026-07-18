@@ -387,11 +387,16 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
   /* Node lùn (chỉ còn tên + dải icon biểu thị) — tên dài xuống dòng (tối đa 2 dòng)
-     thì node tự cao thêm. Cao hơn 1 chút: TÊN căn giữa theo chiều dọc node, còn dải
-     status neo hẳn xuống ĐÁY (grid 1fr/auto) nên luôn chừa khoảng hở với tên. */
+     thì node tự cao thêm. TÊN căn giữa ĐÚNG TÂM node theo chiều dọc (bất chấp dải
+     status): .bk-cs-main chừa đệm trên/dưới ĐỐI XỨNG đủ chỗ cho dải status (neo
+     absolute sát đáy phải) nên tên không bao giờ đè lên icon. Chiều cao dọc do đệm
+     của .bk-cs-main quyết định — node bỏ padding dọc. */
   height: auto;
-  min-height: 76px;
-  padding: 10px 14px;
+  min-height: 74px;
+  padding: 0 14px;
+  /* CS bo tròn hơn màn TS (18px): mềm mại hơn cho người không kỹ thuật. Skin +
+     dải accent trái dùng border-radius: inherit nên tự bo theo. */
+  border-radius: 24px;
   /* Nền/viền/bóng chuyển hết sang lớp .bk-cs-skin (bị mask khoét lỗ tại output) —
      root để TRONG SUỐT, nhờ vậy handle là anh em của skin, không bị mask cắt. */
   background: transparent;
@@ -437,8 +442,8 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--bk-shadow);
 }
-/* Bố cục CS: icon loại (tile) trái + cột 2 DÒNG — trên: tên căn GIỮA (font to);
-   dưới: icon biểu thị căn PHẢI. Nâng lên trên lớp .bk-cs-skin (positioned) —
+/* Bố cục CS: TÊN node căn giữa đúng tâm node; dải icon biểu thị neo absolute góc
+   dưới phải (xem .bk-cs-indicators). Nâng lên trên lớp .bk-cs-skin (positioned) —
    không nâng thì nội dung tĩnh bị skin vẽ đè mất. */
 .bk-node-body--cs {
   gap: 10px;
@@ -453,19 +458,22 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   align-self: stretch;
-  /* 2 hàng: (1fr) vùng TÊN — căn giữa theo chiều dọc node; (auto) dải status — neo
-     xuống ĐÁY node. Nhờ vậy tên luôn ở giữa còn status luôn ở dưới, cách nhau 1 khoảng
-     rõ ràng (không bao giờ chạm nhau, kể cả khi tên xuống 2 dòng). */
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 8px;
-  position: relative;
+  /* Tên căn giữa ĐÚNG TÂM node: đệm trên/dưới ĐỐI XỨNG 27px = chiều cao dải status
+     (13px, neo absolute trong khoảng 11..24px từ đáy — hở hẳn 2-3px trên vùng hõm
+     khoét output bán kính 8px + chấm nối 9px ở mép đáy, kể cả khi hõm nằm ngay dưới
+     dải icon) + 3px khoảng hở với tên. Nhờ đệm đối xứng, tên luôn ở chính giữa node
+     theo chiều dọc; tên 2 dòng thì node tự cao thêm và vẫn giữ khoảng cách với dải
+     status (không bao giờ đè nhau).
+     KHÔNG position:relative ở đây — dải status absolute neo theo .bk-node-body--cs
+     (phủ hết chiều cao node) để bám sát đáy node. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-block: 27px;
 }
-/* Tên node: căn GIỮA theo chiều dọc trong vùng 1fr; DÀI thì xuống dòng (tối đa 2 dòng)
-   rồi mới cắt "…" — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ. */
+/* Tên node: DÀI thì xuống dòng (tối đa 2 dòng) rồi mới cắt "…" — id kiểu snake_case
+   không có dấu cách nên cho phép bẻ bất kỳ. */
 .bk-node-name--cs {
-  /* Căn GIỮA theo chiều dọc trong vùng 1fr của grid .bk-cs-main. */
-  align-self: center;
   /* CS: nền node đảo tông (--bk-node-bg) -> tên dùng màu chữ đảo tông tương ứng.
      (Base .bk-node-name đã trả về --bk-text cho màn TS.) */
   color: var(--bk-node-text);
@@ -479,13 +487,17 @@ body {
   overflow: hidden;
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
-   Neo xuống ĐÁY node (hàng auto của grid) căn phải; cách tên bằng khoảng dư của vùng
-   1fr nên tên (kể cả 2 dòng) không bao giờ chèn lên dải status. */
+   Neo ABSOLUTE góc dưới PHẢI node (tách khỏi flow -> không kéo tên lệch tâm);
+   bottom 11px = hở 2-3px trên vùng hõm khoét output (lỗ mask bán kính 8px) và
+   chấm nối (9px, neo mép đáy) — dải icon dài đến đâu, hõm nằm ngay bên dưới cũng
+   không chạm; khoảng hở với tên do đệm đối xứng của .bk-cs-main đảm bảo. Anchor =
+   nearest positioned ancestor là .bk-node-body--cs (phủ hết chiều cao node). */
 .bk-cs-indicators {
+  position: absolute;
+  right: 0;
+  bottom: 11px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  align-self: end;
   gap: 9px;
 }
 .bk-cs-ind {

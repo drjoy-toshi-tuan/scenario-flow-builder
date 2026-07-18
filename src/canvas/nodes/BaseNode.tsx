@@ -168,8 +168,9 @@ export function makeNode(nodeType: NodeType) {
 
         {csMode ? (
           // CS: KHÔNG icon loại (nhận diện bằng màu accent trái) — TÊN node căn giữa
-          // cả ngang lẫn dọc; dải icon biểu thị cấu hình neo góc dưới phải (không
-          // ảnh hưởng căn giữa của tên, vẫn chừa khoảng cách — xem CSS).
+          // ĐÚNG TÂM node cả ngang lẫn dọc (2 dòng thì node cao thêm); dải icon biểu
+          // thị neo absolute góc dưới phải, tách khỏi flow nên không đẩy lệch tên,
+          // và luôn giữ khoảng hở với tên nhờ đệm đối xứng của .bk-cs-main (xem CSS).
           <div className="bk-node-body bk-node-body--cs">
             <div className="bk-cs-main">
               <div className="bk-node-name bk-node-name--cs" title={d.label}>
