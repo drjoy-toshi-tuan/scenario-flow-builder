@@ -1464,7 +1464,11 @@ describe('flow.settings round-trip', () => {
     expect(s.statuses.find((x) => x.flag === 5)!.name).toBe('対応不要');
     expect(s.statuses.find((x) => x.flag === 5)!.fixed).toBe(true);
     expect(s.statuses.find((x) => x.flag === 21)!.fixed).toBeUndefined();
-    expect(s.smsFlags).toEqual([{ type: '予約完了', flag: 1, content: 'ご予約ありがとうございます。' }]);
+    // SMS flag mặc định (送信なし / -2) luôn đứng đầu, không sửa/xoá; sau đó là dòng thêm tay.
+    expect(s.smsFlags).toEqual([
+      { type: '送信なし', flag: -2, content: '', fixed: true },
+      { type: '予約完了', flag: 1, content: 'ご予約ありがとうございます。' },
+    ]);
   });
 
   it('file không có settings -> ir.settings undefined (không rải block rỗng)', () => {

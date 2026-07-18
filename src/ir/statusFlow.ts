@@ -1,10 +1,14 @@
 import type { FlowIR, NodeType } from './types';
 import { SYNTHETIC_START_ID } from './types';
+import { DEFAULT_STATUS_FLAG, DEFAULT_SMS_FLAG } from './settings';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lan truyền XUÔI flag "trạng thái cuộc gọi" (状態 / SMSフラグ) theo dòng flow:
 // một node đã set status/SMS flag thì các node PHÍA SAU (nối tiếp theo dây) mặc định
 // KẾ THỪA flag đó, cho tới khi gặp node khác set flag mới (kiểu tự fill).
+//
+// Baseline: khi CHƯA node nào phía trên set, mọi node kế thừa flag mặc định
+// status 0 (途中切断) + SMS -2 (送信なし) — xem DEFAULT_STATUS_FLAG / DEFAULT_SMS_FLAG.
 //
 // Hàm thuần (ir/ không import React): trả về, cho MỖI node, flag mà node KẾ THỪA từ
 // thượng nguồn — CHƯA gộp flag của chính node đó. Panel/Announce List dùng giá trị này
@@ -52,8 +56,14 @@ export function computeInheritedFlags(ir: FlowIR | null | undefined): Map<string
     ...ir.nodes.filter((n) => n.id !== SYNTHETIC_START_ID && !hasIncoming.has(n.id)),
   ];
 
+  // Baseline mọi node thừa hưởng khi chưa có node nào phía trên set flag.
+  const baseCarry: InheritedFlags = {
+    statusFlag: String(DEFAULT_STATUS_FLAG),
+    smsFlag: String(DEFAULT_SMS_FLAG),
+  };
+
   // BFS mang flag kế thừa xuôi dòng; mỗi node xử lý 1 lần (first-arrival) để chặn vòng lặp.
-  const queue: { id: string; carry: InheritedFlags }[] = roots.map((n) => ({ id: n.id, carry: {} }));
+  const queue: { id: string; carry: InheritedFlags }[] = roots.map((n) => ({ id: n.id, carry: { ...baseCarry } }));
   const seen = new Set<string>();
   while (queue.length > 0) {
     const { id, carry } = queue.shift()!;
@@ -73,7 +83,7 @@ export function computeInheritedFlags(ir: FlowIR | null | undefined): Map<string
     }
   }
 
-  // Node không tới được từ gốc (cụm rời / toàn vòng) -> không kế thừa gì.
-  for (const n of ir.nodes) if (!result.has(n.id)) result.set(n.id, {});
+  // Node không tới được từ gốc (cụm rời / toàn vòng) -> vẫn nhận flag mặc định.
+  for (const n of ir.nodes) if (!result.has(n.id)) result.set(n.id, { ...baseCarry });
   return result;
 }
