@@ -478,7 +478,10 @@ body {
      (Base .bk-node-name đã trả về --bk-text cho màn TS.) */
   color: var(--bk-node-text);
   text-align: center;
-  font-size: 15px;
+  /* CS: tên to hơn nửa cỡ + đậm hơn màn TS (base .bk-node-name: 14px/600) — tên là
+     thông tin chính duy nhất trên node CS nên cho nổi hẳn. */
+  font-size: 15.5px;
+  font-weight: 700;
   white-space: normal;
   overflow-wrap: anywhere;
   display: -webkit-box;
