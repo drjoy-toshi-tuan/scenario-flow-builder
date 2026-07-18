@@ -392,7 +392,7 @@ body {
      absolute sát đáy phải) nên tên không bao giờ đè lên icon. Chiều cao dọc do đệm
      của .bk-cs-main quyết định — node bỏ padding dọc. */
   height: auto;
-  min-height: 70px;
+  min-height: 74px;
   padding: 0 14px;
   /* Nền/viền/bóng chuyển hết sang lớp .bk-cs-skin (bị mask khoét lỗ tại output) —
      root để TRONG SUỐT, nhờ vậy handle là anh em của skin, không bị mask cắt. */
@@ -455,17 +455,18 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   align-self: stretch;
-  /* Tên căn giữa ĐÚNG TÂM node: đệm trên/dưới ĐỐI XỨNG 25px = chiều cao dải status
-     (13px, neo absolute trong khoảng 8..21px từ đáy — nằm TRÊN vùng hõm khoét output
-     bán kính 8px ở mép đáy) + 4px khoảng hở. Nhờ đệm đối xứng, tên luôn ở chính giữa
-     node theo chiều dọc; tên 2 dòng thì node tự cao thêm và vẫn giữ khoảng cách với
-     dải status (không bao giờ đè nhau).
+  /* Tên căn giữa ĐÚNG TÂM node: đệm trên/dưới ĐỐI XỨNG 27px = chiều cao dải status
+     (13px, neo absolute trong khoảng 11..24px từ đáy — hở hẳn 2-3px trên vùng hõm
+     khoét output bán kính 8px + chấm nối 9px ở mép đáy, kể cả khi hõm nằm ngay dưới
+     dải icon) + 3px khoảng hở với tên. Nhờ đệm đối xứng, tên luôn ở chính giữa node
+     theo chiều dọc; tên 2 dòng thì node tự cao thêm và vẫn giữ khoảng cách với dải
+     status (không bao giờ đè nhau).
      KHÔNG position:relative ở đây — dải status absolute neo theo .bk-node-body--cs
      (phủ hết chiều cao node) để bám sát đáy node. */
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-block: 25px;
+  padding-block: 27px;
 }
 /* Tên node: DÀI thì xuống dòng (tối đa 2 dòng) rồi mới cắt "…" — id kiểu snake_case
    không có dấu cách nên cho phép bẻ bất kỳ. */
@@ -484,14 +485,14 @@ body {
 }
 /* Dải icon biểu thị cấu hình — màu riêng từng loại set inline (xem CsIndicators).
    Neo ABSOLUTE góc dưới PHẢI node (tách khỏi flow -> không kéo tên lệch tâm);
-   bottom 8px = ngay TRÊN vùng hõm khoét output (lỗ mask bán kính 8px ở mép đáy)
-   nên icon không chạm hõm; khoảng hở với tên do đệm đối xứng của .bk-cs-main đảm
-   bảo. Anchor = nearest positioned ancestor là .bk-node-body--cs (phủ hết chiều
-   cao node). */
+   bottom 11px = hở 2-3px trên vùng hõm khoét output (lỗ mask bán kính 8px) và
+   chấm nối (9px, neo mép đáy) — dải icon dài đến đâu, hõm nằm ngay bên dưới cũng
+   không chạm; khoảng hở với tên do đệm đối xứng của .bk-cs-main đảm bảo. Anchor =
+   nearest positioned ancestor là .bk-node-body--cs (phủ hết chiều cao node). */
 .bk-cs-indicators {
   position: absolute;
   right: 0;
-  bottom: 8px;
+  bottom: 11px;
   display: flex;
   align-items: center;
   gap: 9px;
