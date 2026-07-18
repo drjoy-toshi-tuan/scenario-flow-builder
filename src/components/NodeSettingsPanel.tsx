@@ -636,15 +636,17 @@ function SettingsSelect({
   const inheritedLabel = inheritedValue
     ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
     : '';
-  // Ô đang bỏ trống NHƯNG có flag kế thừa -> phủ stamp "継続 · Carried" + nhãn flag lên
+  // Ô đang bỏ trống NHƯNG có flag kế thừa -> phủ stamp "継続 / Carried" + nhãn flag lên
   // mặt pulldown (đóng) để hiện dạng con dấu thay vì chữ trơn. Stamp pointer-events-none
   // nên bấm vào vẫn mở list native; chừa mép phải ~1.75rem cho mũi tên pulldown.
   const showInheritStamp = value === '' && !!inheritedValue;
   return (
     <div className="relative">
       <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
-        {/* Ô rỗng: có flag kế thừa -> option ghi "継続 · Carried — <flag>" (đang tự fill). */}
+        {/* Ô rỗng: có flag kế thừa -> option ghi "継続 / Carried — <flag>" (đang tự fill). */}
         <option value="">{inheritedValue ? `${t('flagInherit')} — ${inheritedLabel}` : t('alUnset')}</option>
+        {/* Gạch ngang phân cách option "継続 / Carried" (kế thừa) với danh sách status. */}
+        {!!inheritedValue && <hr />}
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

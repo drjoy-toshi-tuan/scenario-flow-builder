@@ -399,9 +399,9 @@ const DICT: Record<Lang, Record<string, string>> = {
     alStatusChip: 'Status',
     alSmsChip: 'SMS Flag',
     alUnset: 'Chưa chọn',
-    // Status/SMS flag kế thừa từ node phía trên (tự fill). Hiện dạng stamp song ngữ
-    // cố định "継続 · Carried" (Nhật + Anh) ở ô "chưa chọn" của pulldown và ở preview node.
-    flagInherit: '継続 · Carried',
+    // Status/SMS flag kế thừa từ node phía trên (tự fill). Hiện dạng stamp ở ô "chưa
+    // chọn" của pulldown và ở preview node — nhãn theo ngôn ngữ: VI "Carried", JA "継続".
+    flagInherit: 'Carried',
     flagInheritHint: 'Giá trị kế thừa từ node phía trên (đang tự fill)',
     alEmpty: 'Flow chưa có node nào có announce.',
     // ── Tab General Settings ──
@@ -857,8 +857,8 @@ const DICT: Record<Lang, Record<string, string>> = {
     alStatusChip: '状態',
     alSmsChip: 'SMSフラグ',
     alUnset: '未選択',
-    // 上流ノードから継承した状態/SMSフラグ（自動フィル）— スタンプ「継続 · Carried」で表示。
-    flagInherit: '継続 · Carried',
+    // 上流ノードから継承した状態/SMSフラグ（自動フィル）— スタンプ「継続」で表示。
+    flagInherit: '継続',
     flagInheritHint: '上流ノードから継承した値（自動フィル）',
     alEmpty: 'アナウンスを持つノードがまだありません。',
     // ── Tab General Settings ──
