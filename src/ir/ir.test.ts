@@ -1174,6 +1174,42 @@ flow:
     expect(new Set(steps).size).toBe(1);
   });
 
+  it('node có nhánh failed (ngang) + số nhánh xuống CHẴN: nhánh giữa thẳng cột dưới cha', async () => {
+    // p: failed -> fnode (đi ngang-trái) + 2 nhánh xuống A, B. Chừa slot ảo cho failed
+    // nên nhánh GIỮA (A, nhánh xuống đầu tiên) thẳng cột dưới p; B lệch sang phải.
+    const WITH_FAILED = `
+flow:
+  name: "f"
+  start: p
+  nodes:
+    - id: p
+      type: openai
+      failed: fnode
+      branches:
+        - default: A
+        - when: "X"
+          to: B
+    - id: fnode
+      type: announce
+      text: oops
+      next: fend
+    - id: fend
+      type: hangup
+    - id: A
+      type: hangup
+    - id: B
+      type: hangup
+`;
+    const ir = await layout(fromYaml(WITH_FAILED));
+    // Nhánh giữa (A) thẳng cột dưới node cha p.
+    expect(centerX(ir, 'A')).toBe(centerX(ir, 'p'));
+    // Nhánh còn lại (B) nằm bên phải cha.
+    expect(centerX(ir, 'B')).toBeGreaterThan(centerX(ir, 'p'));
+    // Nhánh failed đi NGANG (cùng hàng với p) và lệch trái.
+    expect(posY(ir, 'fnode')).toBe(posY(ir, 'p'));
+    expect(centerX(ir, 'fnode')).toBeLessThan(centerX(ir, 'p'));
+  });
+
   it('nhánh nexus dàn hàng dưới, cách đều & đối xứng quanh tâm node cha', async () => {
     const ir = await layout(fromYaml(FLOW));
     const jumps = ['jump_1', 'jump_2', 'jump_3', 'jump_4'];

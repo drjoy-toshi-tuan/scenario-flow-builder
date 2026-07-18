@@ -160,6 +160,14 @@ body {
 .react-flow__arrowhead {
   fill: var(--bk-edge);
 }
+/* React Flow gán màu inline mặc định (#b1b1b7) cho <polyline> BÊN TRONG marker (vì
+   markerEnd không truyền color) — inline style này ĐÈ lên fill của .react-flow__arrowhead
+   ở trên nên mũi tên KHÔNG theo màu dây. Ép polyline dùng đúng token màu dây --bk-edge
+   (cần !important vì phải thắng inline style của React Flow) -> đầu mũi tên đồng màu dây. */
+.react-flow__arrowhead polyline {
+  fill: var(--bk-edge) !important;
+  stroke: var(--bk-edge) !important;
+}
 
 /* Thanh công cụ canvas: GIỮ kiểu "cũ" của React Flow Controls (phẳng, gộp 1 khối,
    có đường kẻ ngăn giữa các nút) — nhưng nằm NGANG và trượt ra sau nút toggle. */
@@ -546,10 +554,11 @@ body {
 .bk-node:not(.bk-node--cs) .bk-cs-notch {
   border-color: var(--bk-border);
 }
-/* CS: chấm nối "rỗng" theo nền node đảo tông (--bk-node-bg) để liền mạch với card.
-   (TS dùng nền --bk-surface từ rule .react-flow__handle.bk-handle chung — PR #98.) */
+/* CS: tiếp điểm CHỈ có viền (border accent), nền TRONG SUỐT nhìn xuyên qua được —
+   không tô nền theo màu node nữa. Lỗ mask trên skin đã khoét thật nên qua chấm rỗng
+   thấy luôn nền canvas. (TS vẫn dùng nền --bk-surface từ rule .bk-handle chung — PR #98.) */
 .bk-node--cs .react-flow__handle.bk-handle {
-  background: var(--bk-node-bg);
+  background: transparent;
 }
 /* Chấm output: nhỏ (9px), nằm HẲN trong node ngay trên mép đáy — lọt giữa miệng hõm
    khoét. Áp cho CẢ 2 màn (đối ứng "khoét" của CS sang TS). (Trục: bottom càng ÂM càng
