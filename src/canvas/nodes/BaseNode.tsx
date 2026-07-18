@@ -405,7 +405,7 @@ function NodePreview({
       {fields.map((f) => {
         // Status/SMS Flag (settingsSelect): value chỉ lưu SỐ flag -> map ra nhãn đầy đủ
         // "1 - 未処理" từ Status Settings; node chưa tự đặt mà có flag kế thừa -> hiện
-        // stamp "継続 · Carried" + nhãn flag đang tự fill (thay vì chỉ hiện số / "—").
+        // stamp "継続 / Carried" + nhãn flag đang tự fill (thay vì chỉ hiện số / "—").
         if (f.kind === 'settingsSelect') {
           const opts =
             f.settingsOptions === 'smsFlags'

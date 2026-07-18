@@ -58,6 +58,8 @@ export interface SmsFlagEntry {
   type: string; // 区分
   flag: number;
   content: string; // SMS文言 (chưa gồm URL)
+  // true = SMS flag mặc định (送信なし / -2): luôn tồn tại, không sửa/xoá.
+  fixed?: boolean;
 }
 
 export interface ScenarioSettings {

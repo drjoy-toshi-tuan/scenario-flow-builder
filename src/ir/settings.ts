@@ -25,6 +25,17 @@ export const FIXED_STATUSES: readonly StatusEntry[] = [
   { name: '時間外', flag: 6, fixed: true },
 ] as const;
 
+// SMSフラグ mặc định — LUÔN tồn tại, KHÔNG sửa/xoá (区分 cố định 送信なし, nội dung rỗng).
+// 区分 '送信なし' dùng chung cho cả tiếng Việt/Nhật (không dịch).
+export const FIXED_SMS_FLAGS: readonly SmsFlagEntry[] = [
+  { type: '送信なし', flag: -2, content: '', fixed: true },
+] as const;
+
+// Flag mặc định mọi node KẾ THỪA khi chưa có node nào phía trên set:
+// status 0 (途中切断) + SMS -2 (送信なし).
+export const DEFAULT_STATUS_FLAG = 0;
+export const DEFAULT_SMS_FLAG = -2;
+
 // URL gửi sau cuộc gọi gắn cuối mỗi SMS — độ dài CỐ ĐỊNH 22 ký tự (cột 文字数
 // đếm: nội dung + 22, KHÔNG cộng thêm ký tự xuống dòng — spec team CS).
 // CHƯA nhập nội dung (rỗng/toàn khoảng trắng) thì URL cũng chưa gắn -> đếm 0.
@@ -52,7 +63,7 @@ export function defaultSettings(): ScenarioSettings {
     silentDetectionSec: '',
     timeoutSec: '',
     statuses: FIXED_STATUSES.map((s) => ({ ...s })),
-    smsFlags: [],
+    smsFlags: FIXED_SMS_FLAGS.map((s) => ({ ...s })),
   };
 }
 
@@ -108,11 +119,17 @@ function normalizeStatuses(raw: unknown): StatusEntry[] {
   return result.sort((a, b) => a.flag - b.flag);
 }
 
+// SMSフラグ: SMS flag mặc định (送信なし / -2) LUÔN có mặt ở đầu, KHÔNG sửa/xoá —
+// bỏ mọi bản trùng flag đọc từ file; dòng thêm tay giữ nguyên theo thứ tự.
 function normalizeSmsFlags(raw: unknown): SmsFlagEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
-    .map((s) => ({ type: str(s.type), flag: num(s.flag), content: str(s.content) }));
+  const parsed: SmsFlagEntry[] = Array.isArray(raw)
+    ? raw
+        .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+        .map((s) => ({ type: str(s.type), flag: num(s.flag), content: str(s.content) }))
+    : [];
+  const fixedFlags = new Set(FIXED_SMS_FLAGS.map((s) => s.flag));
+  const rest = parsed.filter((s) => !fixedFlags.has(s.flag));
+  return [...FIXED_SMS_FLAGS.map((s) => ({ ...s })), ...rest];
 }
 
 // Chuẩn hoá settings đọc từ YAML (hoặc undefined) về object đầy đủ field.

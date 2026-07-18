@@ -165,55 +165,74 @@ export function StatusSettingsTab() {
               {settings.smsFlags.map((s, i) => (
                 <tr key={i} className="border-b border-[var(--bk-border)] align-top last:border-0">
                   <td className="px-2 py-1.5">
-                    {cellInput(s.type, (v) =>
-                      setSmsFlags(settings.smsFlags.map((x, j) => (j === i ? { ...x, type: v } : x))),
+                    {s.fixed ? (
+                      // SMS flag mặc định (送信なし): 区分 cố định, không sửa.
+                      <span className="inline-flex w-full items-center rounded-lg bg-[var(--bk-surface-2)] px-2.5 py-1.5 text-sm font-bold text-[var(--bk-text-muted)]">
+                        {s.type}
+                      </span>
+                    ) : (
+                      cellInput(s.type, (v) =>
+                        setSmsFlags(settings.smsFlags.map((x, j) => (j === i ? { ...x, type: v } : x))),
+                      )
                     )}
                   </td>
                   <td className="px-2 py-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={s.flag}
-                      onChange={(e) =>
-                        setSmsFlags(
-                          settings.smsFlags.map((x, j) => (j === i ? { ...x, flag: Number(e.target.value) } : x)),
-                        )
-                      }
-                      onBlur={() =>
-                        // Giới hạn 1~99 — blur thì kẹp về trong dải.
-                        setSmsFlags(
-                          settings.smsFlags.map((x, j) =>
-                            j === i ? { ...x, flag: Math.min(99, Math.max(1, x.flag)) } : x,
-                          ),
-                        )
-                      }
-                      className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-center text-sm text-[var(--bk-text)]"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    {/* Ô SMS文言: textbox tự cao theo nội dung (Enter xuống dòng được).
-                        Tag 通話後送信URL (22 ký tự) nằm NGAY TRONG ô, luôn là dòng cuối —
-                        chỉ hiện khi đã nhập nội dung. */}
-                    <div className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5">
-                      <AutoGrowTextarea
-                        allowNewlines
-                        value={s.content}
-                        onChange={(v) =>
+                    {s.fixed ? (
+                      // Flag mặc định (-2): cố định, không sửa số.
+                      <span className="inline-flex w-full justify-center rounded-lg bg-[var(--bk-surface-2)] px-2 py-1.5 text-sm font-bold text-[var(--bk-text-muted)]">
+                        {s.flag}
+                      </span>
+                    ) : (
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={s.flag}
+                        onChange={(e) =>
                           setSmsFlags(
-                            settings.smsFlags.map((x, j) => (j === i ? { ...x, content: v } : x)),
+                            settings.smsFlags.map((x, j) => (j === i ? { ...x, flag: Number(e.target.value) } : x)),
                           )
                         }
-                        className="block w-full resize-none bg-transparent text-sm leading-relaxed text-[var(--bk-text)] outline-none"
+                        onBlur={() =>
+                          // Giới hạn 1~99 — blur thì kẹp về trong dải.
+                          setSmsFlags(
+                            settings.smsFlags.map((x, j) =>
+                              j === i && !x.fixed ? { ...x, flag: Math.min(99, Math.max(1, x.flag)) } : x,
+                            ),
+                          )
+                        }
+                        className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-center text-sm text-[var(--bk-text)]"
                       />
-                      {s.content.trim() !== '' && (
-                        <div className="mt-1 border-t border-dashed border-[var(--bk-border)] pt-1">
-                          <span className="inline-flex items-center rounded-md bg-[var(--bk-surface-2)] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--bk-text)]">
-                            通話後送信URL
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {s.fixed ? (
+                      // Nội dung mặc định để rỗng, không sửa.
+                      <span className="inline-flex px-2.5 py-1.5 text-sm text-[var(--bk-text-faint)]">ー</span>
+                    ) : (
+                      // Ô SMS文言: textbox tự cao theo nội dung (Enter xuống dòng được).
+                      // Tag 通話後送信URL (22 ký tự) nằm NGAY TRONG ô, luôn là dòng cuối —
+                      // chỉ hiện khi đã nhập nội dung.
+                      <div className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5">
+                        <AutoGrowTextarea
+                          allowNewlines
+                          value={s.content}
+                          onChange={(v) =>
+                            setSmsFlags(
+                              settings.smsFlags.map((x, j) => (j === i ? { ...x, content: v } : x)),
+                            )
+                          }
+                          className="block w-full resize-none bg-transparent text-sm leading-relaxed text-[var(--bk-text)] outline-none"
+                        />
+                        {s.content.trim() !== '' && (
+                          <div className="mt-1 border-t border-dashed border-[var(--bk-border)] pt-1">
+                            <span className="inline-flex items-center rounded-md bg-[var(--bk-surface-2)] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--bk-text)]">
+                              通話後送信URL
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-2 py-2.5 text-center text-sm font-semibold text-[var(--bk-text-muted)]">
                     {(() => {
@@ -231,13 +250,15 @@ export function StatusSettingsTab() {
                     })()}
                   </td>
                   <td className="px-2 py-1.5 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setSmsFlags(settings.smsFlags.filter((_, j) => j !== i))}
-                      className="text-[var(--bk-text-faint)] transition hover:text-rose-500"
-                    >
-                      <Icon icon="lucide:trash-2" width={15} height={15} />
-                    </button>
+                    {!s.fixed && (
+                      <button
+                        type="button"
+                        onClick={() => setSmsFlags(settings.smsFlags.filter((_, j) => j !== i))}
+                        className="text-[var(--bk-text-faint)] transition hover:text-rose-500"
+                      >
+                        <Icon icon="lucide:trash-2" width={15} height={15} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
