@@ -645,8 +645,9 @@ function SettingsSelect({
       <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
         {/* Ô rỗng: có flag kế thừa -> option ghi "継続 / Carried — <flag>" (đang tự fill). */}
         <option value="">{inheritedValue ? `${t('flagInherit')} — ${inheritedLabel}` : t('alUnset')}</option>
-        {/* Gạch ngang phân cách option "継続 / Carried" (kế thừa) với danh sách status. */}
-        {!!inheritedValue && <hr />}
+        {/* Gạch ngang phân cách option "継続 / Carried" (kế thừa) với danh sách status
+            — style theme-aware + giãn cách qua .bk-select-sep. */}
+        {!!inheritedValue && <hr className="bk-select-sep" />}
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
