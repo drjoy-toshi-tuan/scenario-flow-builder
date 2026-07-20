@@ -41,14 +41,13 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' 
 type RrKind = 'retry' | 'reconfirm';
 const RR_KIND: Record<
   RrKind,
-  { icon: string; color: string; tipTitleKey: TKey; typeKey: TKey; prefix: string; contentKey: string }
+  { icon: string; color: string; tipTitleKey: TKey; typeKey: TKey; contentKey: string }
 > = {
   retry: {
     icon: 'akar-icons:arrow-cycle',
     color: '#f472b6',
     tipTitleKey: 'alRetryTipTitle',
     typeKey: 'alTypeRetry',
-    prefix: 'リトライ',
     contentKey: 'retryAnnounce',
   },
   reconfirm: {
@@ -56,7 +55,6 @@ const RR_KIND: Record<
     color: '#fbbf24',
     tipTitleKey: 'alReconfirmTipTitle',
     typeKey: 'alTypeReconfirm',
-    prefix: '復唱',
     contentKey: 'reconfirmAnnounce',
   },
 };
@@ -413,23 +411,20 @@ export function AnnounceListTab() {
                         <span className="font-semibold text-[var(--bk-text)]">{t(cfg.typeKey)}</span>
                       </div>
                     </td>
-                    {/* 項目: リトライ_<tên node> / 復唱_<tên node> — các mục cùng câu
-                        announce gộp 1 dòng, hiển thị dạng chip tự wrap nhiều dòng. */}
+                    {/* 項目: tên node — các mục cùng câu announce gộp 1 dòng,
+                        hiển thị dạng chip tự wrap nhiều dòng. */}
                     <td className="px-3 py-2.5">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {row.nodes.map((n) => (
                           <span
                             key={n.id}
-                            className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium text-[var(--bk-text)]"
+                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-[var(--bk-text)]"
                             style={{
                               background: `color-mix(in srgb, ${cfg.color} 10%, transparent)`,
                               borderColor: `color-mix(in srgb, ${cfg.color} 35%, transparent)`,
                             }}
                           >
-                            <span style={{ color: cfg.color }}>
-                              <Icon icon={cfg.icon} width={11} height={11} />
-                            </span>
-                            {`${cfg.prefix}_${n.label}`}
+                            {n.label}
                           </span>
                         ))}
                       </div>
