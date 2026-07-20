@@ -99,17 +99,17 @@ export function AnnounceListTab() {
       ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
       : '';
     // Pulldown TỰ VẼ (FlagSelect): mặt đóng + dòng đầu list đều hiện stamp 継続/Carried
-    // kèm "<flag> - <tên>" (không gạch phân cách, không dòng lặp). Stamp ở tab này
-    // dùng tone 'cyan' (xanh ngọc — 水色 đậm hơn một chút, giữ opacity) theo yêu cầu CS.
+    // (màu tím thống nhất) kèm "<flag> - <tên>" — không gạch phân cách, không dòng lặp.
     return (
     <label className="flex items-center gap-1.5">
       {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau.
-          Màu phân biệt 2 loại: Status nền xanh emerald sáng trong suốt, SMS Flag nền
-          vàng sáng trong suốt — chữ đậm cùng tông để giữ contrast cả light/dark. */}
+          Màu phân biệt 2 loại: Status (状態) nền xanh ngọc (水色 đậm hơn một chút)
+          trong suốt theo yêu cầu CS, SMS Flag nền vàng sáng trong suốt — chữ đậm
+          cùng tông để giữ contrast cả light/dark. */}
       <span
         className={`inline-flex w-[72px] shrink-0 justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${
           key === 'hangupStatusFlag'
-            ? 'bg-emerald-400/20 text-emerald-600 dark:bg-emerald-400/25 dark:text-emerald-300'
+            ? 'bg-cyan-500/20 text-cyan-600 dark:bg-cyan-500/25 dark:text-cyan-300'
             : 'bg-amber-300/25 text-amber-600 dark:bg-amber-300/25 dark:text-amber-300'
         }`}
       >
@@ -125,7 +125,6 @@ export function AnnounceListTab() {
           emptyLabel="ー"
           buttonClass="w-full min-w-0 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-1.5 py-1 text-xs text-[var(--bk-text)]"
           size="xs"
-          stampTone="cyan"
         />
       </div>
     </label>

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FlagInheritStamp, type StampTone } from './FlagInheritStamp';
+import { FlagInheritStamp } from './FlagInheritStamp';
 import { Icon } from './icons';
 import { useT } from './i18n';
 
@@ -32,7 +32,6 @@ export function FlagSelect({
   emptyLabel,
   buttonClass,
   size = 'sm',
-  stampTone = 'violet',
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -45,8 +44,6 @@ export function FlagSelect({
   /** Style mặt pulldown (đóng) — truyền class sẵn có của từng màn để giữ giao diện. */
   buttonClass: string;
   size?: 'sm' | 'xs';
-  /** Tone màu stamp Carried/継続 — Announce List dùng 'cyan' (xanh ngọc). */
-  stampTone?: StampTone;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -123,7 +120,7 @@ export function FlagSelect({
             đã chọn flag riêng -> nhãn option; rỗng không kế thừa -> nhãn rỗng. */}
         {onInheritedRow && inheritedValue ? (
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            <FlagInheritStamp tone={stampTone} />
+            <FlagInheritStamp />
             <span className="min-w-0 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
           </span>
         ) : selected ? (
@@ -154,7 +151,7 @@ export function FlagSelect({
             >
               {inheritedValue ? (
                 <>
-                  <FlagInheritStamp tone={stampTone} />
+                  <FlagInheritStamp />
                   <span className="min-w-0 flex-1 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
                 </>
               ) : (
