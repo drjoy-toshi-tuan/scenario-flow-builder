@@ -40,7 +40,7 @@ describe('designYaml adapter', () => {
     expect(roundTripDoc.hearing_items).toEqual(originalDoc.hearing_items);
   });
 
-  it('nhánh rẽ (conditions) -> data.branches để dùng editor nhánh có sẵn của canvas, và round-trip lại đúng', () => {
+  it('hearing có conditions -> tách 1 node "分岐" ẢO (nexus, kéo-thả sửa nhánh được) ngay sau, round-trip gộp ngược đúng', () => {
     const text = [
       'scenario_flow:',
       '  - step: "用件確認"',
@@ -70,19 +70,25 @@ describe('designYaml adapter', () => {
 
     const { ir, passthrough } = fromDesignYaml(text, { id: 'x', name: 'x' });
     const hearingNode = ir.nodes.find((n) => n.id === '用件確認');
-    expect(hearingNode?.type).toBe('interaction'); // hearing -> interaction, KHÔNG có data.branches (không phải EDITABLE_BRANCH_TYPES)
+    // hearing -> interaction (2 lối ra CỐ ĐỊNH) -> KHÔNG mang branches trực tiếp.
+    expect(hearingNode?.type).toBe('interaction');
+    expect(hearingNode?.data.branches).toBeUndefined();
 
-    // Edge vẫn dựng đúng dù node type không dùng editor nhánh của canvas.
+    // Node "分岐" ảo: nexus (rẽ nhánh tự do) + đánh dấu step gốc để gộp ngược khi lưu.
+    const routerNode = ir.nodes.find((n) => n.data.syntheticRouterFor === '用件確認');
+    expect(routerNode).toMatchObject({ type: 'nexus' });
+    expect(routerNode?.data.branches).toHaveLength(3);
+
+    // hearing chỉ có 1 dây (mặc định) trỏ tới node ảo; nhánh thật nằm ở node ảo.
+    expect(ir.edges).toContainEqual(expect.objectContaining({ source: '用件確認', target: routerNode?.id, sourceHandle: 'default' }));
     expect(ir.edges).toContainEqual(
-      expect.objectContaining({ source: '用件確認', target: '予約フロー', condition: '予約' }),
-    );
-    expect(ir.edges).toContainEqual(
-      expect.objectContaining({ source: '用件確認', target: '失敗フロー', sourceHandle: 'default' }),
+      expect.objectContaining({ source: routerNode?.id, target: '予約フロー', condition: '予約' }),
     );
 
     const out = toDesignYaml(ir, passthrough);
     const roundTripDoc = parse(out);
     const originalDoc = parse(text);
+    // Xuất lại: node ảo KHÔNG thành step riêng — conditions gộp ngược vào step 用件確認.
     expect(roundTripDoc.scenario_flow).toEqual(originalDoc.scenario_flow);
   });
 });

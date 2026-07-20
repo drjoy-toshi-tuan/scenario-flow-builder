@@ -133,7 +133,10 @@ export function DesignBlockPropertyTab({
   return (
     <div className="space-y-4">
       <p className="text-xs text-[var(--bk-text-faint)]">
-        ブロック型（設計書）: <code>{blockType}</code> — 分岐/次の遷移先は「Rẽ nhánh」タブで設定
+        ブロック型（設計書）: <code>{blockType}</code>
+        {node.type === 'interaction' || node.type === 'faq' || node.type === 'openai' || node.type === 'transfer'
+          ? ' — 分岐がある場合、直後の「〇〇：分岐」ノードで設定（このノード自体は固定2出力）'
+          : ' — 分岐/次の遷移先は「Rẽ nhánh」タブで設定'}
       </p>
 
       {schema.required.length > 0 && (

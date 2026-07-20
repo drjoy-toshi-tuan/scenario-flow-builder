@@ -97,6 +97,32 @@ export function fromDesignYaml(text: string, meta: { id: string; name: string; f
       // node và dùng được editor nhánh có sẵn (nexus/logic/classifier/…), giống
       // hệt quy ước fromYaml.ts — không cần xây editor riêng cho 設計書.
       const editableBranches = EDITABLE_BRANCH_TYPES.includes(nodeType);
+      // Block type như hearing/faq: CHÍNH bản pipeline cho khai báo `conditions`
+      // NGAY trên step đó (scaffold_generator.py tự chèn module rẽ nhánh ẩn khi
+      // build BIVR) — nhưng NodeType tương ứng (interaction/faq…) chỉ có 2 lối
+      // ra CỐ ĐỊNH trên canvas (BRANCH_SCHEMA.mode='fixed'), không rẽ N-nhánh
+      // được. Giải pháp: tách 1 node "分岐" ẢO ngay sau step gốc — người dùng
+      // kéo-thả sửa nhánh ở đó (dùng editor nhánh nexus có sẵn); lúc lưu lại,
+      // toDesignYaml.ts GỘP NGƯỢC nhánh của node ảo vào `conditions` của step gốc
+      // (không xuất node ảo thành step riêng — xem `syntheticRouterFor`).
+      const routerId = editableBranches ? raw.step : `${raw.step}__branch`;
+      const branchSource = editableBranches ? raw.step : routerId;
+      if (!editableBranches) {
+        edges.push({
+          id: edgeId(raw.step, routerId, 'router'),
+          source: raw.step,
+          target: routerId,
+          sourceHandle: 'default',
+        });
+        nodes.push({
+          id: routerId,
+          type: 'nexus',
+          label: `${raw.step}：分岐`,
+          position: { x: 0, y: 0 },
+          data: { syntheticRouterFor: raw.step },
+        });
+      }
+
       const dataBranches: { id: string; value: string; label?: string }[] = [];
       raw.conditions.forEach((cond, index) => {
         if (typeof cond.next !== 'string') return;
@@ -109,8 +135,8 @@ export function fromDesignYaml(text: string, meta: { id: string; name: string; f
         const realLabel = typeof cond.label === 'string' ? cond.label : undefined;
         dataBranches.push({ id: handle, value: match, ...(realLabel ? { label: realLabel } : {}) });
         edges.push({
-          id: edgeId(raw.step, cond.next, handle),
-          source: raw.step,
+          id: edgeId(branchSource, cond.next, handle),
+          source: branchSource,
           target: cond.next,
           sourceHandle: handle,
           ...(isDefault ? {} : { condition: match }),
@@ -119,7 +145,15 @@ export function fromDesignYaml(text: string, meta: { id: string; name: string; f
           label: realLabel ?? match ?? 'default',
         });
       });
-      if (editableBranches && dataBranches.length > 0) data.branches = dataBranches;
+
+      if (editableBranches) {
+        if (dataBranches.length > 0) data.branches = dataBranches;
+      } else {
+        // Gắn branches vào NODE ẢO (nexus) — node gốc (hearing/faq…) giữ nguyên
+        // 2 lối ra cố định, không có data.branches.
+        const routerNode = nodes[nodes.length - 1];
+        if (dataBranches.length > 0) routerNode.data.branches = dataBranches;
+      }
     }
   }
 
