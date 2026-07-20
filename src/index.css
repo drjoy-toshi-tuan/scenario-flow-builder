@@ -1677,15 +1677,3 @@ input[type='search']::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
 }
-
-/* Gạch phân cách trong pulldown Status/SMS Flag: tách option kế thừa "継続 / Carried"
-   khỏi danh sách status thật. <hr> trong <select> render được ở Chromium — dùng
-   --bk-text-faint (đậm hơn --bk-border) để RÕ trên nền trắng của light theme lẫn nền
-   tối của dark theme; giãn cách 2 đầu (margin dọc) cho tách bạch, thụt lề ngang cho gọn. */
-.bk-select-sep {
-  height: 1px;
-  margin: 6px 8px;
-  border: none;
-  background-color: var(--bk-text-faint);
-  opacity: 1;
-}

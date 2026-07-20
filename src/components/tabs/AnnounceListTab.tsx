@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useFlowStore } from '../../store/flowStore';
 import { ensureSettings } from '../../ir/settings';
 import { computeInheritedFlags } from '../../ir/statusFlow';
-import { FlagInheritStamp } from '../../ui/FlagInheritStamp';
+import { FlagSelect } from '../../ui/FlagSelect';
 import type { FlowNode, NodeType } from '../../ir/types';
 import { NODE_CONFIG } from '../../ui/nodeConfig';
 import { Icon } from '../../ui/icons';
@@ -98,10 +98,8 @@ export function AnnounceListTab() {
     const inheritedLabel = inheritedValue
       ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
       : '';
-    // Ô đang bỏ trống NHƯNG có flag kế thừa -> phủ stamp "継続 / Carried" + nhãn flag lên
-    // mặt pulldown (đóng), như con dấu thay vì chữ trơn. Stamp pointer-events-none nên
-    // bấm vào vẫn mở list native; chừa mép phải ~1.5rem cho mũi tên pulldown.
-    const showInheritStamp = str(node.data[key]) === '' && !!inheritedValue;
+    // Pulldown TỰ VẼ (FlagSelect): mặt đóng giữ stamp 継続/Carried + nhãn flag kế thừa;
+    // trong list, ô rỗng chỉ hiện con dấu nhỏ gọn (bỏ chữ dài + gạch phân cách).
     return (
     <label className="flex items-center gap-1.5">
       {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau.
@@ -116,29 +114,17 @@ export function AnnounceListTab() {
       >
         {label}
       </span>
-      <div className="relative min-w-0 flex-1">
-        <select
+      <div className="min-w-0 flex-1">
+        <FlagSelect
           value={str(node.data[key])}
-          onChange={(e) => setNodeData(node.id, { [key]: e.target.value })}
-          className="w-full min-w-0 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-1.5 py-1 text-xs text-[var(--bk-text)]"
-        >
-          {/* Ô rỗng: có flag kế thừa -> option ghi "継続 / Carried — <flag>" (đang tự fill). */}
-          <option value="">{inheritedValue ? `${t('flagInherit')} — ${inheritedLabel}` : 'ー'}</option>
-          {/* Gạch ngang phân cách option "継続 / Carried" (kế thừa) với danh sách status
-              — style theme-aware + giãn cách qua .bk-select-sep. */}
-          {!!inheritedValue && <hr className="bk-select-sep" />}
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {showInheritStamp && (
-          <span className="pointer-events-none absolute inset-y-px left-px right-6 flex items-center gap-1 rounded-lg bg-[var(--bk-surface)] pl-1.5 text-xs">
-            <FlagInheritStamp />
-            <span className="min-w-0 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
-          </span>
-        )}
+          onChange={(v) => setNodeData(node.id, { [key]: v })}
+          options={options}
+          inheritedValue={inheritedValue}
+          inheritedLabel={inheritedLabel}
+          emptyLabel="ー"
+          buttonClass="w-full min-w-0 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-1.5 py-1 text-xs text-[var(--bk-text)]"
+          size="xs"
+        />
       </div>
     </label>
     );
