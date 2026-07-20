@@ -98,8 +98,9 @@ export function AnnounceListTab() {
     const inheritedLabel = inheritedValue
       ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
       : '';
-    // Pulldown TỰ VẼ (FlagSelect): mặt đóng giữ stamp 継続/Carried + nhãn flag kế thừa;
-    // trong list, ô rỗng chỉ hiện con dấu nhỏ gọn (bỏ chữ dài + gạch phân cách).
+    // Pulldown TỰ VẼ (FlagSelect): mặt đóng + dòng đầu list đều hiện stamp 継続/Carried
+    // kèm "<flag> - <tên>" (không gạch phân cách, không dòng lặp). Stamp ở tab này
+    // dùng tone 'cyan' (xanh ngọc — 水色 đậm hơn một chút, giữ opacity) theo yêu cầu CS.
     return (
     <label className="flex items-center gap-1.5">
       {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau.
@@ -124,6 +125,7 @@ export function AnnounceListTab() {
           emptyLabel="ー"
           buttonClass="w-full min-w-0 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-1.5 py-1 text-xs text-[var(--bk-text)]"
           size="xs"
+          stampTone="cyan"
         />
       </div>
     </label>
@@ -140,7 +142,9 @@ export function AnnounceListTab() {
 
   return (
     <div className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">
-      <div className="mx-auto max-w-[1400px]">
+      {/* Nới bề rộng bảng (max 1600px) để cột 切断時フラグ đủ chỗ cho stamp Carried
+          + nhãn flag dài — flag quá dài vẫn cắt bằng "…" trong pulldown. */}
+      <div className="mx-auto max-w-[1600px]">
         {/* Tiêu đề tab: icon + tên (trên cùng bên trái) */}
         <div className="mb-4 flex items-center gap-2 text-[15px] font-bold text-[var(--bk-text)]">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
@@ -150,7 +154,7 @@ export function AnnounceListTab() {
         </div>
 
         <div className="overflow-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
-          <table className="w-full min-w-[1080px] border-collapse text-sm">
+          <table className="w-full min-w-[1200px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
                 <th className="px-3 py-2.5">{t('alColItem')}</th>
@@ -158,7 +162,7 @@ export function AnnounceListTab() {
                 <th className="px-3 py-2.5 text-center">{t('alColRetry')}</th>
                 <th className="px-3 py-2.5">{t('alColRetryFailed')}</th>
                 <th className="px-3 py-2.5 text-center">{t('alColFaq')}</th>
-                <th className="w-[230px] px-3 py-2.5">{t('alColHangup')}</th>
+                <th className="w-[310px] px-3 py-2.5">{t('alColHangup')}</th>
                 {/* 発話文言 — cột rộng nhất */}
                 <th className="w-[34%] px-3 py-2.5">{t('alColAnnounce')}</th>
               </tr>

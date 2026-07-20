@@ -1,16 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FlagInheritStamp } from './FlagInheritStamp';
+import { FlagInheritStamp, type StampTone } from './FlagInheritStamp';
 import { Icon } from './icons';
 import { useT } from './i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pulldown TỰ VẼ cho Status/SMS flag (thay <select> native). Lý do: dropdown của
 // <select> native do trình duyệt/OS render nên KHÔNG style được nội dung bên trong
-// (gạch <hr> phân cách bị vô hình, không nhét được stamp). Dropdown tự vẽ cho phép:
-//   - Ô "chưa chọn" có flag kế thừa -> hiện đúng con dấu 継続/Carried NHỎ GỌN
-//     ngay trong list (không còn chữ dài "Carried — <flag>" + gạch ngang tốn chỗ).
-//   - Mặt pulldown (đóng) giữ nguyên kiểu stamp + nhãn flag kế thừa như cũ.
+// (không nhét được stamp), còn stamp phủ absolute lên mặt select thì che mất viền.
+// Thiết kế theo yêu cầu team CS:
+//   - Mặt pulldown (đóng) VÀ dòng đầu list đều hiện "stamp 継続/Carried + <flag> - <tên>".
+//   - Dòng flag kế thừa (stamp Carried) nằm ĐẦU list; option trùng flag đó bị bỏ
+//     khỏi phần còn lại của list (không có dòng lặp), KHÔNG có gạch ngang phân cách.
 // Popup gắn qua portal + position fixed để không bị cắt bởi container cuộn
 // (panel setting / bảng Announce List).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ export function FlagSelect({
   emptyLabel,
   buttonClass,
   size = 'sm',
+  stampTone = 'violet',
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -43,6 +45,8 @@ export function FlagSelect({
   /** Style mặt pulldown (đóng) — truyền class sẵn có của từng màn để giữ giao diện. */
   buttonClass: string;
   size?: 'sm' | 'xs';
+  /** Tone màu stamp Carried/継続 — Announce List dùng 'cyan' (xanh ngọc). */
+  stampTone?: StampTone;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -95,7 +99,13 @@ export function FlagSelect({
     setOpen(false);
   };
 
-  const selected = value !== '' ? options.find((o) => o.value === value) : undefined;
+  // Chọn dòng Carried (đầu list) = xoá flag riêng -> quay về kế thừa (value '').
+  // Value đặt tay TRÙNG flag kế thừa cũng coi như đang ở dòng Carried (list không
+  // còn dòng lặp của flag đó nên không thể "chọn tay" giá trị trùng nữa).
+  const onInheritedRow = value === '' || (!!inheritedValue && value === inheritedValue);
+  const selected = !onInheritedRow && value !== '' ? options.find((o) => o.value === value) : undefined;
+  // Bỏ option trùng flag kế thừa khỏi list — dòng Carried ở đầu đại diện cho nó.
+  const listOptions = inheritedValue ? options.filter((o) => o.value !== inheritedValue) : options;
   const rowText = size === 'xs' ? 'px-2 py-1 text-xs' : 'px-2.5 py-1.5 text-sm';
   const rowBase = `flex w-full items-center gap-1.5 rounded-md text-left text-[var(--bk-text)] transition hover:bg-[var(--bk-surface-2)] ${rowText}`;
 
@@ -109,15 +119,15 @@ export function FlagSelect({
         aria-haspopup="listbox"
         className={`${buttonClass} flex items-center gap-1.5 text-left`}
       >
-        {/* Mặt pulldown (đóng): đã chọn -> nhãn option; rỗng + có kế thừa -> stamp
-            継続/Carried + nhãn flag kế thừa (mờ); rỗng không kế thừa -> nhãn rỗng. */}
-        {selected ? (
-          <span className="min-w-0 flex-1 truncate">{selected.label}</span>
-        ) : inheritedValue ? (
+        {/* Mặt pulldown (đóng): đang kế thừa -> stamp 継続/Carried + "<flag> - <tên>";
+            đã chọn flag riêng -> nhãn option; rỗng không kế thừa -> nhãn rỗng. */}
+        {onInheritedRow && inheritedValue ? (
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            <FlagInheritStamp />
+            <FlagInheritStamp tone={stampTone} />
             <span className="min-w-0 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
           </span>
+        ) : selected ? (
+          <span className="min-w-0 flex-1 truncate">{selected.label}</span>
         ) : (
           <span className="min-w-0 flex-1 truncate text-[var(--bk-text-muted)]">{emptyLabel}</span>
         )}
@@ -132,19 +142,29 @@ export function FlagSelect({
             style={{ position: 'fixed', ...pos, maxHeight: LIST_MAX_H }}
             className="z-50 overflow-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]"
           >
-            {/* Ô rỗng: có flag kế thừa -> CHỈ con dấu nhỏ gọn (không kèm chữ dài,
-                không gạch phân cách — tiết kiệm chỗ theo yêu cầu CS). */}
+            {/* Dòng ĐẦU list: có flag kế thừa -> stamp Carried + "<flag> - <tên>"
+                (giống mặt pulldown đóng, không gạch phân cách); không kế thừa -> ô rỗng. */}
             <button
               type="button"
               role="option"
-              aria-selected={value === ''}
+              aria-selected={onInheritedRow}
               title={inheritedValue ? `${t('flagInheritHint')}: ${inheritedLabel}` : undefined}
               onClick={() => pick('')}
-              className={`${rowBase} ${value === '' ? 'bg-[var(--bk-accent-soft)]' : ''}`}
+              className={`${rowBase} ${onInheritedRow ? 'bg-[var(--bk-accent-soft)]' : ''}`}
             >
-              {inheritedValue ? <FlagInheritStamp /> : <span className="text-[var(--bk-text-muted)]">{emptyLabel}</span>}
+              {inheritedValue ? (
+                <>
+                  <FlagInheritStamp tone={stampTone} />
+                  <span className="min-w-0 flex-1 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
+                </>
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-[var(--bk-text-muted)]">{emptyLabel}</span>
+              )}
+              {onInheritedRow && (
+                <Icon icon="lucide:check" width={13} height={13} className="shrink-0 text-[var(--bk-accent)]" />
+              )}
             </button>
-            {options.map((o) => (
+            {listOptions.map((o) => (
               <button
                 key={o.value}
                 type="button"

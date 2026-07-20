@@ -636,8 +636,8 @@ function SettingsSelect({
   const inheritedLabel = inheritedValue
     ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
     : '';
-  // Pulldown TỰ VẼ (FlagSelect): mặt đóng giữ stamp 継続/Carried + nhãn flag kế thừa;
-  // trong list, ô rỗng chỉ hiện con dấu nhỏ gọn (bỏ chữ dài + gạch phân cách).
+  // Pulldown TỰ VẼ (FlagSelect): mặt đóng + dòng đầu list đều hiện stamp 継続/Carried
+  // kèm "<flag> - <tên>" (không gạch phân cách, không dòng lặp flag kế thừa).
   return (
     <FlagSelect
       value={value}
