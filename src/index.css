@@ -350,9 +350,10 @@ body {
    ────────────────────────────────────────────────────────────────────────── */
 .bk-node--cs {
   /* Node lùn (chỉ còn tên + dải icon biểu thị) — tên dài xuống dòng (tối đa 2 dòng)
-     thì node tự cao thêm. */
+     thì node tự cao thêm. Cao hơn bản cũ (56 -> 64) để tên và dải icon status
+     (neo đáy) không chèn lên nhau. */
   height: auto;
-  min-height: 56px;
+  min-height: 64px;
   padding: 8px 14px;
   /* Nền/viền/bóng chuyển hết sang lớp .bk-cs-skin (bị mask khoét lỗ tại output) —
      root để TRONG SUỐT, nhờ vậy handle là anh em của skin, không bị mask cắt. */
@@ -416,12 +417,20 @@ body {
   justify-content: center;
   position: relative;
 }
+/* Node CÓ dải icon status: chừa hẳn vùng đáy cho icon — tên dài (2 dòng) chỉ chiếm
+   phần trên, không bao giờ chèn lên icon; node height:auto nên tự cao thêm theo tên. */
+.bk-cs-main:has(.bk-cs-indicators) {
+  padding-bottom: 16px;
+}
 /* Tên node: căn giữa vùng bên phải icon; DÀI thì xuống dòng (tối đa 2 dòng rồi
    mới cắt "…") — id kiểu snake_case không có dấu cách nên cho phép bẻ bất kỳ.
-   Font hạ nhẹ (17 -> 15) để chừa khoảng thở với dải icon neo góc dưới. */
+   Font hạ nhẹ (17 -> 15) để chừa khoảng thở với dải icon neo góc dưới.
+   max-width chặn tên kéo dài sát 2 mép node — quá thì tự bẻ xuống dòng 2. */
 .bk-node-name--cs {
   text-align: center;
   font-size: 15px;
+  max-width: 208px;
+  margin-inline: auto;
   white-space: normal;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -434,7 +443,8 @@ body {
 .bk-cs-indicators {
   position: absolute;
   right: 0;
-  bottom: -3px;
+  /* Hạ thấp gần sát mép đáy node (đáy content-box cách mép node 8px padding). */
+  bottom: -6px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -445,9 +455,9 @@ body {
   align-items: center;
   gap: 2px;
 }
-/* Số lần retry: to ngang cỡ icon (13px) cho dễ đọc. */
+/* Số lần retry: nhỏ hơn icon (10px) — chỉ là chú thích kèm, không lấn át icon. */
 .bk-cs-ind-num {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
 }

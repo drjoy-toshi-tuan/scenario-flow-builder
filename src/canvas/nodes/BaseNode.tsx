@@ -259,15 +259,9 @@ function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unk
   // nhìn phát phân biệt ngay: reconfirm vàng, retry hồng sáng, flag cyan sáng.
   const icons: { key: string; icon: string; title: string; color: string; text?: string }[] = [];
 
+  // Thứ tự hiển thị trái -> phải: Retry > Reconfirm > Flag.
   if (type === 'interaction') {
-    if (data.reconfirm === 'yes')
-      icons.push({
-        key: 'reconfirm',
-        icon: 'fluent:arrow-sync-checkmark-20-regular',
-        title: str(data.reconfirmAnnounce) || 'Re-confirm',
-        color: '#fbbf24',
-      });
-    // Retry: hiện số lần (default 2) — icon vòng lặp + con số to bằng icon. Retry = 0 thì ẩn.
+    // Retry: hiện số lần (default 2) — icon vòng lặp + con số nhỏ kèm bên. Retry = 0 thì ẩn.
     const retry = str(data.retryCount) || '2';
     if (retry !== '0')
       icons.push({
@@ -276,6 +270,13 @@ function CsIndicators({ type, data }: { type: NodeType; data: Record<string, unk
         title: str(data.retryAnnounce),
         color: '#f472b6',
         text: retry,
+      });
+    if (data.reconfirm === 'yes')
+      icons.push({
+        key: 'reconfirm',
+        icon: 'fa6-solid:check-double',
+        title: str(data.reconfirmAnnounce) || 'Re-confirm',
+        color: '#fbbf24',
       });
   }
   // Flag: node có set Status/SMS Flag (transfer/hangup: statusFlag/smsFlag; hearing:

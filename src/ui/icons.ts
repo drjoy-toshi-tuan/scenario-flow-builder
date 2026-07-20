@@ -112,6 +112,21 @@ addCollection({
   },
 });
 
+// Icon fa6-solid bổ sung ngoài subset trim sẵn (GỘP vào fa6SolidSubset cùng prefix).
+addCollection({
+  prefix: 'fa6-solid',
+  width: 512,
+  height: 512,
+  icons: {
+    // Indicator node CS: Re-confirm (2 dấu check) — body chính chủ fa6-solid:check-double
+    // (viewBox 448x512, khai width riêng vì bộ fa6 mặc định 512).
+    'check-double': {
+      body: '<path fill="currentColor" d="M342.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L160 178.7l-57.4-57.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l80 80c12.5 12.5 32.8 12.5 45.3 0l160-160zm96 128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L160 402.7L54.6 297.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l256-256z"/>',
+      width: 448,
+    },
+  },
+});
+
 // Icon gravity-ui (16x16) — cờ flag cho tab Status Settings + indicator node CS.
 addCollection({
   prefix: 'gravity-ui',
