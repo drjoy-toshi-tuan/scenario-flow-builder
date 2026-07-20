@@ -1210,6 +1210,75 @@ flow:
     expect(centerX(ir, 'fnode')).toBeLessThan(centerX(ir, 'p'));
   });
 
+  it('failed target DÙNG CHUNG (node khác đã giành): vẫn chừa slot ảo, nhánh giữa thẳng cột', async () => {
+    // n1 giành 'sorry' làm chuỗi ngang trước; n2 (failed cũng trỏ sorry) + 2 nhánh
+    // xuống vẫn phải chừa slot ảo bên trái -> nhánh đầu (A) thẳng cột dưới n2.
+    const SHARED_FAILED = `
+flow:
+  name: "f"
+  start: n1
+  nodes:
+    - id: n1
+      type: interaction
+      announce: "?"
+      next: n2
+      failed: sorry
+    - id: sorry
+      type: announce
+      text: oops
+    - id: n2
+      type: openai
+      failed: sorry
+      branches:
+        - default: A
+        - when: "X"
+          to: B
+    - id: A
+      type: hangup
+    - id: B
+      type: hangup
+`;
+    const ir = await layout(fromYaml(SHARED_FAILED));
+    expect(centerX(ir, 'A')).toBe(centerX(ir, 'n2'));
+    expect(centerX(ir, 'B')).toBeGreaterThan(centerX(ir, 'n2'));
+  });
+
+  it('chuỗi failed MERGE vào node có neo dọc: không kéo node đó sang ngang, nhánh giữa vẫn thẳng', async () => {
+    // p: failed -> fnode -> merge vào B (nhánh của chính p). B phải Ở LẠI hàng dưới
+    // (là nhánh xuống thật) chứ không bị chuỗi ngang giành mất; p vẫn chừa slot ảo
+    // cho failed -> nhánh đầu (A) thẳng cột dưới p.
+    const MERGE_FAILED = `
+flow:
+  name: "f"
+  start: p
+  nodes:
+    - id: p
+      type: openai
+      failed: fnode
+      branches:
+        - default: A
+        - when: "X"
+          to: B
+    - id: fnode
+      type: announce
+      text: oops
+      next: B
+    - id: A
+      type: hangup
+    - id: B
+      type: hangup
+`;
+    const ir = await layout(fromYaml(MERGE_FAILED));
+    // B nằm hàng DƯỚI (không bị kéo lên hàng ngang của p).
+    expect(posY(ir, 'B')).toBeGreaterThan(posY(ir, 'p'));
+    // Nhánh giữa (A, tính failed là slot trái) thẳng cột dưới p; B bên phải.
+    expect(centerX(ir, 'A')).toBe(centerX(ir, 'p'));
+    expect(centerX(ir, 'B')).toBeGreaterThan(centerX(ir, 'p'));
+    // fnode vẫn đi ngang-trái cùng hàng với p.
+    expect(posY(ir, 'fnode')).toBe(posY(ir, 'p'));
+    expect(centerX(ir, 'fnode')).toBeLessThan(centerX(ir, 'p'));
+  });
+
   it('nhánh nexus dàn hàng dưới, cách đều & đối xứng quanh tâm node cha', async () => {
     const ir = await layout(fromYaml(FLOW));
     const jumps = ['jump_1', 'jump_2', 'jump_3', 'jump_4'];

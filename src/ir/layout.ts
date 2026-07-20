@@ -35,6 +35,10 @@ interface TreeNode {
   id: string;
   down: TreeNode[]; // con xếp ở hàng dưới
   side: TreeNode[]; // con xếp cùng hàng, lấn sang trái (chuỗi failed)
+  // Node có edge `failed` đi ra mà target KHÔNG phải con dọc của chính nó (target
+  // là side child, đã bị node khác giành, hoặc vòng ngược) -> khi dàn nhánh xuống
+  // phải chừa "slot ảo" bên trái cho failed để nhánh giữa thẳng cột dưới cha.
+  failedSlot: boolean;
 }
 
 // Bao ngang của subtree theo từng tầng (toạ độ mép, tương đối so với TÂM gốc subtree).
@@ -59,32 +63,44 @@ function buildTree(
   id: string,
   mode: Mode,
   outgoing: Map<string, FlowEdge[]>,
+  nonFailedIncoming: Map<string, number>,
   visited: Set<string>,
 ): TreeNode {
   visited.add(id);
-  const node: TreeNode = { id, down: [], side: [] };
+  const node: TreeNode = { id, down: [], side: [], failedSlot: false };
   const edges = outgoing.get(id) ?? [];
   // Đang trong chuỗi ngang mà chỉ có 1 lối ra -> tiếp tục chạy ngang; rẽ nhiều
   // nhánh thì quay về xếp dọc xuống dưới.
   const freshCount = edges.filter((e) => !visited.has(e.target)).length;
   const continueSide = mode === 'side' && freshCount === 1;
-  // Phân loại theo trạng thái visited TẠI THỜI ĐIỂM vào node (giữ nguyên thứ tự khai báo).
-  const classified = edges.map((edge) => ({
-    edge,
-    toSide: continueSide || (mode === 'down' && edge.sourceHandle === 'failed'),
-  }));
+  // Target còn NEO vào mạch dọc bằng edge thường (next/branch) từ chỗ khác thì không
+  // được kéo sang ngang: node đó giữ chỗ trong mạch dọc, chuỗi failed chỉ vẽ dây tới
+  // (vd failed chain merge vào end announce chung / vào 1 nhánh của chính node nguồn).
+  const anchoredElsewhere = (edge: FlowEdge): boolean =>
+    (nonFailedIncoming.get(edge.target) ?? 0) - (edge.sourceHandle !== 'failed' ? 1 : 0) > 0;
+  // Phân loại theo trạng thái visited TẠI THỜI ĐIỂM vào node (giữ nguyên thứ tự khai
+  // báo). Edge muốn đi ngang (wantSide) nhưng target bị neo -> BỎ QUA hẳn khi dựng
+  // cây (không xếp dọc thay): target sẽ được edge thường của mạch dọc giành sau.
+  const classified = edges.map((edge) => {
+    const wantSide = continueSide || (mode === 'down' && edge.sourceHandle === 'failed');
+    return { edge, wantSide, toSide: wantSide && !anchoredElsewhere(edge) };
+  });
   // Giành nhánh NGANG (side/failed) TRƯỚC nhánh dọc: khi 2 node xếp dọc cùng nối tới 1
   // node nằm NGANG bên cạnh, node ngang đó phải nằm cùng hàng với node TRÊN CÙNG (nông
   // nhất) — node nông được duyệt trước nên giành node ngang trước khi con ở dưới kịp
   // giành (nếu duyệt dọc trước, con dưới đi sâu rồi kéo node ngang tụt xuống hàng dưới).
   for (const { edge } of classified.filter((c) => c.toSide)) {
     if (visited.has(edge.target)) continue;
-    node.side.push(buildTree(edge.target, 'side', outgoing, visited));
+    node.side.push(buildTree(edge.target, 'side', outgoing, nonFailedIncoming, visited));
   }
-  for (const { edge } of classified.filter((c) => !c.toSide)) {
+  for (const { edge } of classified.filter((c) => !c.wantSide)) {
     if (visited.has(edge.target)) continue;
-    node.down.push(buildTree(edge.target, 'down', outgoing, visited));
+    node.down.push(buildTree(edge.target, 'down', outgoing, nonFailedIncoming, visited));
   }
+  const downIds = new Set(node.down.map((child) => child.id));
+  node.failedSlot = edges.some(
+    (e) => e.sourceHandle === 'failed' && e.target !== id && !downIds.has(e.target),
+  );
   return node;
 }
 
@@ -133,13 +149,15 @@ function layoutSubtree(tree: TreeNode): SubtreeLayout {
       }
     }
     const mid = (subs.length - 1) / 2;
-    // Node có nhánh side (failed) đi NGANG-TRÁI + số nhánh xuống CHẴN: chừa 1 "slot ảo"
-    // bên trái cho failed rồi đẩy các nhánh xuống sang phải NỬA BƯỚC. Nhờ vậy nhánh GIỮA
-    // (tính cả failed) thẳng cột dưới node cha (vd failed + 2 nhánh -> nhánh đầu thẳng).
+    // Node có failed đi NGANG-TRÁI + số nhánh xuống CHẴN: chừa 1 "slot ảo" bên trái
+    // cho failed rồi đẩy các nhánh xuống sang phải NỬA BƯỚC. Nhờ vậy nhánh GIỮA (tính
+    // cả failed) thẳng cột dưới node cha (vd failed + 2 nhánh -> nhánh đầu thẳng).
     // Số nhánh xuống LẺ vốn đã có nhánh giữa thẳng -> không dịch (giữ interaction
-    // failed+next 1 nhánh thẳng như cũ). Chỉ dịch khi thật sự có side để không đụng
-    // node rẽ nhánh thường (không failed).
-    const failedSlotShift = tree.side.length > 0 && subs.length % 2 === 0 ? step / 2 : 0;
+    // failed+next 1 nhánh thẳng như cũ). Dựa vào failedSlot (CÓ edge failed rời node,
+    // kể cả khi target đã bị node khác giành — vd announce retry dùng chung) chứ không
+    // phải side.length, để node nào có failed cũng thẳng cột như nhau; node rẽ nhánh
+    // thường (không failed) không bị đụng.
+    const failedSlotShift = tree.failedSlot && subs.length % 2 === 0 ? step / 2 : 0;
     subs.forEach((sub, index) => {
       const dx = (index - mid) * step + failedSlotShift; // đối xứng qua tâm cha (+ bù slot failed)
       for (const p of sub.placements) {
@@ -174,6 +192,9 @@ export async function layout(ir: FlowIR): Promise<FlowIR> {
   const nodeIds = new Set(ir.nodes.map((n) => n.id));
   const outgoing = new Map<string, FlowEdge[]>();
   const hasIncoming = new Set<string>();
+  // Số edge thường (next/branch, KHÔNG phải failed) trỏ VÀO từng node — node có neo
+  // dọc như vậy không được chuỗi failed kéo sang ngang (xem anchoredElsewhere).
+  const nonFailedIncoming = new Map<string, number>();
   for (const edge of ir.edges) {
     // Bỏ edge treo (node không tồn tại) và self-loop khỏi tính toán layout.
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue;
@@ -182,6 +203,9 @@ export async function layout(ir: FlowIR): Promise<FlowIR> {
     if (list) list.push(edge);
     else outgoing.set(edge.source, [edge]);
     hasIncoming.add(edge.target);
+    if (edge.sourceHandle !== 'failed') {
+      nonFailedIncoming.set(edge.target, (nonFailedIncoming.get(edge.target) ?? 0) + 1);
+    }
   }
 
   // Thứ tự chọn gốc cây: node Start tổng hợp -> node không có dây vào -> phần còn
@@ -197,7 +221,7 @@ export async function layout(ir: FlowIR): Promise<FlowIR> {
   let offsetX = 0; // mép trái dành cho cụm (component) tiếp theo
   for (const candidate of rootCandidates) {
     if (visited.has(candidate.id)) continue;
-    const tree = buildTree(candidate.id, 'down', outgoing, visited);
+    const tree = buildTree(candidate.id, 'down', outgoing, nonFailedIncoming, visited);
     const sub = layoutSubtree(tree);
 
     let minX = Infinity;
