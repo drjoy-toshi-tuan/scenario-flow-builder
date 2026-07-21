@@ -223,8 +223,20 @@ export function DeletableEdge({
   const edgeData = data as RFEdgeData | undefined;
   // Node condition/script: nhãn giá trị nhánh luôn hiện; các node khác chỉ hiện khi hover.
   const alwaysLabel = edgeData?.alwaysLabel === true;
-  // Nhãn hiện khi: luôn-hiện (stamp) · hover · hoặc dây đang được CHỌN (bấm vào dây).
-  const labelVisible = alwaysLabel || hovered || selected === true;
+  // Đang chọn NHIỀU node (kéo khung / Shift-click): React Flow đánh dấu selected cho cả
+  // các edge nằm trong khung -> nếu để selected bung nút xoá + nhãn thì cả canvas rối
+  // nút thùng rác. Khi ở chế độ chọn nhóm, KHÔNG cho selected của edge kích hoạt toolbar
+  // (vẫn giữ nguyên khi bấm chọn ĐÚNG 1 dây, và luôn giữ hover). Đếm node selected > 1.
+  const multiNodeSelection = useStore((s) => {
+    let count = 0;
+    for (const n of s.nodeLookup.values()) {
+      if (n.selected && ++count > 1) return true;
+    }
+    return false;
+  });
+  const selectionTriggersUi = selected === true && !multiNodeSelection;
+  // Nhãn hiện khi: luôn-hiện (stamp) · hover · hoặc dây đang được CHỌN đơn (bấm vào dây).
+  const labelVisible = alwaysLabel || hovered || selectionTriggersUi;
 
   // ── Stamp điều kiện kéo được (GHIM trên dây) ────────────────────────────────
   // Vị trí nhãn = tâm dây + stagger chống chồng (irAdapter tính) + offset người dùng
@@ -382,7 +394,7 @@ export function DeletableEdge({
             title={t('deleteEdgeTitle')}
             aria-label={t('deleteEdgeTitle')}
             className="edge-trash"
-            style={{ opacity: hovered || selected ? 1 : 0 }}
+            style={{ opacity: hovered || selectionTriggersUi ? 1 : 0 }}
             onClick={(e) => {
               e.stopPropagation();
               removeEdge(id);
