@@ -104,6 +104,12 @@ addCollection({
     'circle-filled-to-confirm-circle-filled-transition': {
       body: '<defs><mask id="SVGy4zdAbbT"><g stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path fill="#fff" stroke="#fff" d="M3 12c0 -4.97 4.03 -9 9 -9c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9Z"/><path fill="none" stroke="#000" stroke-dasharray="14" d="M8 12l3 3l5 -5"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.2s" values="14;0"/></path></g></mask></defs><path fill="currentColor" d="M0 0h24v24H0z" mask="url(#SVGy4zdAbbT)"/>',
     },
+    // Vòng tròn ĐẶC + dấu trừ, vòng tròn tô đặc NGAY, chỉ nét dấu trừ vẽ animation
+    // (DISPLAY = no) — đồng bộ với icon yes ở trên để toggle yes↔no chỉ animate nét
+    // bên trong, không redraw cả vòng tròn mỗi lần bấm.
+    'minus-circle-filled-transition': {
+      body: '<defs><mask id="SVGminusCircleFilledTrans"><g stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path fill="#fff" stroke="#fff" d="M3 12c0 -4.97 4.03 -9 9 -9c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9Z"/><path fill="none" stroke="#000" stroke-dasharray="12" stroke-dashoffset="12" d="M7 12h10"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.2s" values="14;0"/></path></g></mask></defs><path fill="currentColor" d="M0 0h24v24H0z" mask="url(#SVGminusCircleFilledTrans)"/>',
+    },
   },
 });
 

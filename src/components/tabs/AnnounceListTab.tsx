@@ -858,10 +858,35 @@ function NodePicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const wrapRef = useRef<HTMLDivElement>(null);
+  // Toạ độ menu (fixed) neo theo input. Render qua portal ra document.body để menu
+  // KHÔNG bị container `overflow-x-auto` của bảng cắt/tạo scroll dọc (overflow-x:auto
+  // ép overflow-y thành auto theo spec) — cùng lý do RrHint dùng portal.
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number; width: number } | null>(null);
 
   const selected = nodes.find((n) => n.id === value);
   const q = query.trim().toLowerCase();
   const visible = q ? nodes.filter((n) => n.label.toLowerCase().includes(q)) : nodes;
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const el = wrapRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setMenuPos({ left: r.left, top: r.bottom + 4, width: r.width });
+    };
+    place();
+    // Cuộn/resize -> đặt lại vị trí (capture để bắt cả cuộn trong container bảng).
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [open]);
 
   return (
     <div className="relative w-full" ref={wrapRef}>
@@ -886,35 +911,41 @@ function NodePicker({
         height={15}
         className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--bk-text-faint)] transition-transform ${open ? 'rotate-180' : ''}`}
       />
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
-          {visible.length === 0 ? (
-            <div className="px-2.5 py-2 text-xs text-[var(--bk-text-faint)]">{emptyLabel}</div>
-          ) : (
-            visible.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(n.id);
-                  setOpen(false);
-                }}
-                className={[
-                  'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition',
-                  n.id === value
-                    ? 'bg-[var(--bk-accent-soft)] font-medium text-[var(--bk-accent)]'
-                    : 'text-[var(--bk-text)] hover:bg-[var(--bk-surface-2)]',
-                ].join(' ')}
-                title={n.label}
-              >
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} />
-                <span className="min-w-0 truncate">{n.label}</span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            className="fixed z-[1000] max-h-52 overflow-y-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]"
+            style={{ left: menuPos.left, top: menuPos.top, width: menuPos.width }}
+          >
+            {visible.length === 0 ? (
+              <div className="px-2.5 py-2 text-xs text-[var(--bk-text-faint)]">{emptyLabel}</div>
+            ) : (
+              visible.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(n.id);
+                    setOpen(false);
+                  }}
+                  className={[
+                    'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition',
+                    n.id === value
+                      ? 'bg-[var(--bk-accent-soft)] font-medium text-[var(--bk-accent)]'
+                      : 'text-[var(--bk-text)] hover:bg-[var(--bk-surface-2)]',
+                  ].join(' ')}
+                  title={n.label}
+                >
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} />
+                  <span className="min-w-0 truncate">{n.label}</span>
+                </button>
+              ))
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

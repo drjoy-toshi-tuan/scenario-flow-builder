@@ -323,7 +323,9 @@ export function StatusSettingsTab() {
                 <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
                   <th className="px-2 py-2">{t('stAuthColItem')}</th>
                   <th className="w-48 px-2 py-2">{t('stAuthColSetting')}</th>
-                  <th className="w-40 px-2 py-2 text-center">{t('stAuthColDisplay')}</th>
+                  {/* Cột 確認画面表示 rộng ra: lấy đúng phần bề ngang bớt đi của cột
+                      Hiển thị màn chi tiết (cột 1 là cột co giãn, tự nhường chỗ). */}
+                  <th className="w-72 px-2 py-2 text-center">{t('stAuthColDisplay')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -468,12 +470,13 @@ function AuthPrioritySelect({ value, onChange }: { value: AuthPriority; onChange
 
 // 確認画面表示: NÚT BẤM toggle yes<->no bằng icon (không còn pulldown).
 //   yes → line-md:circle-filled-to-confirm-circle-filled-transition (xanh lá)
-//   no  → line-md:minus-circle-filled (đỏ nhẹ)
+//   no  → line-md:minus-circle-filled-transition (đỏ nhẹ) — vòng tròn tô đặc ngay,
+//         chỉ nét dấu trừ animate (đồng bộ style với icon yes).
 function DisplaySelect({ value, onChange }: { value: 'yes' | 'no'; onChange: (v: 'yes' | 'no') => void }) {
   const face =
     value === 'yes'
       ? { icon: 'line-md:circle-filled-to-confirm-circle-filled-transition', cls: 'text-emerald-500', label: 'YES' }
-      : { icon: 'line-md:minus-circle-filled', cls: 'text-rose-400', label: 'NO' };
+      : { icon: 'line-md:minus-circle-filled-transition', cls: 'text-rose-400', label: 'NO' };
   return (
     <div className="flex justify-center">
       <button
