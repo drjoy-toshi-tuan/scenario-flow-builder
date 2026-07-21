@@ -41,20 +41,16 @@ export function computeInheritedFlags(ir: FlowIR | null | undefined): Map<string
 
   const nodeById = new Map(ir.nodes.map((n) => [n.id, n]));
   const outgoing = new Map<string, string[]>();
-  const hasIncoming = new Set<string>();
+  // Số dây vào TỪ NODE THẬT (bỏ qua node Start tổng hợp — nó chỉ đánh dấu điểm vào,
+  // không phải "node phía trên" theo nghĩa kế thừa flag).
+  const realIncoming = new Set<string>();
   for (const e of ir.edges) {
     if (!nodeById.has(e.source) || !nodeById.has(e.target)) continue;
     const list = outgoing.get(e.source);
     if (list) list.push(e.target);
     else outgoing.set(e.source, [e.target]);
-    hasIncoming.add(e.target);
+    if (e.source !== SYNTHETIC_START_ID) realIncoming.add(e.target);
   }
-
-  // Gốc lan truyền: node Start tổng hợp -> node không có dây vào (theo thứ tự IR).
-  const roots = [
-    ...ir.nodes.filter((n) => n.id === SYNTHETIC_START_ID),
-    ...ir.nodes.filter((n) => n.id !== SYNTHETIC_START_ID && !hasIncoming.has(n.id)),
-  ];
 
   // Baseline mọi node thừa hưởng khi chưa có node nào phía trên set flag.
   const baseCarry: InheritedFlags = {
@@ -62,28 +58,41 @@ export function computeInheritedFlags(ir: FlowIR | null | undefined): Map<string
     smsFlag: String(DEFAULT_SMS_FLAG),
   };
 
+  // Node ĐẦU TIÊN (entry): node thật KHÔNG có dây vào từ node thật khác (điểm bắt đầu
+  // luồng gọi). Vì phía trên không có gì để "継続/Carried" nên inherited = RỖNG (không
+  // hiện stamp) — nhưng nó vẫn khởi nguồn baseline mặc định cho các node phía sau.
+  const entries = ir.nodes.filter((n) => n.id !== SYNTHETIC_START_ID && !realIncoming.has(n.id));
+
   // BFS mang flag kế thừa xuôi dòng; mỗi node xử lý 1 lần (first-arrival) để chặn vòng lặp.
-  const queue: { id: string; carry: InheritedFlags }[] = roots.map((n) => ({ id: n.id, carry: { ...baseCarry } }));
+  const queue: { id: string; carry: InheritedFlags; isEntry: boolean }[] = entries.map((n) => ({
+    id: n.id,
+    carry: {},
+    isEntry: true,
+  }));
   const seen = new Set<string>();
   while (queue.length > 0) {
-    const { id, carry } = queue.shift()!;
+    const { id, carry, isEntry } = queue.shift()!;
     if (seen.has(id)) continue;
     seen.add(id);
-    result.set(id, carry);
+    // Node đầu tiên -> RỖNG (không stamp Carried); node sau -> flag kế thừa thật.
+    result.set(id, isEntry ? {} : carry);
 
     const node = nodeById.get(id);
     const own = node ? ownFlags(node.type, node.data) : {};
-    // Flag mang xuống các node sau = flag của chính node (nếu có) đè lên flag kế thừa.
+    // Flag mang xuống các node sau = flag của chính node (nếu có) đè lên flag kế thừa;
+    // node đầu tiên khởi nguồn từ baseline mặc định (0 / -2).
+    const inFlow = isEntry ? baseCarry : carry;
     const carryOut: InheritedFlags = {
-      statusFlag: own.statusFlag ?? carry.statusFlag,
-      smsFlag: own.smsFlag ?? carry.smsFlag,
+      statusFlag: own.statusFlag ?? inFlow.statusFlag,
+      smsFlag: own.smsFlag ?? inFlow.smsFlag,
     };
     for (const target of outgoing.get(id) ?? []) {
-      if (!seen.has(target)) queue.push({ id: target, carry: carryOut });
+      if (!seen.has(target)) queue.push({ id: target, carry: carryOut, isEntry: false });
     }
   }
 
-  // Node không tới được từ gốc (cụm rời / toàn vòng) -> vẫn nhận flag mặc định.
-  for (const n of ir.nodes) if (!result.has(n.id)) result.set(n.id, { ...baseCarry });
+  // Node không tới được (node Start tổng hợp / cụm rời / toàn vòng) -> coi như điểm
+  // bắt đầu riêng: inherited RỖNG (không stamp).
+  for (const n of ir.nodes) if (!result.has(n.id)) result.set(n.id, {});
   return result;
 }

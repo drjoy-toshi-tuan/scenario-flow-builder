@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeInheritedFlags } from './statusFlow';
+import { SYNTHETIC_START_ID } from './types';
 import type { FlowEdge, FlowIR, FlowNode } from './types';
 
 // Helper dựng IR tối giản (chỉ cần nodes/edges cho computeInheritedFlags).
@@ -23,13 +24,16 @@ const node = (id: string, type: FlowNode['type'], data: Record<string, unknown> 
 const edge = (source: string, target: string): FlowEdge => ({ id: `${source}-${target}`, source, target });
 
 describe('computeInheritedFlags — baseline mặc định', () => {
-  it('chưa node nào set -> mọi node kế thừa status 0 + SMS -2', () => {
+  it('node đầu tiên KHÔNG kế thừa (rỗng); node sau kế thừa baseline 0 + SMS -2', () => {
     const ir = makeIr(
       [node('a', 'announce'), node('b', 'transfer'), node('c', 'hangup')],
       [edge('a', 'b'), edge('b', 'c')],
     );
     const flags = computeInheritedFlags(ir);
-    for (const id of ['a', 'b', 'c']) {
+    // a = node đầu tiên (không có dây vào) -> rỗng, không stamp Carried.
+    expect(flags.get('a')).toEqual({});
+    // b, c ở sau -> kế thừa baseline mặc định.
+    for (const id of ['b', 'c']) {
       expect(flags.get(id)).toEqual({ statusFlag: '0', smsFlag: '-2' });
     }
   });
@@ -43,13 +47,24 @@ describe('computeInheritedFlags — baseline mặc định', () => {
       [edge('a', 'b')],
     );
     const flags = computeInheritedFlags(ir);
-    // a chưa có ai phía trên -> vẫn baseline; b kế thừa flag của a.
-    expect(flags.get('a')).toEqual({ statusFlag: '0', smsFlag: '-2' });
+    // a là node đầu tiên -> inherited rỗng (giá trị riêng của a hiển thị riêng); b kế thừa flag của a.
+    expect(flags.get('a')).toEqual({});
     expect(flags.get('b')).toEqual({ statusFlag: '3', smsFlag: '1' });
   });
 
-  it('node rời rạc (không nối gốc) vẫn nhận baseline mặc định', () => {
+  it('node đầu tiên sau Start tổng hợp cũng không kế thừa (rỗng)', () => {
+    const ir = makeIr(
+      [node(SYNTHETIC_START_ID, 'start'), node('first', 'interaction'), node('second', 'hangup')],
+      [edge(SYNTHETIC_START_ID, 'first'), edge('first', 'second')],
+    );
+    const flags = computeInheritedFlags(ir);
+    // 'first' chỉ có dây vào từ node Start tổng hợp -> vẫn là node đầu tiên -> rỗng.
+    expect(flags.get('first')).toEqual({});
+    expect(flags.get('second')).toEqual({ statusFlag: '0', smsFlag: '-2' });
+  });
+
+  it('node rời rạc (không nối gốc) -> không kế thừa (rỗng)', () => {
     const ir = makeIr([node('lonely', 'hangup')], []);
-    expect(computeInheritedFlags(ir).get('lonely')).toEqual({ statusFlag: '0', smsFlag: '-2' });
+    expect(computeInheritedFlags(ir).get('lonely')).toEqual({});
   });
 });

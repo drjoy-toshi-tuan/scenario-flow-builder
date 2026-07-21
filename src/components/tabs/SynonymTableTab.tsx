@@ -21,13 +21,13 @@ const CONFIG: Record<
     settingsKey: 'clinicalDepartments',
     titleKey: 'ctClinicalDept',
     nameColKey: 'clColDept',
-    icon: 'mingcute:classify-2-fill',
+    icon: 'material-symbols-light:view-list-outline',
   },
   courseList: {
     settingsKey: 'courses',
     titleKey: 'ctCourseList',
     nameColKey: 'clColCourse',
-    icon: 'lucide:file-text',
+    icon: 'material-symbols-light:view-list-outline',
   },
 };
 
@@ -85,13 +85,13 @@ export function SynonymTableTab({ kind }: { kind: PageKind }) {
                       onChange={(synonyms) => updateRow(i, { synonyms })}
                     />
                   </td>
-                  {/* Xoá dòng */}
-                  <td className="px-3 py-2.5 text-center">
+                  {/* Xoá dòng — căn giữa theo trục dọc của hàng và giữa ô trống theo trục ngang */}
+                  <td className="px-2 py-2.5 align-middle">
                     <button
                       type="button"
                       onClick={() => removeRow(i)}
                       title={t('clRemoveRow')}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,var(--bk-danger,#ef4444)_14%,transparent)] hover:text-[var(--bk-danger,#ef4444)]"
+                      className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,var(--bk-danger,#ef4444)_14%,transparent)] hover:text-[var(--bk-danger,#ef4444)]"
                     >
                       <Icon icon="lucide:trash-2" width={15} height={15} />
                     </button>

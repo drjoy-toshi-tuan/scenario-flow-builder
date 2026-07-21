@@ -37,6 +37,10 @@ export const FIXED_SMS_FLAGS: readonly SmsFlagEntry[] = [
 export const DEFAULT_STATUS_FLAG = 0;
 export const DEFAULT_SMS_FLAG = -2;
 
+// 状態フラグ CHỌN ĐƯỢC trong pulldown (Announce List + panel node màn Flow Diagram):
+// chỉ 0,1,2,3,6 — bỏ 4 (処理中) và 5 (処理済み) vì là trạng thái nội bộ, không set tay.
+export const STATUS_FLAG_PICKABLE: ReadonlySet<number> = new Set([0, 1, 2, 3, 6]);
+
 // URL gửi sau cuộc gọi gắn cuối mỗi SMS — độ dài CỐ ĐỊNH 22 ký tự (cột 文字数
 // đếm: nội dung + 22, KHÔNG cộng thêm ký tự xuống dòng — spec team CS).
 // CHƯA nhập nội dung (rỗng/toàn khoảng trắng) thì URL cũng chưa gắn -> đếm 0.

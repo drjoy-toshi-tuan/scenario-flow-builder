@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import type { FlowNode, NodeType } from '../ir/types';
 import { NODE_CONFIG, nodeTypeLabel } from '../ui/nodeConfig';
 import { CsLogicBranchEditor } from './CsLogicBranchEditor';
-import { ensureSettings } from '../ir/settings';
+import { ensureSettings, STATUS_FLAG_PICKABLE } from '../ir/settings';
 import { computeInheritedFlags } from '../ir/statusFlow';
 import { FlagSelect } from '../ui/FlagSelect';
 import {
@@ -622,10 +622,13 @@ function SettingsSelect({
   const ir = useFlowStore((s) => s.ir);
   const settings = ensureSettings(ir?.settings);
   // Nhãn option dạng "0 - 途中切断" (flag - tên) — đồng bộ với tab Announce List.
+  // Status: chỉ cho chọn flag trong whitelist (0,1,2,3,6) — bỏ 4/5 như màn Announce.
   const options =
     field.settingsOptions === 'smsFlags'
       ? settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }))
-      : settings.statuses.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
+      : settings.statuses
+          .filter((s) => STATUS_FLAG_PICKABLE.has(s.flag))
+          .map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
   // Status/SMS flag KẾ THỪA từ node phía trên (tự fill): khi node chưa tự đặt flag, ô
   // "chưa chọn" hiển thị flag kế thừa để người dùng biết giá trị mặc định đang áp dụng.
   const inherited = useMemo(() => computeInheritedFlags(ir), [ir]);
