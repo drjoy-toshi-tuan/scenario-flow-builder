@@ -13,6 +13,9 @@ interface AutoGrowTextareaProps {
   className?: string;
   // true: CHO PHÉP xuống dòng cứng (Enter) — vẫn tự cao theo nội dung (vd SMS文言).
   allowNewlines?: boolean;
+  // Chiều cao tối đa (px): quá thì DỪNG cao thêm và bật scroll trong ô (vd announce
+  // giới hạn 3 dòng ở màn Announce List).
+  maxHeight?: number;
 }
 
 export function AutoGrowTextarea({
@@ -21,16 +24,24 @@ export function AutoGrowTextarea({
   placeholder,
   className,
   allowNewlines = false,
+  maxHeight,
 }: AutoGrowTextareaProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  // Đặt lại chiều cao theo nội dung mỗi khi value đổi.
+  // Đặt lại chiều cao theo nội dung mỗi khi value đổi; kẹp theo maxHeight nếu có.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+    const full = el.scrollHeight;
+    if (maxHeight != null && full > maxHeight) {
+      el.style.height = `${maxHeight}px`;
+      el.style.overflowY = 'auto';
+    } else {
+      el.style.height = `${full}px`;
+      el.style.overflowY = 'hidden';
+    }
+  }, [value, maxHeight]);
 
   return (
     <textarea

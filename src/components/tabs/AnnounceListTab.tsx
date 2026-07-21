@@ -18,10 +18,16 @@ import { AutoGrowTextarea } from '../AutoGrowTextarea';
 //     lưu vào node.data (interaction dùng hangup*Flag; announce/transfer/hangup dùng
 //     statusFlag/smsFlag) — option liên động tab Status Settings.
 //   - Màn PHỤ (復唱・リトライ): Re-confirm luôn ở trên (1 node 1 câu); Retry để cơ
-//     chế catch-all (gộp theo câu) + có thể "thêm" node để tách riêng khỏi catch-all.
+//     chế catch-all (gộp theo câu, chip Default) + có thể thêm/tách node thành dòng
+//     riêng, sửa node + câu ngay trên dòng, và xoá dòng (trừ retry catch-all).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 15;
+// Chiều cao tối đa ô 発話文言: ~3 dòng (text-sm leading-relaxed) rồi mới scroll.
+const ANNOUNCE_MAX_H = 80;
+// Ước lượng chiều cao 1 dòng bảng (worst-case ô announce 3 dòng) — dùng để tính số
+// record/trang theo chiều cao khả dụng, chống browser tạo scroll.
+const ROW_H_EST = 100;
+const THEAD_H = 40;
 
 // Loại node có announce + field chứa nội dung announce của từng loại.
 const CONTENT_KEY: Partial<Record<NodeType, string>> = {
@@ -94,13 +100,16 @@ export function AnnounceListTab() {
     [ir],
   );
 
+  const interactions = useMemo(
+    () => (ir?.nodes ?? []).filter((n) => n.type === 'interaction'),
+    [ir],
+  );
+
   // Dòng màn phụ (Re-confirm trước, Retry sau):
   //  - Re-confirm: mỗi node bật 復唱 = 1 dòng riêng (1 node 1 câu, không gộp).
   //  - Retry catch-all: các node retry CHƯA tách riêng, gộp theo câu リトライ.
   //  - Retry tách riêng (data.retryBreakout): mỗi node 1 dòng.
   const subRows = useMemo<RrRow[]>(() => {
-    const interactions = (ir?.nodes ?? []).filter((n) => n.type === 'interaction');
-
     // Re-confirm — 1 node 1 dòng.
     const reconfirmRows: RrRow[] = interactions
       .filter((n) => n.data.reconfirm === 'yes')
@@ -138,14 +147,48 @@ export function AnnounceListTab() {
     );
 
     return [...reconfirmRows, ...retryRows];
-  }, [ir]);
+  }, [interactions]);
 
   const [page, setPage] = useState(0);
+  // Số record/trang tính động theo chiều cao khả dụng (chống scroll của browser).
+  const [pageSize, setPageSize] = useState(12);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableTopRef = useRef<HTMLDivElement>(null);
+
+  // Bản nháp dòng "Thêm" của màn phụ (hiện như 1 dòng bảng: chọn node + nhập câu).
+  const [draft, setDraft] = useState<{ kind: RrKind; nodeId: string; text: string } | null>(null);
+  useEffect(() => {
+    if (view === 'main') setDraft(null);
+  }, [view]);
+
   const rowCount = view === 'main' ? rows.length : subRows.length;
-  const totalPages = Math.max(1, Math.ceil(rowCount / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(rowCount / pageSize));
   const safePage = Math.min(page, totalPages - 1);
-  const pageRows = rows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
-  const pageSubRows = subRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const pageRows = rows.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const pageSubRows = subRows.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
+  // Tính số record/trang theo chiều cao còn trống (viewport - phần trên bảng - chỗ
+  // phân trang - vùng "Thêm" của màn phụ). Bảo đảm ít nhất 3 dòng.
+  useLayoutEffect(() => {
+    const compute = () => {
+      const scroll = scrollRef.current;
+      const marker = tableTopRef.current;
+      if (!scroll || !marker) return;
+      const usedTop = marker.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+      const reservedBottom = 20 /* p-5 bottom */ + 48 /* thanh phân trang */ + (view === 'sub' ? 108 /* vùng Thêm/nháp */ : 0);
+      const available = scroll.clientHeight - usedTop - reservedBottom - THEAD_H;
+      const n = Math.max(3, Math.floor(available / ROW_H_EST));
+      setPageSize(n);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    if (scrollRef.current) ro.observe(scrollRef.current);
+    window.addEventListener('resize', compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
+  }, [view]);
 
   const switchView = (v: 'main' | 'sub') => {
     setView(v);
@@ -166,15 +209,49 @@ export function AnnounceListTab() {
     addEdge({ id: `${nodeId}->${targetId}#failed`, source: nodeId, target: targetId, sourceHandle: 'failed' });
   };
 
-  // Thêm node vào màn phụ (chọn phân loại -> chọn node): bật tính năng + (retry) tách
-  // khỏi catch-all thành dòng riêng.
-  const addSubNode = (kind: RrKind, nodeId: string) => {
+  // Bật tính năng cho node (từ dòng nháp "Thêm"): reconfirm=yes / retry tách riêng.
+  const enableSub = (kind: RrKind, nodeId: string, text: string) => {
     const node = ir?.nodes.find((n) => n.id === nodeId);
     if (!node) return;
     if (kind === 'reconfirm') {
-      setNodeData(nodeId, { reconfirm: 'yes' });
+      setNodeData(nodeId, { reconfirm: 'yes', ...(text ? { reconfirmAnnounce: text } : {}) });
     } else {
-      setNodeData(nodeId, { retryBreakout: true, ...(retryOn(node.data) ? {} : { retryCount: '2' }) });
+      setNodeData(nodeId, {
+        retryBreakout: true,
+        ...(retryOn(node.data) ? {} : { retryCount: '2' }),
+        ...(text ? { retryAnnounce: text } : {}),
+      });
+    }
+  };
+
+  // Đổi node của 1 dòng (reconfirm / retry tách riêng) ngay trên dòng — chuyển cấu
+  // hình + câu từ node cũ sang node mới.
+  const changeRecordNode = (row: RrRow, newId: string) => {
+    const oldNode = row.nodes[0];
+    if (!oldNode || oldNode.id === newId) return;
+    if (row.kind === 'reconfirm') {
+      setNodeData(oldNode.id, { reconfirm: 'no', reconfirmAnnounce: '' });
+      setNodeData(newId, { reconfirm: 'yes', reconfirmAnnounce: row.text });
+    } else {
+      const target = ir?.nodes.find((n) => n.id === newId);
+      setNodeData(oldNode.id, { retryBreakout: false });
+      setNodeData(newId, {
+        retryBreakout: true,
+        retryAnnounce: row.text,
+        ...(target && retryOn(target.data) ? {} : { retryCount: '2' }),
+      });
+    }
+  };
+
+  // Xoá 1 dòng (mọi dòng TRỪ retry catch-all). Reconfirm -> tự tắt 復唱=yes (bỏ câu);
+  // retry tách riêng -> nhập lại catch-all (bỏ dòng riêng).
+  const deleteRecord = (row: RrRow) => {
+    const node = row.nodes[0];
+    if (!node || row.catchAll) return;
+    if (row.kind === 'reconfirm') {
+      setNodeData(node.id, { reconfirm: 'no', reconfirmAnnounce: '' });
+    } else {
+      setNodeData(node.id, { retryBreakout: false });
     }
   };
 
@@ -250,14 +327,15 @@ export function AnnounceListTab() {
     .map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
   const smsOptions = settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }));
 
+  // Grid template dùng chung cho header + dòng của màn phụ (3 cột + gutter thùng rác).
+  const SUB_GRID = 'grid-cols-[170px_minmax(0,1fr)_46%]';
+
   return (
-    <div className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">
+    <div ref={scrollRef} className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">
       <div className="mx-auto max-w-[1600px]">
-        {/* Tiêu đề màn (đổi theo màn đang xem) + nút chuyển màn chính⇄phụ ngay cạnh.
-            min-w cố định + nowrap: hộp icon và vị trí nút chuyển màn GIỮ NGUYÊN khi đổi
-            màn (tiêu đề dài ngắn khác nhau không làm xê dịch) -> chuyển màn liền mạch. */}
+        {/* Tiêu đề màn (đổi theo màn đang xem) + nút chuyển màn NẰM SÁT tiêu đề. */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex min-w-[300px] items-center gap-2 whitespace-nowrap text-[15px] font-bold text-[var(--bk-text)]">
+          <div className="flex items-center gap-2 whitespace-nowrap text-[15px] font-bold text-[var(--bk-text)]">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
               <Icon icon={view === 'main' ? 'lucide:volume-2' : 'line-md:chat-filled'} width={17} height={17} />
             </span>
@@ -290,6 +368,9 @@ export function AnnounceListTab() {
             })}
           </div>
         </div>
+
+        {/* Marker đầu bảng: mốc đo chiều cao khả dụng để phân trang động. */}
+        <div ref={tableTopRef} />
 
         {view === 'main' ? (
         <div className="overflow-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
@@ -407,12 +488,13 @@ export function AnnounceListTab() {
                         dash
                       )}
                     </td>
-                    {/* 発話文言 */}
+                    {/* 発話文言 — giới hạn 3 dòng rồi scroll. */}
                     <td className="px-3 py-2">
                       <AutoGrowTextarea
                         value={str(node.data[contentKey])}
                         onChange={(v) => setNodeData(node.id, { [contentKey]: v })}
-                        className="w-full resize-none overflow-hidden rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--bk-text)]"
+                        maxHeight={ANNOUNCE_MAX_H}
+                        className="w-full resize-none rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--bk-text)]"
                       />
                     </td>
                   </tr>
@@ -430,83 +512,153 @@ export function AnnounceListTab() {
         </div>
         ) : (
         // ── Màn PHỤ: 復唱・リトライアナウンス一覧 ────────────────────────────────
+        // Bố cục div-grid (không dùng <table>) để nút xoá nằm NGOÀI bảng, cùng hàng
+        // với record. Mỗi hàng = [ ô bảng (3 cột) ] + [ gutter thùng rác ].
         <>
-        <div className="overflow-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
-          {/* Cùng min-width với bảng màn chính -> độ rộng bảng không nhảy khi đổi màn. */}
-          <table className="w-full min-w-[1200px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-                <th className="w-[170px] px-3 py-2.5">{t('alColType')}</th>
-                <th className="px-3 py-2.5">{t('alColSubItems')}</th>
-                <th className="w-[46%] px-3 py-2.5">{t('alColAnnounce')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageSubRows.map((row) => {
-                const cfg = RR_KIND[row.kind];
-                return (
-                  <tr
-                    key={row.key}
-                    className="border-b border-[var(--bk-border)] align-middle last:border-0"
+        <div className="overflow-x-auto">
+          <div className="min-w-[1240px]">
+            {/* Header: chỉ phủ phần bảng (flex-1), gutter thùng rác để trống. */}
+            <div className="flex items-stretch">
+              <div
+                className={`grid flex-1 ${SUB_GRID} rounded-t-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]`}
+              >
+                <div className="px-3 py-2.5">{t('alColType')}</div>
+                <div className="px-3 py-2.5">{t('alColSubItems')}</div>
+                <div className="px-3 py-2.5">{t('alColAnnounce')}</div>
+              </div>
+              <div className="w-10 shrink-0" />
+            </div>
+
+            {pageSubRows.map((row, idx) => {
+              const cfg = RR_KIND[row.kind];
+              const isLastCard = idx === pageSubRows.length - 1 && !draft;
+              // Dòng đơn node (reconfirm / retry tách riêng) -> sửa node + xoá được.
+              const editable = !row.catchAll && row.nodes.length === 1;
+              const candidates = editable
+                ? interactions.filter((n) =>
+                    row.kind === 'reconfirm'
+                      ? n.data.reconfirm !== 'yes' || n.id === row.nodes[0].id
+                      : n.data.retryBreakout !== true || n.id === row.nodes[0].id,
+                  )
+                : [];
+              return (
+                <div key={row.key} className="flex items-stretch">
+                  <div
+                    className={`grid flex-1 ${SUB_GRID} border border-t-0 border-[var(--bk-border)] bg-[var(--bk-surface)] align-middle ${
+                      isLastCard ? 'rounded-b-xl' : ''
+                    }`}
                   >
-                    {/* 分類: logo + màu đặc trưng (đúng icon indicator trên node CS) */}
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                          style={{ color: cfg.color, background: `color-mix(in srgb, ${cfg.color} 16%, transparent)` }}
-                        >
-                          <Icon icon={cfg.icon} width={13} height={13} />
+                    {/* 分類: logo + màu đặc trưng; retry catch-all kèm chip Default. */}
+                    <div className="flex items-center gap-2 px-3 py-2.5">
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                        style={{ color: cfg.color, background: `color-mix(in srgb, ${cfg.color} 16%, transparent)` }}
+                      >
+                        <Icon icon={cfg.icon} width={13} height={13} />
+                      </span>
+                      <span className="font-semibold text-[var(--bk-text)]">{t(cfg.typeKey)}</span>
+                      {row.catchAll && (
+                        <span className="inline-flex items-center rounded-full bg-[var(--bk-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--bk-accent)]">
+                          {t('alDefault')}
                         </span>
-                        <span className="font-semibold text-[var(--bk-text)]">{t(cfg.typeKey)}</span>
-                      </div>
-                    </td>
-                    {/* 項目: tên node — chip tự wrap nhiều dòng. */}
-                    <td className="px-3 py-2.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {row.nodes.map((n) => (
-                          <span
-                            key={n.id}
-                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-[var(--bk-text)]"
-                            style={{
-                              background: `color-mix(in srgb, ${cfg.color} 10%, transparent)`,
-                              borderColor: `color-mix(in srgb, ${cfg.color} 35%, transparent)`,
-                            }}
-                          >
-                            {n.label}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
+                      )}
+                    </div>
+                    {/* 項目: catch-all -> chip node (chỉ đọc); dòng đơn -> chọn node ngay. */}
+                    <div className="flex items-center px-3 py-2.5">
+                      {editable ? (
+                        <NodePicker
+                          nodes={candidates}
+                          value={row.nodes[0].id}
+                          onChange={(id) => changeRecordNode(row, id)}
+                          accent={cfg.color}
+                          emptyLabel={t('alAddNoNode')}
+                        />
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {row.nodes.map((n) => (
+                            <span
+                              key={n.id}
+                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-[var(--bk-text)]"
+                              style={{
+                                background: `color-mix(in srgb, ${cfg.color} 10%, transparent)`,
+                                borderColor: `color-mix(in srgb, ${cfg.color} 35%, transparent)`,
+                              }}
+                            >
+                              {n.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     {/* 発話文言: sửa 1 lần -> áp cho MỌI node trong nhóm (cùng câu). */}
-                    <td className="px-3 py-2">
+                    <div className="px-3 py-2">
                       <AutoGrowTextarea
                         value={row.text}
                         onChange={(v) => {
                           for (const n of row.nodes) setNodeData(n.id, { [cfg.contentKey]: v });
                         }}
-                        className="w-full resize-none overflow-hidden rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--bk-text)]"
+                        maxHeight={ANNOUNCE_MAX_H}
+                        className="w-full resize-none rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--bk-text)]"
                       />
-                    </td>
-                  </tr>
-                );
-              })}
-              {subRows.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-8 text-center text-xs text-[var(--bk-text-faint)]">
-                    {t('alSubEmpty')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                  {/* Gutter NGOÀI bảng: thùng rác (mọi dòng trừ retry catch-all). */}
+                  <div className="flex w-10 shrink-0 items-center justify-center">
+                    {!row.catchAll && (
+                      <button
+                        type="button"
+                        onClick={() => deleteRecord(row)}
+                        title={t('alDeleteRow')}
+                        aria-label={t('alDeleteRow')}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,#ef4444_14%,transparent)] hover:text-[#ef4444]"
+                      >
+                        <Icon icon="lucide:trash-2" width={15} height={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Dòng nháp "Thêm": trông như 1 dòng bảng — chọn node + nhập câu ngay. */}
+            {draft && (
+              <DraftRow
+                grid={SUB_GRID}
+                draft={draft}
+                nodes={interactions}
+                onChangeText={(text) => setDraft((d) => (d ? { ...d, text } : d))}
+                onChangeKind={() => setDraft(null)}
+                onPickNode={(id) => {
+                  enableSub(draft.kind, id, draft.text);
+                  setDraft(null);
+                }}
+                onCancel={() => setDraft(null)}
+              />
+            )}
+
+            {subRows.length === 0 && !draft && (
+              <div className="flex items-stretch">
+                <div className="flex-1 rounded-b-xl border border-t-0 border-[var(--bk-border)] bg-[var(--bk-surface)] px-3 py-8 text-center text-xs text-[var(--bk-text-faint)]">
+                  {t('alSubEmpty')}
+                </div>
+                <div className="w-10 shrink-0" />
+              </div>
+            )}
+          </div>
         </div>
-        {/* Nút thêm node vào màn phụ (chọn phân loại -> chọn node) */}
-        <AddRrForm nodes={(ir?.nodes ?? []).filter((n) => n.type === 'interaction')} onAdd={addSubNode} />
+        {/* Nút thêm dòng (chọn phân loại -> hiện dòng nháp trong bảng) */}
+        {!draft && (
+          <AddRrButton
+            onPick={(kind) => {
+              setDraft({ kind, nodeId: '', text: '' });
+              setPage(0);
+            }}
+          />
+        )}
         </>
         )}
 
-        {/* Phân trang: tối đa 15 dòng / trang (theo màn đang xem) */}
+        {/* Phân trang: số record/trang tính theo chiều cao (chống scroll) */}
         {totalPages > 1 && (
           <div className="mt-3 flex items-center justify-end gap-2 text-xs text-[var(--bk-text-muted)]">
             <span>{t('fmResultCount', { n: rowCount })}</span>
@@ -538,167 +690,150 @@ export function AnnounceListTab() {
   );
 }
 
-// ── Nút "Thêm" node vào màn phụ ──────────────────────────────────────────────
-// Luồng 2 bước: bấm "Thêm" -> popover nhỏ chọn 分類 (Re-confirm / Retry). Chọn xong
-// popover đóng, hiện ĐÚNG 1 dòng nhập (chọn node + xác nhận) — không còn phần chọn
-// phân loại chiếm chỗ. Muốn đổi phân loại: bấm huy hiệu để mở lại popover.
-function AddRrForm({
+// ── Dòng nháp "Thêm" của màn phụ: 1 dòng bảng (chọn node + nhập câu) ──────────
+function DraftRow({
+  grid,
+  draft,
   nodes,
-  onAdd,
+  onChangeText,
+  onChangeKind,
+  onPickNode,
+  onCancel,
 }: {
+  grid: string;
+  draft: { kind: RrKind; nodeId: string; text: string };
   nodes: FlowNode[];
-  onAdd: (kind: RrKind, nodeId: string) => void;
+  onChangeText: (text: string) => void;
+  onChangeKind: () => void;
+  onPickNode: (id: string) => void;
+  onCancel: () => void;
 }) {
   const t = useT();
-  // 'idle' = nút Thêm; 'pickKind' = popover chọn phân loại; 'fill' = dòng nhập node.
-  const [mode, setMode] = useState<'idle' | 'pickKind' | 'fill'>('idle');
-  const [kind, setKind] = useState<RrKind>('reconfirm');
-  const [nodeId, setNodeId] = useState('');
-  const wrapRef = useRef<HTMLDivElement>(null);
-
+  const cfg = RR_KIND[draft.kind];
   // Node còn "thêm được": reconfirm -> chưa bật 復唱; retry -> chưa tách riêng.
   const candidates = useMemo(
     () =>
       nodes.filter((n) =>
-        kind === 'reconfirm' ? n.data.reconfirm !== 'yes' : n.data.retryBreakout !== true,
+        draft.kind === 'reconfirm' ? n.data.reconfirm !== 'yes' : n.data.retryBreakout !== true,
       ),
-    [nodes, kind],
+    [nodes, draft.kind],
   );
 
-  // Đổi phân loại -> reset node đã chọn nếu không còn hợp lệ.
-  useEffect(() => {
-    if (nodeId && !candidates.some((n) => n.id === nodeId)) setNodeId('');
-  }, [candidates, nodeId]);
+  return (
+    <div className="flex items-stretch">
+      <div
+        className={`grid flex-1 ${grid} rounded-b-xl border border-t-0 border-[var(--bk-accent)] bg-[var(--bk-accent-soft)]/30`}
+      >
+        {/* 分類: chip phân loại đã chọn — bấm để đổi lại (huỷ dòng nháp). */}
+        <div className="flex items-center px-3 py-2.5">
+          <button
+            type="button"
+            onClick={onChangeKind}
+            title={t('alAddPickKind')}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm"
+            style={{ background: cfg.color }}
+          >
+            <Icon icon={cfg.icon} width={13} height={13} />
+            {t(cfg.typeKey)}
+            <Icon icon="lucide:chevron-down" width={12} height={12} />
+          </button>
+        </div>
+        {/* 項目: chọn node — chọn xong là commit (bật tính năng cho node). */}
+        <div className="flex items-center px-3 py-2.5">
+          <NodePicker
+            nodes={candidates}
+            value=""
+            onChange={onPickNode}
+            accent={cfg.color}
+            emptyLabel={t('alAddNoNode')}
+            placeholder={t('alPickNodePh')}
+          />
+        </div>
+        {/* 発話文言: nhập câu ngay (áp vào node khi chọn node xong). */}
+        <div className="px-3 py-2">
+          <AutoGrowTextarea
+            value={draft.text}
+            onChange={onChangeText}
+            maxHeight={ANNOUNCE_MAX_H}
+            className="w-full resize-none rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--bk-text)]"
+          />
+        </div>
+      </div>
+      {/* Gutter: nút huỷ dòng nháp. */}
+      <div className="flex w-10 shrink-0 items-center justify-center">
+        <button
+          type="button"
+          onClick={onCancel}
+          title={t('alAddCancel')}
+          aria-label={t('alAddCancel')}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:text-[var(--bk-text)]"
+        >
+          <Icon icon="line-md:close-small" width={16} height={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
-  // Đóng popover chọn phân loại khi bấm ra ngoài.
+// ── Nút "Thêm" -> popover chọn 分類 (Re-confirm / Retry) rồi mở dòng nháp ──────
+function AddRrButton({ onPick }: { onPick: (kind: RrKind) => void }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (mode !== 'pickKind') return;
+    if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMode('idle');
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [mode]);
+  }, [open]);
 
-  const cfg = RR_KIND[kind];
-  const canAdd = nodeId && candidates.some((n) => n.id === nodeId);
-
-  // Chọn phân loại xong -> sang thẳng bước nhập node.
-  const pickKind = (k: RrKind) => {
-    setKind(k);
-    setNodeId('');
-    setMode('fill');
-  };
-
-  const submit = () => {
-    if (!canAdd) return;
-    onAdd(kind, nodeId);
-    setNodeId(''); // giữ nguyên bước 'fill' để thêm tiếp node cùng phân loại cho nhanh.
-  };
-
-  // ── Bước idle + popover chọn phân loại (modal nhỏ) ──
-  if (mode !== 'fill') {
-    return (
-      <div className="relative mt-3 inline-block" ref={wrapRef}>
-        <button
-          type="button"
-          onClick={() => setMode((m) => (m === 'pickKind' ? 'idle' : 'pickKind'))}
-          aria-expanded={mode === 'pickKind'}
-          className={`inline-flex items-center gap-2 rounded-xl border border-dashed px-3.5 py-2 text-sm font-semibold transition ${
-            mode === 'pickKind'
-              ? 'border-[var(--bk-accent)] text-[var(--bk-accent)]'
-              : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]'
-          }`}
-        >
-          <Icon icon="line-md:plus-square-filled" width={18} height={18} />
-          {t('alAddRow')}
-        </button>
-        {mode === 'pickKind' && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-60 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
-            <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-              {t('alAddPickKind')}
-            </div>
-            {(['reconfirm', 'retry'] as const).map((k) => {
-              const kcfg = RR_KIND[k];
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => pickKind(k)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--bk-text)] transition hover:bg-[var(--bk-surface-2)]"
-                >
-                  <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                    style={{ color: kcfg.color, background: `color-mix(in srgb, ${kcfg.color} 16%, transparent)` }}
-                  >
-                    <Icon icon={kcfg.icon} width={15} height={15} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{t(kcfg.typeKey)}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ── Bước fill: 1 dòng nhập (huy hiệu phân loại + chọn node + xác nhận + đóng) ──
   return (
-    <div className="mt-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-3 shadow-sm">
-      {/* Huy hiệu phân loại đã chọn — bấm để đổi lại (mở popover). */}
-      <label className="flex flex-col gap-1">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-          {t('alAddPickKind')}
-        </span>
-        <button
-          type="button"
-          onClick={() => setMode('pickKind')}
-          title={t('alAddPickKind')}
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm"
-          style={{ background: cfg.color }}
-        >
-          <Icon icon={cfg.icon} width={13} height={13} />
-          {t(cfg.typeKey)}
-          <Icon icon="lucide:chevron-down" width={12} height={12} />
-        </button>
-      </label>
-      {/* Chọn node (search) */}
-      <label className="flex min-w-[240px] flex-1 flex-col gap-1">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-          {t('alAddPickNode')}
-        </span>
-        <NodePicker
-          nodes={candidates}
-          value={nodeId}
-          onChange={setNodeId}
-          accent={cfg.color}
-          emptyLabel={t('alAddNoNode')}
-        />
-      </label>
-      {/* Xác nhận */}
+    <div className="relative mt-3 inline-block" ref={wrapRef}>
       <button
         type="button"
-        onClick={submit}
-        disabled={!canAdd}
-        className="inline-flex items-center gap-2 rounded-xl border border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-accent)] transition enabled:hover:bg-[var(--bk-accent)] enabled:hover:text-white disabled:opacity-40"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`inline-flex items-center gap-2 rounded-xl border border-dashed px-3.5 py-2 text-sm font-semibold transition ${
+          open
+            ? 'border-[var(--bk-accent)] text-[var(--bk-accent)]'
+            : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]'
+        }`}
       >
-        <Icon icon="line-md:plus-circle" width={18} height={18} />
-        {t('alAddConfirm')}
+        <Icon icon="line-md:plus-square-filled" width={18} height={18} />
+        {t('alAddRow')}
       </button>
-      {/* Đóng dòng nhập */}
-      <button
-        type="button"
-        onClick={() => {
-          setMode('idle');
-          setNodeId('');
-        }}
-        title={t('alAddCancel')}
-        aria-label={t('alAddCancel')}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--bk-border)] text-[var(--bk-text-faint)] transition hover:text-[var(--bk-text)]"
-      >
-        <Icon icon="line-md:close-small" width={18} height={18} />
-      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-60 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
+          <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+            {t('alAddPickKind')}
+          </div>
+          {(['reconfirm', 'retry'] as const).map((k) => {
+            const kcfg = RR_KIND[k];
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => {
+                  onPick(k);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--bk-text)] transition hover:bg-[var(--bk-surface-2)]"
+              >
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                  style={{ color: kcfg.color, background: `color-mix(in srgb, ${kcfg.color} 16%, transparent)` }}
+                >
+                  <Icon icon={kcfg.icon} width={15} height={15} />
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">{t(kcfg.typeKey)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -710,12 +845,14 @@ function NodePicker({
   onChange,
   accent,
   emptyLabel,
+  placeholder,
 }: {
   nodes: FlowNode[];
   value: string;
   onChange: (id: string) => void;
   accent: string;
   emptyLabel: string;
+  placeholder?: string;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -727,12 +864,12 @@ function NodePicker({
   const visible = q ? nodes.filter((n) => n.label.toLowerCase().includes(q)) : nodes;
 
   return (
-    <div className="relative" ref={wrapRef}>
+    <div className="relative w-full" ref={wrapRef}>
       <input
         type="text"
         className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 pr-8 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
         value={open ? query : selected?.label ?? ''}
-        placeholder={t('searchSelectPlaceholder')}
+        placeholder={placeholder ?? t('searchSelectPlaceholder')}
         onFocus={() => {
           setOpen(true);
           setQuery('');

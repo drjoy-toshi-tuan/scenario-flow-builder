@@ -40,6 +40,8 @@ export function CanvasTabs() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // Trang phụ đang chờ xác nhận xoá (mở modal cảnh báo thay vì xoá 1 click).
+  const [pendingRemove, setPendingRemove] = useState<(typeof EXTRA_PAGES)[number] | null>(null);
 
   // Đóng menu khi click ra ngoài.
   useEffect(() => {
@@ -66,10 +68,11 @@ export function CanvasTabs() {
   };
 
   // Xoá trang bảng phụ: bỏ field settings (undefined -> không round-trip YAML) và
-  // nếu đang đứng ở tab đó thì quay về Flow Diagram.
+  // nếu đang đứng ở tab đó thì quay về Flow Diagram. Gọi sau khi đã xác nhận.
   const removePage = (page: (typeof EXTRA_PAGES)[number]) => {
     setSettings({ [page.settingsKey]: undefined });
     if (active === page.id) setTab('flow');
+    setPendingRemove(null);
   };
 
   const renderTab = (
@@ -117,7 +120,7 @@ export function CanvasTabs() {
   return (
     <div className="flex items-end gap-1 border-b border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 pt-1.5">
       {TABS.map((tab) => renderTab(tab))}
-      {openExtras.map((p) => renderTab(p, () => removePage(p)))}
+      {openExtras.map((p) => renderTab(p, () => setPendingRemove(p)))}
 
       {/* Nút thêm trang (plus-circle-filled) -> menu chỉ liệt kê trang CHƯA tạo.
           Đã tạo đủ cả 2 trang -> ẩn hẳn nút "+"; xoá bớt 1 trang thì "+" hiện lại.
@@ -155,6 +158,45 @@ export function CanvasTabs() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal xác nhận xoá trang bảng phụ (thay cho one-click). */}
+      {pendingRemove && (
+        <div
+          className="bk-modal-overlay bk-modal-overlay--fixed"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPendingRemove(null)}
+        >
+          <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[color-mix(in_srgb,#dc2626_14%,transparent)] text-[#dc2626]">
+                <Icon icon="lucide:trash-2" width={15} height={15} />
+              </span>
+              {t('clRemovePageConfirmTitle')}
+            </div>
+            <p className="mb-4 text-sm leading-relaxed text-[var(--bk-text-muted)]">
+              {t('clRemovePageConfirmMsg')}
+              {` (${t(pendingRemove.labelKey)})`}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingRemove(null)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('btnCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => removePage(pendingRemove)}
+                className="rounded-lg bg-[#dc2626] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
+              >
+                {t('delete')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

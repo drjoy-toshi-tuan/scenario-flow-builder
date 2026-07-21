@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFlowStore } from '../../store/flowStore';
-import { ensureSettings, smsCharCount, SMS_WARN_LIMIT } from '../../ir/settings';
-import type { SmsFlagEntry, StatusEntry } from '../../ir/types';
+import { ensureSettings, smsCharCount, SMS_WARN_LIMIT, DEFAULT_SMS_FLAG } from '../../ir/settings';
+import type { FlowNode, SmsFlagEntry, StatusEntry } from '../../ir/types';
 import { Icon } from '../../ui/icons';
 import { AutoGrowTextarea } from '../AutoGrowTextarea';
-import { useT } from '../../ui/i18n';
+import { useT, type TKey } from '../../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab "Status Settings / 通話状態設定" — 2 phần:
@@ -16,12 +16,57 @@ import { useT } from '../../ui/i18n';
 // Option của 2 bảng liên động sang cột 切断時フラグ của tab Announce List.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── SMS認証設定: matching ưu tiên tên node Hearing theo regex gần nghĩa ─────────
+// Thứ tự KIỂM TRA đặt 着信元 TRƯỚC 連絡先 để 2 loại "電話番号" không lẫn nhau.
+const AUTH_MATCH: { key: string; re: RegExp }[] = [
+  { key: '氏名', re: /(氏名|名前|お名前|姓名|フルネーム|受信者名|患者名|利用者名|お客様名)/ },
+  { key: '生年月日', re: /(生年月日|誕生日|生年|バースデー|birth|dob)/i },
+  { key: '診察券番号', re: /(診察券|カルテ番号|患者番号|会員番号|受付番号|予約番号)/ },
+  { key: '着信元電話番号', re: /(着信元|発信元|着信番号|発信番号|発信者|着信者|かけている|今お使い)/ },
+  { key: '連絡先電話番号', re: /(連絡先|折り返し|携帯|電話番号|お電話番号|tel|phone)/i },
+];
+// Thứ tự HIỂN THỊ (khác thứ tự kiểm tra): 連絡先 đứng trước 着信元.
+const AUTH_DISPLAY_RANK: Record<string, number> = {
+  氏名: 0,
+  生年月日: 1,
+  診察券番号: 2,
+  連絡先電話番号: 3,
+  着信元電話番号: 4,
+};
+function authRank(label: string): number {
+  for (const m of AUTH_MATCH) if (m.re.test(label)) return AUTH_DISPLAY_RANK[m.key];
+  return 99; // không khớp -> giữ theo thứ tự flow, xuống sau nhóm ưu tiên.
+}
+
+// Option 認証設定: 認証なし + 優先1(đỏ)/優先2(cam)/優先3(xanh lá) — kiểu chip.
+type AuthPriority = 'none' | '1' | '2' | '3';
+const AUTH_CHIP: Record<AuthPriority, { labelKey: TKey; cls: string }> = {
+  none: { labelKey: 'stAuthNone', cls: 'bg-[var(--bk-surface-2)] text-[var(--bk-text-muted)]' },
+  '1': { labelKey: 'stAuthP1', cls: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  '2': { labelKey: 'stAuthP2', cls: 'bg-orange-500/15 text-orange-600 dark:text-orange-400' },
+  '3': { labelKey: 'stAuthP3', cls: 'bg-green-500/15 text-green-600 dark:text-green-400' },
+};
+
 export function StatusSettingsTab() {
   const t = useT();
   const ir = useFlowStore((s) => s.ir);
   const setSettings = useFlowStore((s) => s.setSettings);
+  const setNodeData = useFlowStore((s) => s.setNodeData);
   const settings = ensureSettings(ir?.settings);
   const [showInfo, setShowInfo] = useState(false);
+
+  // Có SMS flag nào KHÁC -2 (送信なし) không -> mới hiện block SMS認証設定.
+  const hasExtraSmsFlag = settings.smsFlags.some((s) => s.flag !== DEFAULT_SMS_FLAG);
+
+  // Danh sách node Hearing sắp theo: ưu tiên (氏名/生年月日/診察券番号/連絡先電話番号/
+  // 着信元電話番号 — khớp regex gần nghĩa) lên đầu; còn lại theo thứ tự flow (y, x).
+  const authNodes = useMemo<FlowNode[]>(() => {
+    const interactions = (ir?.nodes ?? []).filter((n) => n.type === 'interaction');
+    const byFlow = [...interactions].sort(
+      (a, b) => a.position.y - b.position.y || a.position.x - b.position.x,
+    );
+    return [...byFlow].sort((a, b) => authRank(a.label) - authRank(b.label));
+  }, [ir]);
 
   const setStatuses = (statuses: StatusEntry[]) => setSettings({ statuses });
   const setSmsFlags = (smsFlags: SmsFlagEntry[]) => setSettings({ smsFlags });
@@ -268,6 +313,52 @@ export function StatusSettingsTab() {
             setSmsFlags([...settings.smsFlags, { type: '', flag: nextSmsFlag(), content: '' }]),
           )}
         </section>
+
+        {/* ── SMS認証設定: chỉ hiện khi có SMS flag khác -2 ── */}
+        {hasExtraSmsFlag && (
+          <section className="mt-4 rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-4">
+            <h3 className="mb-3 text-[13px] font-bold text-[var(--bk-text)]">{t('stSecSmsAuth')}</h3>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+                  <th className="px-2 py-2">{t('stAuthColItem')}</th>
+                  <th className="w-48 px-2 py-2">{t('stAuthColSetting')}</th>
+                  <th className="w-40 px-2 py-2 text-center">{t('stAuthColDisplay')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {authNodes.map((node) => {
+                  const priority = (node.data.smsAuthPriority as AuthPriority) ?? 'none';
+                  const display = node.data.smsAuthDisplay === 'no' ? 'no' : 'yes';
+                  return (
+                    <tr key={node.id} className="border-b border-[var(--bk-border)] last:border-0">
+                      <td className="px-2 py-2 font-medium text-[var(--bk-text)]">{node.label}</td>
+                      <td className="px-2 py-1.5">
+                        <AuthPrioritySelect
+                          value={priority}
+                          onChange={(v) => setNodeData(node.id, { smsAuthPriority: v })}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <DisplaySelect
+                          value={display}
+                          onChange={(v) => setNodeData(node.id, { smsAuthDisplay: v })}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+                {authNodes.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-2 py-6 text-center text-xs text-[var(--bk-text-faint)]">
+                      {t('alEmpty')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+        )}
       </div>
 
       {/* Modal quy tắc đặt tên/đánh số status */}
@@ -295,6 +386,106 @@ export function StatusSettingsTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Pulldown TỰ VẼ nhỏ dùng chung cho 認証設定 / 確認画面表示 (đóng khi click ngoài).
+function MiniDropdown({
+  trigger,
+  children,
+  width = 'w-full',
+}: {
+  trigger: (open: boolean) => ReactNode;
+  children: (close: () => void) => ReactNode;
+  width?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+  return (
+    <div className={`relative ${width}`} ref={wrapRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-1.5 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2 py-1.5 text-left"
+      >
+        {trigger(open)}
+        <Icon icon="lucide:chevron-down" width={14} height={14} className="shrink-0 text-[var(--bk-text-faint)]" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
+          {children(() => setOpen(false))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Pulldown 認証設定: chip 認証なし / 優先1(đỏ)/優先2(cam)/優先3(xanh).
+function AuthPrioritySelect({ value, onChange }: { value: AuthPriority; onChange: (v: AuthPriority) => void }) {
+  const t = useT();
+  const chip = (v: AuthPriority) => {
+    const c = AUTH_CHIP[v];
+    return (
+      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${c.cls}`}>
+        {t(c.labelKey)}
+      </span>
+    );
+  };
+  return (
+    <MiniDropdown trigger={() => chip(value)}>
+      {(close) => (
+        <>
+          {(['none', '1', '2', '3'] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => {
+                onChange(v);
+                close();
+              }}
+              className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left transition hover:bg-[var(--bk-surface-2)] ${
+                v === value ? 'bg-[var(--bk-accent-soft)]' : ''
+              }`}
+            >
+              {chip(v)}
+            </button>
+          ))}
+        </>
+      )}
+    </MiniDropdown>
+  );
+}
+
+// 確認画面表示: NÚT BẤM toggle yes<->no bằng icon (không còn pulldown).
+//   yes → line-md:circle-filled-to-confirm-circle-filled-transition (xanh lá)
+//   no  → line-md:minus-circle-filled (đỏ nhẹ)
+function DisplaySelect({ value, onChange }: { value: 'yes' | 'no'; onChange: (v: 'yes' | 'no') => void }) {
+  const face =
+    value === 'yes'
+      ? { icon: 'line-md:circle-filled-to-confirm-circle-filled-transition', cls: 'text-emerald-500', label: 'YES' }
+      : { icon: 'line-md:minus-circle-filled', cls: 'text-rose-400', label: 'NO' };
+  return (
+    <div className="flex justify-center">
+      <button
+        type="button"
+        onClick={() => onChange(value === 'yes' ? 'no' : 'yes')}
+        aria-label={face.label}
+        title={face.label}
+        className={`inline-flex items-center justify-center rounded-lg p-1.5 transition hover:bg-[var(--bk-surface-2)] ${face.cls}`}
+      >
+        {/* key theo value để icon re-mount, chạy lại animation vẽ nét khi toggle */}
+        <Icon key={value} icon={face.icon} width={22} height={22} />
+      </button>
     </div>
   );
 }
