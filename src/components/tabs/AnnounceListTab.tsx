@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useFlowStore } from '../../store/flowStore';
 import { ensureSettings } from '../../ir/settings';
@@ -13,12 +13,12 @@ import { AutoGrowTextarea } from '../AutoGrowTextarea';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab "Announce List / アナウンス一覧" — gồm 2 MÀN, chuyển bằng nút cạnh tiêu đề:
-//   - Màn CHÍNH: bảng mọi node CÓ ANNOUNCE của flow đang mở, sửa trực tiếp ->
-//     ghi thẳng vào IR (liên động 2 chiều với tab Flow Diagram). Riêng cột
-//     切断時フラグ chỉ lưu vào node.data (không thể hiện trên diagram); option
-//     của nó liên động với tab Status Settings (statuses / smsFlags).
-//   - Màn PHỤ (リトライ・復唱アナウンス一覧): list câu announce của Retry /
-//     Re-confirm — các mục CÙNG câu announce gộp 1 dòng, sửa 1 lần áp cho cả nhóm.
+//   - Màn CHÍNH (Main): bảng mọi node CÓ ANNOUNCE của flow đang mở, sửa trực tiếp ->
+//     ghi thẳng vào IR (liên động 2 chiều với tab Flow Diagram). Cột 切断時フラグ
+//     lưu vào node.data (interaction dùng hangup*Flag; announce/transfer/hangup dùng
+//     statusFlag/smsFlag) — option liên động tab Status Settings.
+//   - Màn PHỤ (復唱・リトライ): Re-confirm luôn ở trên (1 node 1 câu); Retry để cơ
+//     chế catch-all (gộp theo câu) + có thể "thêm" node để tách riêng khỏi catch-all.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 15;
@@ -33,6 +33,15 @@ const CONTENT_KEY: Partial<Record<NodeType, string>> = {
 
 // Loại node có nhánh FAILED cố định -> chọn được "Retry 上限後".
 const FAILED_CAPABLE: ReadonlySet<NodeType> = new Set(['interaction', 'openai', 'faq', 'transfer']);
+
+// Cột 切断時フラグ: key data theo loại node. interaction lưu ở hangup*Flag (đồng bộ
+// panel Hearing); announce/transfer/hangup lưu ở statusFlag/smsFlag (cùng key panel CS).
+const FLAG_KEYS: Partial<Record<NodeType, { status: string; sms: string }>> = {
+  interaction: { status: 'hangupStatusFlag', sms: 'hangupSmsFlag' },
+  announce: { status: 'statusFlag', sms: 'smsFlag' },
+  transfer: { status: 'statusFlag', sms: 'smsFlag' },
+  hangup: { status: 'statusFlag', sms: 'smsFlag' },
+};
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
 
@@ -59,11 +68,14 @@ const RR_KIND: Record<
   },
 };
 
-// 1 dòng màn phụ: các node CÙNG loại (retry/reconfirm) và CÙNG câu announce gộp lại.
+// 1 dòng màn phụ. reconfirm: luôn 1 node. retry: catch-all gộp theo câu (nhiều node)
+// hoặc node đã "tách riêng" (retryBreakout) -> 1 node.
 interface RrRow {
+  key: string;
   kind: RrKind;
   nodes: FlowNode[];
   text: string;
+  catchAll?: boolean;
 }
 
 export function AnnounceListTab() {
@@ -74,7 +86,7 @@ export function AnnounceListTab() {
   const removeEdge = useFlowStore((s) => s.removeEdge);
   const settings = ensureSettings(ir?.settings);
 
-  // Màn đang xem: 'main' (announce chính) | 'sub' (リトライ・復唱).
+  // Màn đang xem: 'main' (announce chính) | 'sub' (復唱・リトライ).
   const [view, setView] = useState<'main' | 'sub'>('main');
 
   const rows = useMemo(
@@ -82,22 +94,47 @@ export function AnnounceListTab() {
     [ir],
   );
 
-  // Dòng màn phụ: node Hearing bật retry (>0) / reconfirm — nhóm theo câu announce.
+  // Dòng màn phụ (Re-confirm trước, Retry sau):
+  //  - Re-confirm: mỗi node bật 復唱 = 1 dòng riêng (1 node 1 câu, không gộp).
+  //  - Retry catch-all: các node retry CHƯA tách riêng, gộp theo câu リトライ.
+  //  - Retry tách riêng (data.retryBreakout): mỗi node 1 dòng.
   const subRows = useMemo<RrRow[]>(() => {
-    const buckets: Record<RrKind, Map<string, RrRow>> = { retry: new Map(), reconfirm: new Map() };
-    const add = (kind: RrKind, node: FlowNode) => {
-      const text = str(node.data[RR_KIND[kind].contentKey]);
-      const bucket = buckets[kind];
-      const row = bucket.get(text);
-      if (row) row.nodes.push(node);
-      else bucket.set(text, { kind, nodes: [node], text });
-    };
-    for (const n of ir?.nodes ?? []) {
-      if (n.type !== 'interaction') continue;
-      if (retryOn(n.data)) add('retry', n);
-      if (n.data.reconfirm === 'yes') add('reconfirm', n);
+    const interactions = (ir?.nodes ?? []).filter((n) => n.type === 'interaction');
+
+    // Re-confirm — 1 node 1 dòng.
+    const reconfirmRows: RrRow[] = interactions
+      .filter((n) => n.data.reconfirm === 'yes')
+      .map((n) => ({
+        key: `reconfirm:${n.id}`,
+        kind: 'reconfirm',
+        nodes: [n],
+        text: str(n.data.reconfirmAnnounce),
+      }));
+
+    // Retry — chia catch-all vs đã tách riêng.
+    const retryNodes = interactions.filter((n) => retryOn(n.data));
+    const brokenOut = retryNodes.filter((n) => n.data.retryBreakout === true);
+    const catchAllNodes = retryNodes.filter((n) => n.data.retryBreakout !== true);
+
+    // Catch-all: gộp theo câu announce.
+    const catchAllBuckets = new Map<string, RrRow>();
+    for (const n of catchAllNodes) {
+      const text = str(n.data.retryAnnounce);
+      const row = catchAllBuckets.get(text);
+      if (row) row.nodes.push(n);
+      else catchAllBuckets.set(text, { key: `retry-ca:${text}`, kind: 'retry', nodes: [n], text, catchAll: true });
     }
-    return [...buckets.retry.values(), ...buckets.reconfirm.values()];
+    const retryRows: RrRow[] = [
+      ...catchAllBuckets.values(),
+      ...brokenOut.map((n) => ({
+        key: `retry:${n.id}`,
+        kind: 'retry' as const,
+        nodes: [n],
+        text: str(n.data.retryAnnounce),
+      })),
+    ];
+
+    return [...reconfirmRows, ...retryRows];
   }, [ir]);
 
   const [page, setPage] = useState(0);
@@ -126,24 +163,39 @@ export function AnnounceListTab() {
     addEdge({ id: `${nodeId}->${targetId}#failed`, source: nodeId, target: targetId, sourceHandle: 'failed' });
   };
 
-  // Toggle kiểu ー / ✓ cho field yes/no. Cột 復唱 dùng tone cyan (đồng bộ màu icon
-  // status/flag trên node CS); FAQ giữ emerald như cũ.
-  const yesNoToggle = (node: FlowNode, key: string, tone: 'emerald' | 'cyan' = 'emerald') => {
+  // Thêm node vào màn phụ (chọn phân loại -> chọn node): bật tính năng + (retry) tách
+  // khỏi catch-all thành dòng riêng.
+  const addSubNode = (kind: RrKind, nodeId: string) => {
+    const node = ir?.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    if (kind === 'reconfirm') {
+      setNodeData(nodeId, { reconfirm: 'yes' });
+    } else {
+      setNodeData(nodeId, { retryBreakout: true, ...(retryOn(node.data) ? {} : { retryCount: '2' }) });
+    }
+  };
+
+  // Toggle TRÒN kiểu button (復唱 / FAQ) — border nét (border-2), icon theo yêu cầu:
+  // 復唱 dùng line-md:check-all tone amber (đồng bộ màu chip/stamp Re-confirm);
+  // FAQ dùng line-md:confirm tone emerald (giữ màu cũ).
+  const roundToggle = (node: FlowNode, key: string, opts: { tone: 'amber' | 'emerald'; icon: string }) => {
     const on = node.data[key] === 'yes';
     const onClass =
-      tone === 'cyan'
-        ? 'border-cyan-500 bg-cyan-500/90 text-white shadow-sm dark:border-cyan-400 dark:bg-cyan-400/80'
-        : 'border-emerald-500 bg-emerald-500/90 text-white shadow-sm dark:border-emerald-500 dark:bg-emerald-500/80';
+      opts.tone === 'amber'
+        ? 'border-amber-500 bg-amber-400 text-white shadow-sm dark:border-amber-400 dark:bg-amber-400'
+        : 'border-emerald-500 bg-emerald-500 text-white shadow-sm dark:border-emerald-500 dark:bg-emerald-500';
     return (
       <button
         type="button"
         onClick={() => setNodeData(node.id, { [key]: on ? 'no' : 'yes' })}
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-lg border transition ${
-          on ? onClass : 'border-[var(--bk-border)] text-[var(--bk-text-faint)] hover:text-[var(--bk-text)]'
-        }`}
         aria-pressed={on}
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-2 transition ${
+          on
+            ? onClass
+            : 'border-[var(--bk-border)] text-[var(--bk-text-faint)] hover:border-[var(--bk-text-muted)] hover:text-[var(--bk-text)]'
+        }`}
       >
-        {on ? <Icon icon="lucide:check" width={15} height={15} /> : 'ー'}
+        <Icon icon={opts.icon} width={16} height={16} />
       </button>
     );
   };
@@ -153,28 +205,22 @@ export function AnnounceListTab() {
   const inheritedFlags = useMemo(() => computeInheritedFlags(ir), [ir]);
   const chipSelect = (
     node: FlowNode,
-    key: 'hangupStatusFlag' | 'hangupSmsFlag',
+    dataKey: string,
+    kind: 'status' | 'sms',
     label: string,
     options: { value: string; label: string }[],
   ) => {
     const inheritedValue =
-      key === 'hangupStatusFlag'
-        ? inheritedFlags.get(node.id)?.statusFlag
-        : inheritedFlags.get(node.id)?.smsFlag;
+      kind === 'status' ? inheritedFlags.get(node.id)?.statusFlag : inheritedFlags.get(node.id)?.smsFlag;
     const inheritedLabel = inheritedValue
       ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
       : '';
-    // Pulldown TỰ VẼ (FlagSelect): mặt đóng + dòng đầu list đều hiện stamp 継続/Carried
-    // (màu tím thống nhất) kèm "<flag> - <tên>" — không gạch phân cách, không dòng lặp.
     return (
     <label className="flex items-center gap-1.5">
-      {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau.
-          Màu phân biệt 2 loại: Status (状態) nền xanh ngọc (水色 đậm hơn một chút)
-          trong suốt theo yêu cầu CS, SMS Flag nền vàng sáng trong suốt — chữ đậm
-          cùng tông để giữ contrast cả light/dark. */}
+      {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau. */}
       <span
         className={`inline-flex w-[72px] shrink-0 justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${
-          key === 'hangupStatusFlag'
+          kind === 'status'
             ? 'bg-cyan-500/20 text-cyan-600 dark:bg-cyan-500/25 dark:text-cyan-300'
             : 'bg-amber-300/25 text-amber-600 dark:bg-amber-300/25 dark:text-amber-300'
         }`}
@@ -183,8 +229,8 @@ export function AnnounceListTab() {
       </span>
       <div className="min-w-0 flex-1">
         <FlagSelect
-          value={str(node.data[key])}
-          onChange={(v) => setNodeData(node.id, { [key]: v })}
+          value={str(node.data[dataKey])}
+          onChange={(v) => setNodeData(node.id, { [dataKey]: v })}
           options={options}
           inheritedValue={inheritedValue}
           inheritedLabel={inheritedLabel}
@@ -198,7 +244,6 @@ export function AnnounceListTab() {
   };
 
   // Nhãn option dạng "0 - 途中切断" (flag - tên) theo yêu cầu team CS.
-  // Pulldown 状態 (切断時フラグ) chỉ dùng các flag 0,1,2,3,6 theo yêu cầu team CS.
   const STATUS_FLAG_WHITELIST = new Set([0, 1, 2, 3, 6]);
   const statusOptions = settings.statuses
     .filter((s) => STATUS_FLAG_WHITELIST.has(s.flag))
@@ -207,8 +252,6 @@ export function AnnounceListTab() {
 
   return (
     <div className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">
-      {/* Nới bề rộng bảng (max 1600px) để cột 切断時フラグ đủ chỗ cho stamp Carried
-          + nhãn flag dài — flag quá dài vẫn cắt bằng "…" trong pulldown. */}
       <div className="mx-auto max-w-[1600px]">
         {/* Tiêu đề màn (đổi theo màn đang xem) + nút chuyển màn chính⇄phụ ngay cạnh */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -218,12 +261,12 @@ export function AnnounceListTab() {
             </span>
             {view === 'main' ? t('ctAnnounce') : t('alSubTitle')}
           </div>
-          {/* Segmented switch: viên thuốc 2 nút, nút active nền accent nhạt. */}
+          {/* Segmented switch: viên thuốc 2 nút (KHÔNG icon), nút active nền accent nhạt. */}
           <div className="flex items-center gap-0.5 rounded-full border border-[var(--bk-border)] bg-[var(--bk-surface)] p-0.5 shadow-sm">
             {(
               [
-                { id: 'main', icon: 'lucide:volume-2', labelKey: 'alViewMain' },
-                { id: 'sub', icon: 'line-md:chat-filled', labelKey: 'alViewSub' },
+                { id: 'main', labelKey: 'alViewMain' },
+                { id: 'sub', labelKey: 'alViewSub' },
               ] as const
             ).map((v) => {
               const on = view === v.id;
@@ -233,13 +276,12 @@ export function AnnounceListTab() {
                   type="button"
                   onClick={() => switchView(v.id)}
                   aria-pressed={on}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition ${
+                  className={`rounded-full px-3.5 py-1 text-xs transition ${
                     on
                       ? 'bg-[var(--bk-accent-soft)] font-bold text-[var(--bk-accent)]'
                       : 'font-semibold text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]'
                   }`}
                 >
-                  <Icon icon={v.icon} width={13} height={13} />
                   {t(v.labelKey)}
                 </button>
               );
@@ -258,7 +300,6 @@ export function AnnounceListTab() {
                 <th className="px-3 py-2.5">{t('alColRetryFailed')}</th>
                 <th className="px-3 py-2.5 text-center">{t('alColFaq')}</th>
                 <th className="w-[310px] px-3 py-2.5">{t('alColHangup')}</th>
-                {/* 発話文言 — cột rộng nhất */}
                 <th className="w-[34%] px-3 py-2.5">{t('alColAnnounce')}</th>
               </tr>
             </thead>
@@ -268,18 +309,14 @@ export function AnnounceListTab() {
                 const isHearing = node.type === 'interaction';
                 const contentKey = CONTENT_KEY[node.type]!;
                 const failed = failedTargetOf(node.id);
-                // Retry: rỗng coi như 0 (tắt); CHƯA TỪNG nhập mới áp default 2.
                 const rawRetry = node.data.retryCount;
                 const retryValue = rawRetry == null ? '2' : str(rawRetry).trim() || '0';
+                const flagKeys = FLAG_KEYS[node.type];
                 return (
-                  // align-middle: các ô ngoài 発話文言 căn GIỮA theo chiều dọc dòng —
-                  // chiều cao dòng do ô announce (tự cao theo nội dung) quyết định.
                   <tr key={node.id} className="border-b border-[var(--bk-border)] align-middle last:border-0">
-                    {/* 聴取項目: tên node + chấm màu loại */}
+                    {/* 聴取項目: tên node + huy hiệu màu loại */}
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
-                        {/* Icon loại node trong huy hiệu TRÒN (thay chấm màu) — màu icon =
-                            màu loại node, nền pha nhẹ cùng màu. */}
                         <span
                           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
                           style={{ color: cfg.color, background: `color-mix(in srgb, ${cfg.color} 16%, transparent)` }}
@@ -289,23 +326,27 @@ export function AnnounceListTab() {
                         <span className="font-semibold text-[var(--bk-text)]">{node.label}</span>
                       </div>
                     </td>
-                    {/* 復唱: toggle (cyan) + icon chat khi bật -> hover xem câu 復唱 */}
+                    {/* 復唱: toggle tròn (check-all, amber) — icon câu 復唱 hiện BÊN CẠNH,
+                        không xô lệch vị trí toggle (định vị absolute). */}
                     <td className="px-3 py-2 text-center">
                       {isHearing ? (
-                        <span className="inline-flex items-center justify-center gap-1.5">
-                          {yesNoToggle(node, 'reconfirm', 'cyan')}
+                        <span className="relative inline-flex items-center justify-center">
+                          {roundToggle(node, 'reconfirm', { tone: 'amber', icon: 'line-md:check-all' })}
                           {node.data.reconfirm === 'yes' && (
-                            <RrHint kind="reconfirm" text={str(node.data.reconfirmAnnounce)} />
+                            <span className="absolute left-full top-1/2 ml-1.5 -translate-y-1/2">
+                              <RrHint kind="reconfirm" text={str(node.data.reconfirmAnnounce)} />
+                            </span>
                           )}
                         </span>
                       ) : (
                         dash
                       )}
                     </td>
-                    {/* リトライ回数: 0-5 + icon chat khi >0 -> hover xem câu リトライ */}
+                    {/* リトライ回数: pulldown 0-5 — icon câu リトライ hiện BÊN CẠNH, không
+                        xô lệch pulldown (định vị absolute). */}
                     <td className="px-3 py-2 text-center">
                       {isHearing ? (
-                        <span className="inline-flex items-center justify-center gap-1.5">
+                        <span className="relative inline-flex items-center justify-center">
                           <select
                             value={retryValue}
                             onChange={(e) => setNodeData(node.id, { retryCount: e.target.value })}
@@ -317,7 +358,11 @@ export function AnnounceListTab() {
                               </option>
                             ))}
                           </select>
-                          {retryOn(node.data) && <RrHint kind="retry" text={str(node.data.retryAnnounce)} />}
+                          {retryOn(node.data) && (
+                            <span className="absolute left-full top-1/2 ml-1.5 -translate-y-1/2">
+                              <RrHint kind="retry" text={str(node.data.retryAnnounce)} />
+                            </span>
+                          )}
                         </span>
                       ) : (
                         dash
@@ -344,22 +389,23 @@ export function AnnounceListTab() {
                         dash
                       )}
                     </td>
-                    {/* FAQ設定 */}
-                    <td className="px-3 py-2 text-center">{isHearing ? yesNoToggle(node, 'faqEnabled') : dash}</td>
-                    {/* 切断時フラグ: 2 chip Status / SMS Flag — option từ tab Status Settings.
-                        KHÔNG liên động với diagram (chỉ lưu trong node.data). */}
+                    {/* FAQ設定: toggle tròn (confirm, emerald) */}
+                    <td className="px-3 py-2 text-center">
+                      {isHearing ? roundToggle(node, 'faqEnabled', { tone: 'emerald', icon: 'line-md:confirm' }) : dash}
+                    </td>
+                    {/* 切断時フラグ: 2 chip Status / SMS Flag — hiện cho MỌI node có flag
+                        (interaction + announce/transfer/hangup). */}
                     <td className="px-3 py-2">
-                      {isHearing ? (
+                      {flagKeys ? (
                         <div className="flex flex-col gap-1.5">
-                          {chipSelect(node, 'hangupStatusFlag', t('alStatusChip'), statusOptions)}
-                          {chipSelect(node, 'hangupSmsFlag', t('alSmsChip'), smsOptions)}
+                          {chipSelect(node, flagKeys.status, 'status', t('alStatusChip'), statusOptions)}
+                          {chipSelect(node, flagKeys.sms, 'sms', t('alSmsChip'), smsOptions)}
                         </div>
                       ) : (
                         dash
                       )}
                     </td>
-                    {/* 発話文言: textbox "1 dòng logic" — không cho Enter, text dài tự
-                        wrap theo đúng bề ngang cột và tự tăng chiều cao dòng. */}
+                    {/* 発話文言 */}
                     <td className="px-3 py-2">
                       <AutoGrowTextarea
                         value={str(node.data[contentKey])}
@@ -381,12 +427,13 @@ export function AnnounceListTab() {
           </table>
         </div>
         ) : (
-        // ── Màn PHỤ: リトライ・復唱アナウンス一覧 ──────────────────────────────
+        // ── Màn PHỤ: 復唱・リトライアナウンス一覧 ────────────────────────────────
+        <>
         <div className="overflow-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
           <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-                <th className="w-[150px] px-3 py-2.5">{t('alColType')}</th>
+                <th className="w-[170px] px-3 py-2.5">{t('alColType')}</th>
                 <th className="px-3 py-2.5">{t('alColSubItems')}</th>
                 <th className="w-[46%] px-3 py-2.5">{t('alColAnnounce')}</th>
               </tr>
@@ -396,7 +443,7 @@ export function AnnounceListTab() {
                 const cfg = RR_KIND[row.kind];
                 return (
                   <tr
-                    key={`${row.kind}:${row.nodes.map((n) => n.id).join(',')}`}
+                    key={row.key}
                     className="border-b border-[var(--bk-border)] align-middle last:border-0"
                   >
                     {/* 分類: logo + màu đặc trưng (đúng icon indicator trên node CS) */}
@@ -409,10 +456,14 @@ export function AnnounceListTab() {
                           <Icon icon={cfg.icon} width={13} height={13} />
                         </span>
                         <span className="font-semibold text-[var(--bk-text)]">{t(cfg.typeKey)}</span>
+                        {row.catchAll && (
+                          <span className="rounded-full bg-[color-mix(in_srgb,var(--bk-text)_10%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--bk-text-muted)]">
+                            {t('alCatchAll')}
+                          </span>
+                        )}
                       </div>
                     </td>
-                    {/* 項目: tên node — các mục cùng câu announce gộp 1 dòng,
-                        hiển thị dạng chip tự wrap nhiều dòng. */}
+                    {/* 項目: tên node — chip tự wrap nhiều dòng. */}
                     <td className="px-3 py-2.5">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {row.nodes.map((n) => (
@@ -452,6 +503,9 @@ export function AnnounceListTab() {
             </tbody>
           </table>
         </div>
+        {/* Nút thêm node vào màn phụ (chọn phân loại -> chọn node) */}
+        <AddRrForm nodes={(ir?.nodes ?? []).filter((n) => n.type === 'interaction')} onAdd={addSubNode} />
+        </>
         )}
 
         {/* Phân trang: tối đa 15 dòng / trang (theo màn đang xem) */}
@@ -486,15 +540,192 @@ export function AnnounceListTab() {
   );
 }
 
-// ── Icon chat + hover card xem câu announce của Retry / Re-confirm ────────────
-// Icon line-md:chat-filled màu cyan (đồng bộ màu icon status/flag trên node CS).
-// Hover -> card nổi (portal ra <body>, không bị bảng cắt): header là icon màu
-// đặc trưng (không viền/nền) + tiêu đề chữ xám bold; dưới là nội dung announce.
+// ── Nút "Thêm" node vào màn phụ ──────────────────────────────────────────────
+// Bấm plus-square-filled -> mở form: chọn 分類 (Retry/Re-confirm) + pulldown chọn
+// node (search theo tên) + nút xác nhận plus-circle.
+function AddRrForm({
+  nodes,
+  onAdd,
+}: {
+  nodes: FlowNode[];
+  onAdd: (kind: RrKind, nodeId: string) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<RrKind>('reconfirm');
+  const [nodeId, setNodeId] = useState('');
 
-// Element icon trigger dùng CHUNG 1 reference cho mọi render: Iconify <Icon> mỗi
-// lần re-render sẽ THAY children của <svg> (sinh id mask mới) ngay dưới con trỏ,
-// làm browser bắn mouseenter lặp vô hạn và nuốt mất mouseleave (card không ẩn).
-// Cùng reference -> React bail-out, SVG giữ nguyên -> enter/leave hoạt động đúng.
+  // Node còn "thêm được": reconfirm -> chưa bật 復唱; retry -> chưa tách riêng.
+  const candidates = useMemo(
+    () =>
+      nodes.filter((n) =>
+        kind === 'reconfirm' ? n.data.reconfirm !== 'yes' : n.data.retryBreakout !== true,
+      ),
+    [nodes, kind],
+  );
+
+  // Đổi phân loại -> reset node đã chọn nếu không còn hợp lệ.
+  useEffect(() => {
+    if (nodeId && !candidates.some((n) => n.id === nodeId)) setNodeId('');
+  }, [candidates, nodeId]);
+
+  const cfg = RR_KIND[kind];
+  const canAdd = nodeId && candidates.some((n) => n.id === nodeId);
+
+  const submit = () => {
+    if (!canAdd) return;
+    onAdd(kind, nodeId);
+    setNodeId('');
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-dashed border-[var(--bk-border)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+      >
+        <Icon icon="line-md:plus-square-filled" width={18} height={18} />
+        {t('alAddRow')}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-3 shadow-sm">
+      {/* 分類 */}
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+          {t('alAddPickKind')}
+        </span>
+        <div className="flex items-center gap-0.5 rounded-full border border-[var(--bk-border)] bg-[var(--bk-canvas)] p-0.5">
+          {(['reconfirm', 'retry'] as const).map((k) => {
+            const on = kind === k;
+            const kcfg = RR_KIND[k];
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                  on ? 'text-white shadow-sm' : 'text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]'
+                }`}
+                style={on ? { background: kcfg.color } : undefined}
+              >
+                <Icon icon={kcfg.icon} width={13} height={13} />
+                {t(kcfg.typeKey)}
+              </button>
+            );
+          })}
+        </div>
+      </label>
+      {/* Chọn node (search) */}
+      <label className="flex min-w-[240px] flex-1 flex-col gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+          {t('alAddPickNode')}
+        </span>
+        <NodePicker
+          nodes={candidates}
+          value={nodeId}
+          onChange={setNodeId}
+          accent={cfg.color}
+          emptyLabel={t('alAddNoNode')}
+        />
+      </label>
+      {/* Xác nhận */}
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!canAdd}
+        className="inline-flex items-center gap-2 rounded-xl border border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-accent)] transition enabled:hover:bg-[var(--bk-accent)] enabled:hover:text-white disabled:opacity-40"
+      >
+        <Icon icon="line-md:plus-circle" width={18} height={18} />
+        {t('alAddConfirm')}
+      </button>
+    </div>
+  );
+}
+
+// Pulldown chọn node có search theo tên (giống searchSelect của panel setting).
+function NodePicker({
+  nodes,
+  value,
+  onChange,
+  accent,
+  emptyLabel,
+}: {
+  nodes: FlowNode[];
+  value: string;
+  onChange: (id: string) => void;
+  accent: string;
+  emptyLabel: string;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const selected = nodes.find((n) => n.id === value);
+  const q = query.trim().toLowerCase();
+  const visible = q ? nodes.filter((n) => n.label.toLowerCase().includes(q)) : nodes;
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <input
+        type="text"
+        className="w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-1.5 pr-8 text-sm text-[var(--bk-text)] outline-none focus:border-[var(--bk-accent)]"
+        value={open ? query : selected?.label ?? ''}
+        placeholder={t('searchSelectPlaceholder')}
+        onFocus={() => {
+          setOpen(true);
+          setQuery('');
+        }}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+      />
+      <Icon
+        icon="lucide:chevron-down"
+        width={15}
+        height={15}
+        className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--bk-text-faint)] transition-transform ${open ? 'rotate-180' : ''}`}
+      />
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
+          {visible.length === 0 ? (
+            <div className="px-2.5 py-2 text-xs text-[var(--bk-text-faint)]">{emptyLabel}</div>
+          ) : (
+            visible.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(n.id);
+                  setOpen(false);
+                }}
+                className={[
+                  'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition',
+                  n.id === value
+                    ? 'bg-[var(--bk-accent-soft)] font-medium text-[var(--bk-accent)]'
+                    : 'text-[var(--bk-text)] hover:bg-[var(--bk-surface-2)]',
+                ].join(' ')}
+                title={n.label}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} />
+                <span className="min-w-0 truncate">{n.label}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Icon chat + hover card xem câu announce của Retry / Re-confirm ────────────
 const CHAT_TRIGGER_ICON = <Icon icon="line-md:chat-filled" width={16} height={16} />;
 
 function RrHint({ kind, text }: { kind: RrKind; text: string }) {
@@ -503,7 +734,6 @@ function RrHint({ kind, text }: { kind: RrKind; text: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number; below: boolean } | null>(null);
 
-  // Ẩn card nếu cuộn/zoom (vị trí đã cũ) — giống useFloatingTip của HoverTip.
   useLayoutEffect(() => {
     if (!pos) return;
     const onScroll = () => setPos(null);
@@ -513,10 +743,10 @@ function RrHint({ kind, text }: { kind: RrKind; text: string }) {
 
   const show = () => {
     const el = ref.current;
-    if (!el || pos) return; // đang mở rồi -> không set lại (tránh vòng re-render)
+    if (!el || pos) return;
     const r = el.getBoundingClientRect();
     const x = Math.min(Math.max(r.left + r.width / 2, 210), window.innerWidth - 210);
-    const below = r.top < 140; // gần mép trên -> lật xuống dưới cho khỏi tràn màn hình
+    const below = r.top < 140;
     setPos({ x, y: below ? r.bottom : r.top, below });
   };
 

@@ -53,7 +53,7 @@ export interface NodeDraft {
 
 // Các tab của màn canvas (dưới header). 'flow' = canvas React Flow; các tab khác
 // là UI bảng/form thường (Announce List / General Settings / Status Settings).
-export type CanvasTab = 'flow' | 'announce' | 'general' | 'status';
+export type CanvasTab = 'flow' | 'announce' | 'general' | 'status' | 'clinicalDept' | 'courseList';
 
 interface FlowState {
   // ir.nodes/edges là graph ĐANG MỞ (main flow hoặc 1 sub flow — xem activeFlowId).

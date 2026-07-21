@@ -5,6 +5,7 @@ import {
   type ScenarioSettings,
   type SmsFlagEntry,
   type StatusEntry,
+  type SynonymRow,
   type TimeRange,
 } from './types';
 
@@ -132,10 +133,24 @@ function normalizeSmsFlags(raw: unknown): SmsFlagEntry[] {
   return [...FIXED_SMS_FLAGS.map((s) => ({ ...s })), ...rest];
 }
 
+// Bảng 類義語 (診療科一覧 / コースリスト): chỉ đọc khi field TỒN TẠI trong file
+// (undefined = chưa tạo trang). Mỗi dòng: name + mảng synonyms (chip).
+function normalizeSynonymRows(raw: unknown): SynonymRow[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+    .map((s) => ({
+      name: str(s.name),
+      synonyms: Array.isArray(s.synonyms) ? s.synonyms.map((w) => str(w)).filter((w) => w !== '') : [],
+    }));
+}
+
 // Chuẩn hoá settings đọc từ YAML (hoặc undefined) về object đầy đủ field.
 export function normalizeSettings(raw: unknown): ScenarioSettings {
   if (!raw || typeof raw !== 'object') return defaultSettings();
   const r = raw as Record<string, unknown>;
+  const clinicalDepartments = normalizeSynonymRows(r.clinicalDepartments);
+  const courses = normalizeSynonymRows(r.courses);
   return {
     mainPhone: str(r.mainPhone),
     master050: str(r.master050),
@@ -147,6 +162,8 @@ export function normalizeSettings(raw: unknown): ScenarioSettings {
     timeoutSec: str(r.timeoutSec),
     statuses: normalizeStatuses(r.statuses),
     smsFlags: normalizeSmsFlags(r.smsFlags),
+    ...(clinicalDepartments ? { clinicalDepartments } : {}),
+    ...(courses ? { courses } : {}),
   };
 }
 

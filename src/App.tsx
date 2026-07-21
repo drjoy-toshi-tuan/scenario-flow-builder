@@ -14,6 +14,7 @@ import { CanvasTabs } from './components/tabs/CanvasTabs';
 import { AnnounceListTab } from './components/tabs/AnnounceListTab';
 import { GeneralSettingsTab } from './components/tabs/GeneralSettingsTab';
 import { StatusSettingsTab } from './components/tabs/StatusSettingsTab';
+import { SynonymTableTab } from './components/tabs/SynonymTableTab';
 import { useFlowStore } from './store/flowStore';
 import { useWorkspaceStore } from './store/workspaceStore';
 import { Toast } from './ui/Toast';
@@ -69,6 +70,8 @@ function FlowApp() {
         {csMode && tab === 'announce' && <AnnounceListTab />}
         {csMode && tab === 'general' && <GeneralSettingsTab />}
         {csMode && tab === 'status' && <StatusSettingsTab />}
+        {csMode && tab === 'clinicalDept' && <SynonymTableTab kind="clinicalDept" />}
+        {csMode && tab === 'courseList' && <SynonymTableTab kind="courseList" />}
       </main>
     </div>
   );

@@ -62,6 +62,12 @@ export interface SmsFlagEntry {
   fixed?: boolean;
 }
 
+// 1 dòng bảng "類義語" (診療科一覧 / コースリスト): 1 tên chính + danh sách từ gần nghĩa.
+export interface SynonymRow {
+  name: string; // 診療科 / コース・追加オプション
+  synonyms: string[]; // 類義語 — hiển thị dạng chip
+}
+
 export interface ScenarioSettings {
   mainPhone: string; // 代表電話（直通電話）
   master050: string; // 050番号 — môi trường master (本番)
@@ -73,6 +79,10 @@ export interface ScenarioSettings {
   timeoutSec: string; // 無回答待機時間 (giây)
   statuses: StatusEntry[]; // tab Status Settings — phần 状態
   smsFlags: SmsFlagEntry[]; // tab Status Settings — phần SMSフラグ
+  // Trang bảng phụ (thêm qua nút "+" trên dải tab). undefined = chưa tạo trang;
+  // [] = đã tạo nhưng chưa có dòng. Round-trip qua YAML như field settings khác.
+  clinicalDepartments?: SynonymRow[]; // 診療科一覧
+  courses?: SynonymRow[]; // コースリスト
 }
 
 export interface SubFlow {
