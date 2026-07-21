@@ -2336,6 +2336,20 @@ function PickOrCreateField({
   const [open, setOpen] = useState(false);
   // Chữ đang gõ để LỌC folder (chỉ ở chế độ chọn). Rỗng -> hiện toàn bộ.
   const [filter, setFilter] = useState('');
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // Click ra ngoài -> đóng list (thay cho lớp phủ full màn: lớp phủ + z-index từng
+  // gây "bóng ma" icon của field bên dưới đè lên dropdown).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setFilter('');
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
 
   // ── Chế độ TẠO MỚI: textbox nhập tên (icon + bên trái, ✕ để quay lại chọn/lọc) ──
   if (selected === NEW_OPTION) {
@@ -2389,8 +2403,8 @@ function PickOrCreateField({
   };
 
   return (
-    <div className={`relative ${className}`}>
-      <span className="pointer-events-none absolute left-3 top-1/2 z-30 -translate-y-1/2 text-[var(--bk-accent)]">
+    <div className={`relative ${open ? 'z-20 ' : ''}${className}`} ref={wrapRef}>
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--bk-accent)]">
         <Icon icon={optionIcon} width={15} height={15} />
       </span>
       <input
@@ -2412,46 +2426,39 @@ function PickOrCreateField({
           if (e.key === 'Escape') closeList();
         }}
         placeholder={current ? current.name : placeholder}
-        // Khi mở list: nâng input lên trên lớp phủ đóng-ngoài (z-10) để vẫn bấm được.
-        className={`${FIELD_CLS} pl-9 pr-9 ${open ? 'relative z-20' : ''}`}
+        className={`${FIELD_CLS} pl-9 pr-9`}
       />
       <Icon
         icon="lucide:chevron-down"
         width={14}
         height={14}
-        className={`pointer-events-none absolute right-3 top-1/2 z-30 -translate-y-1/2 text-[var(--bk-text-muted)] transition ${open ? 'rotate-180' : ''}`}
+        className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--bk-text-muted)] transition ${open ? 'rotate-180' : ''}`}
       />
       {open && (
-        <>
-          {/* Lớp phủ trong suốt để click ra ngoài là đóng list */}
-          <div className="fixed inset-0 z-10" onClick={closeList} />
-          <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] py-1 shadow-lg">
+        <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={chooseCreate}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[var(--bk-accent)] transition hover:bg-[var(--bk-accent-soft)]"
+          >
+            <Icon icon="line-md:plus" width={15} height={15} />
+            {createLabel}
+          </button>
+          <div className="mx-2 my-1 h-px bg-[var(--bk-border)]" aria-hidden />
+          {filtered.map((o) => (
             <button
+              key={o.id}
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={chooseCreate}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[var(--bk-accent)] transition hover:bg-[var(--bk-accent-soft)]"
+              onClick={() => pick(o.id)}
+              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-[var(--bk-surface-2)] ${
+                o.id === selected ? 'font-semibold text-[var(--bk-accent)]' : 'text-[var(--bk-text)]'
+              }`}
             >
-              <Icon icon="line-md:plus" width={15} height={15} />
-              {createLabel}
+              <Icon icon={optionIcon} width={15} height={15} className="shrink-0 text-[var(--bk-accent)]" />
+              <span className="truncate">{o.name}</span>
             </button>
-            <div className="mx-2 my-1 h-px bg-[var(--bk-border)]" aria-hidden />
-            {filtered.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(o.id)}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-[var(--bk-surface-2)] ${
-                  o.id === selected ? 'font-semibold text-[var(--bk-accent)]' : 'text-[var(--bk-text)]'
-                }`}
-              >
-                <Icon icon={optionIcon} width={15} height={15} className="shrink-0 text-[var(--bk-accent)]" />
-                <span className="truncate">{o.name}</span>
-              </button>
-            ))}
-          </div>
-        </>
+          ))}
+        </div>
       )}
     </div>
   );
