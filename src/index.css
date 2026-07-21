@@ -147,15 +147,24 @@ body {
   border: 1.5px dashed var(--bk-accent);
   border-radius: 6px;
 }
-/* Khung BAO quanh nhóm node đã chọn (hiện SAU khi kéo-chọn xong / chọn nhiều node):
-   viền accent + nền mờ để thấy rõ "đang chọn cả nhóm", và tự NỞ RA khi thêm/bớt node.
-   Đây cũng chính là vùng kéo để di chuyển cả nhóm cùng lúc. */
-.react-flow__nodesselection-rect,
-.react-flow__nodesselection .react-flow__nodesselection-rect {
+/* Khung nhóm mặc định của React Flow chỉ hiện khi KÉO KHUNG (không có khi Ctrl/Shift+
+   click). Ta tự vẽ khung riêng (.bk-selection-box, xem SelectionOverlay) hiện nhất quán
+   cho MỌI cách chọn -> tắt hẳn phần vẽ của RF để tránh 2 khung chồng nhau. Vẫn giữ
+   pointer-events để nắm khung kéo cả nhóm hoạt động như thường. */
+.react-flow__nodesselection-rect {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+/* Khung BAO quanh nhóm node đang chọn (≥2) — vùng cam. Tự vẽ qua ViewportPortal nên
+   hiện cả khi Ctrl/Shift+click và tự NỞ RA theo bbox nhóm. Nằm DƯỚI node (z âm) để
+   node + glow của node vẽ đè lên trên. */
+.bk-selection-box {
+  z-index: -1;
   background: var(--bk-accent-soft);
   border: 1.5px solid var(--bk-accent);
-  border-radius: 10px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bk-accent) 16%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bk-accent) 14%, transparent);
 }
 
 /* Dây nối: dùng token màu; nhánh được chọn/hover đổi sang accent. */
@@ -336,9 +345,12 @@ body {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-border));
 }
 .bk-node:not(.bk-node--cs).bk-node--selected .bk-node-skin {
-  /* Ring accent ĐẶC (nổi rõ là "đang chọn") + quầng ngoài mờ để tách khỏi nền. */
+  /* Ring accent ĐẶC + quầng sáng MỀM (blur) toả ra — giống hiệu ứng chọn ở screenshot. */
   border-color: var(--accent);
-  box-shadow: 0 0 0 2.5px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent), var(--bk-shadow);
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 16px 2px color-mix(in srgb, var(--accent) 45%, transparent),
+    var(--bk-shadow);
 }
 .bk-node-body {
   display: flex;
@@ -460,7 +472,10 @@ body {
 }
 .bk-node--cs.bk-node--selected .bk-cs-skin {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2.5px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent), var(--bk-shadow);
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 16px 2px color-mix(in srgb, var(--accent) 45%, transparent),
+    var(--bk-shadow);
 }
 /* Bố cục CS: TÊN node căn giữa đúng tâm node; dải icon biểu thị neo absolute góc
    dưới phải (xem .bk-cs-indicators). Nâng lên trên lớp .bk-cs-skin (positioned) —

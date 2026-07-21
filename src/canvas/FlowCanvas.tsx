@@ -26,6 +26,7 @@ import { nodeTypes } from './nodes';
 import { edgeTypes } from './edges/DeletableEdge';
 import { AddModulePanel, DND_MIME } from '../components/AddModulePanel';
 import { CanvasControls } from './CanvasControls';
+import { SelectionOverlay } from './SelectionOverlay';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canvas React Flow. IR là source of truth:
@@ -300,6 +301,8 @@ export function FlowCanvas() {
         <AddModulePanel />
       </Panel>
       <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
+      {/* Khung cam bao nhóm node đang chọn (≥2) — tự vẽ để hiện cả khi Ctrl/Shift+click. */}
+      <SelectionOverlay />
       {/* Thanh công cụ canvas NGANG (zoom/fit/lock/undo/redo) sau 1 nút toggle. */}
       <Panel position="bottom-left">
         <CanvasControls />
