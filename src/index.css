@@ -312,7 +312,7 @@ body {
   padding: 12px 14px 12px 16px;
   /* KHÔNG dùng overflow:hidden ở đây — nó sẽ cắt handle (điểm nối) thành nửa
      hình tròn. Thanh accent bên trái vẽ trên skin nên tự bo góc theo card. */
-  transition: transform 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.18s ease;
 }
 /* Thanh accent trái đã chuyển sang .bk-node-skin::before -> bỏ ::before trên root. */
 .bk-node::before {
@@ -344,12 +344,19 @@ body {
 .bk-node:not(.bk-node--cs):hover .bk-node-skin {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--bk-border));
 }
+/* Node được chọn: viền CAM đậm ở mép card (box-shadow ring + glow đặt trên ROOT ở dưới —
+   KHÔNG đặt trên .bk-node-skin vì skin bị mask khoét lỗ output, mask cắt luôn box-shadow
+   toả ra ngoài nên ring/glow trên skin sẽ vô hình với mọi node có lỗ khoét). */
 .bk-node:not(.bk-node--cs).bk-node--selected .bk-node-skin {
-  /* Ring accent ĐẶC + quầng sáng MỀM (blur) toả ra — giống hiệu ứng chọn ở screenshot. */
-  border-color: var(--accent);
+  border-color: var(--bk-accent);
+}
+/* Ring CAM DÀY + quầng GLOW toả ra — đặt trên ROOT (không mask) nên hiện với MỌI node
+   ở cả TS lẫn CS. Dùng 2 class (.bk-node.bk-node--selected) để thắng box-shadow:none của
+   cả .bk-node (TS) lẫn .bk-node--cs (CS). border-radius kế thừa root (18px TS / 30px CS). */
+.bk-node.bk-node--selected {
   box-shadow:
-    0 0 0 3px var(--accent),
-    0 0 16px 2px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 0 3px var(--bk-accent),
+    0 0 22px 4px color-mix(in srgb, var(--bk-accent) 55%, transparent),
     var(--bk-shadow);
 }
 .bk-node-body {
@@ -466,16 +473,8 @@ body {
      nhờ translateY) — không hạ tông viền. */
   border-color: var(--accent);
 }
-.bk-node--cs.bk-node--selected {
-  border-color: transparent;
-  box-shadow: none;
-}
 .bk-node--cs.bk-node--selected .bk-cs-skin {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 3px var(--accent),
-    0 0 16px 2px color-mix(in srgb, var(--accent) 45%, transparent),
-    var(--bk-shadow);
+  border-color: var(--bk-accent);
 }
 /* Bố cục CS: TÊN node căn giữa đúng tâm node; dải icon biểu thị neo absolute góc
    dưới phải (xem .bk-cs-indicators). Nâng lên trên lớp .bk-cs-skin (positioned) —
