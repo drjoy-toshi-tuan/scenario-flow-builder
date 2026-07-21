@@ -254,10 +254,12 @@ export function AnnounceListTab() {
   return (
     <div className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">
       <div className="mx-auto max-w-[1600px]">
-        {/* Tiêu đề màn (đổi theo màn đang xem) + nút chuyển màn chính⇄phụ ngay cạnh */}
+        {/* Tiêu đề màn (đổi theo màn đang xem) + nút chuyển màn chính⇄phụ ngay cạnh.
+            min-w cố định + nowrap: hộp icon và vị trí nút chuyển màn GIỮ NGUYÊN khi đổi
+            màn (tiêu đề dài ngắn khác nhau không làm xê dịch) -> chuyển màn liền mạch. */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--bk-text)]">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
+          <div className="flex min-w-[300px] items-center gap-2 whitespace-nowrap text-[15px] font-bold text-[var(--bk-text)]">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
               <Icon icon={view === 'main' ? 'lucide:volume-2' : 'line-md:chat-filled'} width={17} height={17} />
             </span>
             {view === 'main' ? t('ctAnnounce') : t('alSubTitle')}
@@ -431,7 +433,8 @@ export function AnnounceListTab() {
         // ── Màn PHỤ: 復唱・リトライアナウンス一覧 ────────────────────────────────
         <>
         <div className="overflow-auto rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          {/* Cùng min-width với bảng màn chính -> độ rộng bảng không nhảy khi đổi màn. */}
+          <table className="w-full min-w-[1200px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bk-border)] text-left text-[11px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
                 <th className="w-[170px] px-3 py-2.5">{t('alColType')}</th>

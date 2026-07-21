@@ -26,8 +26,8 @@ const EXTRA_PAGES: {
   labelKey: TKey;
   icon: string;
 }[] = [
-  { id: 'clinicalDept', settingsKey: 'clinicalDepartments', labelKey: 'ctClinicalDept', icon: 'mingcute:classify-2-fill' },
-  { id: 'courseList', settingsKey: 'courses', labelKey: 'ctCourseList', icon: 'lucide:file-text' },
+  { id: 'clinicalDept', settingsKey: 'clinicalDepartments', labelKey: 'ctClinicalDept', icon: 'material-symbols-light:view-list-outline' },
+  { id: 'courseList', settingsKey: 'courses', labelKey: 'ctCourseList', icon: 'material-symbols-light:view-list-outline' },
 ];
 
 export function CanvasTabs() {
@@ -63,44 +63,73 @@ export function CanvasTabs() {
     setMenuOpen(false);
   };
 
-  const renderTab = (tab: { id: CanvasTab; labelKey: TKey; icon: string }) => {
+  // Xoá trang bảng phụ: bỏ field settings (undefined -> không round-trip YAML) và
+  // nếu đang đứng ở tab đó thì quay về Flow Diagram.
+  const removePage = (page: (typeof EXTRA_PAGES)[number]) => {
+    setSettings({ [page.settingsKey]: undefined });
+    if (active === page.id) setTab('flow');
+  };
+
+  const renderTab = (
+    tab: { id: CanvasTab; labelKey: TKey; icon: string },
+    onClose?: () => void,
+  ) => {
     const on = tab.id === active;
+    // Tab đóng được (trang bảng phụ) -> bọc div để nút chọn + nút xoá là 2 <button>
+    // riêng (không lồng button). Nút xoá nằm bên phải, kiểu đóng tab Chrome.
     return (
-      <button
+      <div
         key={tab.id}
-        type="button"
-        onClick={() => setTab(tab.id)}
-        aria-current={on ? 'page' : undefined}
         className={[
-          'flex items-center gap-2 rounded-t-lg border border-b-0 px-4 py-2 text-[12.5px] font-semibold transition -mb-px',
+          'flex items-center rounded-t-lg border border-b-0 text-[12.5px] font-semibold transition -mb-px',
+          onClose ? 'pr-1.5' : '',
           on
             ? 'border-[var(--bk-border)] bg-[var(--bk-canvas)] text-[var(--bk-accent)]'
             : 'border-transparent text-[var(--bk-text-muted)] hover:bg-[color-mix(in_srgb,var(--bk-text)_6%,transparent)] hover:text-[var(--bk-text)]',
         ].join(' ')}
       >
-        <Icon icon={tab.icon} width={14} height={14} />
-        <span>{t(tab.labelKey)}</span>
-      </button>
+        <button
+          type="button"
+          onClick={() => setTab(tab.id)}
+          aria-current={on ? 'page' : undefined}
+          className={`flex items-center gap-2 py-2 pl-4 ${onClose ? 'pr-1.5' : 'pr-4'}`}
+        >
+          <Icon icon={tab.icon} width={14} height={14} />
+          <span>{t(tab.labelKey)}</span>
+        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            title={t('clRemovePage')}
+            aria-label={t('clRemovePage')}
+            className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--bk-text-faint)] transition hover:bg-[color-mix(in_srgb,var(--bk-danger,#ef4444)_16%,transparent)] hover:text-[var(--bk-danger,#ef4444)]"
+          >
+            <Icon icon="line-md:close-small" width={16} height={16} />
+          </button>
+        )}
+      </div>
     );
   };
 
   return (
     <div className="flex items-end gap-1 border-b border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 pt-1.5">
-      {TABS.map(renderTab)}
-      {openExtras.map(renderTab)}
+      {TABS.map((tab) => renderTab(tab))}
+      {openExtras.map((p) => renderTab(p, () => removePage(p)))}
 
-      {/* Nút thêm trang (plus-square-twotone) -> menu chọn 1 trong 2 trang bảng phụ */}
-      <div className="relative -mb-px" ref={menuRef}>
+      {/* Nút thêm trang (plus-circle-filled) -> menu chọn 1 trong 2 trang bảng phụ.
+          self-center: căn giữa theo trục dọc của dải tab (không dính đáy như tab). */}
+      <div className="relative mb-1 self-center" ref={menuRef}>
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
           title={t('ctAddPage')}
           aria-label={t('ctAddPage')}
-          className={`flex items-center justify-center rounded-t-lg border border-b-0 border-transparent px-2.5 py-2 text-[var(--bk-text-muted)] transition hover:bg-[color-mix(in_srgb,var(--bk-text)_6%,transparent)] hover:text-[var(--bk-accent)] ${
+          className={`flex items-center justify-center rounded-lg p-1.5 text-[var(--bk-text-muted)] transition hover:bg-[color-mix(in_srgb,var(--bk-text)_6%,transparent)] hover:text-[var(--bk-accent)] ${
             menuOpen ? 'text-[var(--bk-accent)]' : ''
           }`}
         >
-          <Icon icon="line-md:plus-square-twotone" width={17} height={17} />
+          <Icon icon="line-md:plus-circle-filled" width={18} height={18} />
         </button>
         {menuOpen && (
           <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">

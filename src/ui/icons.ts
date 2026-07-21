@@ -77,6 +77,14 @@ addCollection({
     'plus-square-twotone': {
       body: '<g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path fill="currentColor" fill-opacity="0" stroke-dasharray="66" d="M4 12v-7c0 -0.55 0.45 -1 1 -1h14c0.55 0 1 0.45 1 1v14c0 0.55 -0.45 1 -1 1h-14c-0.55 0 -1 -0.45 -1 -1Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="66;0"/><animate fill="freeze" attributeName="fill-opacity" begin="0.6s" dur="0.15s" to=".3"/></path><g fill="none" stroke-dasharray="12" stroke-dashoffset="12"><path d="M7 12h10"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.85s" dur="0.2s" to="0"/></path><path d="M12 7v10"><animate fill="freeze" attributeName="stroke-dashoffset" begin="1.05s" dur="0.2s" to="0"/></path></g></g>',
     },
+    // Dấu cộng trong vòng tròn ĐẶC (nút thêm trang trên dải tab) — line-md:plus-circle-filled.
+    'plus-circle-filled': {
+      body: '<defs><mask id="lineMdPlusCircleFilled"><g stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path fill="#fff" fill-opacity="0" stroke="#fff" stroke-dasharray="60" d="M3 12c0 -4.97 4.03 -9 9 -9c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="60;0"/><animate fill="freeze" attributeName="fill-opacity" begin="0.6s" dur="0.4s" to="1"/></path><g fill="none" stroke="#000" stroke-dasharray="12" stroke-dashoffset="12"><path d="M7 12h10"><animate fill="freeze" attributeName="stroke-dashoffset" begin="1.1s" dur="0.2s" to="0"/></path><path d="M12 7v10"><animate fill="freeze" attributeName="stroke-dashoffset" begin="1.3s" dur="0.2s" to="0"/></path></g></g></mask></defs><path fill="currentColor" d="M0 0h24v24H0z" mask="url(#lineMdPlusCircleFilled)"/>',
+    },
+    // Dấu X nhỏ vẽ nét (nút đóng/xoá trang trên dải tab, kiểu đóng tab Chrome) — line-md:close-small.
+    'close-small': {
+      body: '<g fill="none" stroke="currentColor" stroke-dasharray="18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M7 7l10 10"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="18;0"/></path><path stroke-dashoffset="18" d="M17 7l-10 10"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.5s" dur="0.5s" to="0"/></path></g>',
+    },
   },
 });
 
@@ -129,6 +137,20 @@ addCollection({
     // Node Classifier — 4 ô phân loại (body chính chủ mingcute:classify-2-fill).
     'classify-2-fill': {
       body: '<g fill="none" fill-rule="evenodd"><path d="m12.594 23.258l-.012.002l-.071.035l-.02.004l-.014-.004l-.071-.036q-.016-.004-.024.006l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.016-.018m.264-.113l-.014.002l-.184.093l-.01.01l-.003.011l.018.43l.005.012l.008.008l.201.092q.019.005.029-.008l.004-.014l-.034-.614q-.005-.019-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.003-.011l.018-.43l-.003-.012l-.01-.01z"/><path fill="currentColor" d="M15.586 2.757a2 2 0 0 1 2.828 0l2.829 2.829a2 2 0 0 1 0 2.828l-2.829 2.829a2 2 0 0 1-2.828 0l-2.829-2.829a2 2 0 0 1 0-2.828zM9 3a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm12 12a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2zM9 13a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z"/></g>',
+    },
+  },
+});
+// Icon material-symbols-light (24x24) — dùng cho tab trang bảng phụ (診療科一覧 /
+// コース・追加オプション一覧). Prefix mới, chưa có trong subset trim sẵn.
+addCollection({
+  prefix: 'material-symbols-light',
+  width: 24,
+  height: 24,
+  icons: {
+    // Danh sách dạng bảng (icon tab 診療科 / コース) — body chính chủ
+    // material-symbols-light:view-list-outline.
+    'view-list-outline': {
+      body: '<path fill="currentColor" d="M8.5 18h10.885q.23 0 .423-.192t.192-.424v-2.559H8.5zM4 9.175h3.5V6H4.616q-.231 0-.424.192T4 6.616zm0 4.675h3.5v-3.675H4zM4.616 18H7.5v-3.175H4v2.56q0 .23.192.423t.423.192M8.5 13.85H20v-3.675H8.5zm0-4.675H20v-2.56q0-.23-.192-.423T19.385 6H8.5zM4.616 19q-.691 0-1.153-.462T3 17.384V6.616q0-.691.463-1.153T4.615 5h14.77q.69 0 1.152.463T21 6.616v10.769q0 .69-.463 1.153T19.385 19z"/>',
     },
   },
 });
