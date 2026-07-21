@@ -53,6 +53,8 @@ export function CanvasTabs() {
 
   // Trang phụ đã tạo (field settings tồn tại) -> hiện tab tương ứng.
   const openExtras = EXTRA_PAGES.filter((p) => settings[p.settingsKey] !== undefined);
+  // Trang phụ CHƯA tạo -> hiện trong menu nút "+". Hết trang chưa tạo thì ẩn luôn nút "+".
+  const addablePages = EXTRA_PAGES.filter((p) => settings[p.settingsKey] === undefined);
 
   // Tạo trang (nếu chưa) rồi chuyển sang. Chưa có -> seed 1 dòng trống.
   const createPage = (page: (typeof EXTRA_PAGES)[number]) => {
@@ -117,28 +119,28 @@ export function CanvasTabs() {
       {TABS.map((tab) => renderTab(tab))}
       {openExtras.map((p) => renderTab(p, () => removePage(p)))}
 
-      {/* Nút thêm trang (plus-circle-filled) -> menu chọn 1 trong 2 trang bảng phụ.
+      {/* Nút thêm trang (plus-circle-filled) -> menu chỉ liệt kê trang CHƯA tạo.
+          Đã tạo đủ cả 2 trang -> ẩn hẳn nút "+"; xoá bớt 1 trang thì "+" hiện lại.
           self-center: căn giữa theo trục dọc của dải tab (không dính đáy như tab). */}
-      <div className="relative mb-1 self-center" ref={menuRef}>
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          title={t('ctAddPage')}
-          aria-label={t('ctAddPage')}
-          className={`flex items-center justify-center rounded-lg p-1.5 text-[var(--bk-text-muted)] transition hover:bg-[color-mix(in_srgb,var(--bk-text)_6%,transparent)] hover:text-[var(--bk-accent)] ${
-            menuOpen ? 'text-[var(--bk-accent)]' : ''
-          }`}
-        >
-          <Icon icon="line-md:plus-circle-filled" width={18} height={18} />
-        </button>
-        {menuOpen && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
-            <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
-              {t('ctAddPage')}
-            </div>
-            {EXTRA_PAGES.map((p) => {
-              const exists = settings[p.settingsKey] !== undefined;
-              return (
+      {addablePages.length > 0 && (
+        <div className="relative mb-1 self-center" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            title={t('ctAddPage')}
+            aria-label={t('ctAddPage')}
+            className={`flex items-center justify-center rounded-lg p-1.5 text-[var(--bk-text-muted)] transition hover:bg-[color-mix(in_srgb,var(--bk-text)_6%,transparent)] hover:text-[var(--bk-accent)] ${
+              menuOpen ? 'text-[var(--bk-accent)]' : ''
+            }`}
+          >
+            <Icon icon="line-md:plus-circle-filled" width={18} height={18} />
+          </button>
+          {menuOpen && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
+              <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+                {t('ctAddPage')}
+              </div>
+              {addablePages.map((p) => (
                 <button
                   key={p.id}
                   type="button"
@@ -149,13 +151,12 @@ export function CanvasTabs() {
                     <Icon icon={p.icon} width={15} height={15} />
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium">{t(p.labelKey)}</span>
-                  {exists && <Icon icon="lucide:check" width={15} height={15} className="text-[var(--bk-accent)]" />}
                 </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

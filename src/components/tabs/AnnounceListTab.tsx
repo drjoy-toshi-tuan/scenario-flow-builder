@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useFlowStore } from '../../store/flowStore';
-import { ensureSettings } from '../../ir/settings';
+import { ensureSettings, STATUS_FLAG_PICKABLE } from '../../ir/settings';
 import { computeInheritedFlags } from '../../ir/statusFlow';
 import { FlagSelect } from '../../ui/FlagSelect';
 import type { FlowNode, NodeType } from '../../ir/types';
@@ -245,9 +245,8 @@ export function AnnounceListTab() {
   };
 
   // Nhãn option dạng "0 - 途中切断" (flag - tên) theo yêu cầu team CS.
-  const STATUS_FLAG_WHITELIST = new Set([0, 1, 2, 3, 6]);
   const statusOptions = settings.statuses
-    .filter((s) => STATUS_FLAG_WHITELIST.has(s.flag))
+    .filter((s) => STATUS_FLAG_PICKABLE.has(s.flag))
     .map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.name}` }));
   const smsOptions = settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }));
 
@@ -540,8 +539,9 @@ export function AnnounceListTab() {
 }
 
 // ── Nút "Thêm" node vào màn phụ ──────────────────────────────────────────────
-// Bấm plus-square-filled -> mở form: chọn 分類 (Retry/Re-confirm) + pulldown chọn
-// node (search theo tên) + nút xác nhận plus-circle.
+// Luồng 2 bước: bấm "Thêm" -> popover nhỏ chọn 分類 (Re-confirm / Retry). Chọn xong
+// popover đóng, hiện ĐÚNG 1 dòng nhập (chọn node + xác nhận) — không còn phần chọn
+// phân loại chiếm chỗ. Muốn đổi phân loại: bấm huy hiệu để mở lại popover.
 function AddRrForm({
   nodes,
   onAdd,
@@ -550,9 +550,11 @@ function AddRrForm({
   onAdd: (kind: RrKind, nodeId: string) => void;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  // 'idle' = nút Thêm; 'pickKind' = popover chọn phân loại; 'fill' = dòng nhập node.
+  const [mode, setMode] = useState<'idle' | 'pickKind' | 'fill'>('idle');
   const [kind, setKind] = useState<RrKind>('reconfirm');
   const [nodeId, setNodeId] = useState('');
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   // Node còn "thêm được": reconfirm -> chưa bật 復唱; retry -> chưa tách riêng.
   const candidates = useMemo(
@@ -568,55 +570,98 @@ function AddRrForm({
     if (nodeId && !candidates.some((n) => n.id === nodeId)) setNodeId('');
   }, [candidates, nodeId]);
 
+  // Đóng popover chọn phân loại khi bấm ra ngoài.
+  useEffect(() => {
+    if (mode !== 'pickKind') return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMode('idle');
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [mode]);
+
   const cfg = RR_KIND[kind];
   const canAdd = nodeId && candidates.some((n) => n.id === nodeId);
+
+  // Chọn phân loại xong -> sang thẳng bước nhập node.
+  const pickKind = (k: RrKind) => {
+    setKind(k);
+    setNodeId('');
+    setMode('fill');
+  };
 
   const submit = () => {
     if (!canAdd) return;
     onAdd(kind, nodeId);
-    setNodeId('');
+    setNodeId(''); // giữ nguyên bước 'fill' để thêm tiếp node cùng phân loại cho nhanh.
   };
 
-  if (!open) {
+  // ── Bước idle + popover chọn phân loại (modal nhỏ) ──
+  if (mode !== 'fill') {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-dashed border-[var(--bk-border)] px-3.5 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
-      >
-        <Icon icon="line-md:plus-square-filled" width={18} height={18} />
-        {t('alAddRow')}
-      </button>
+      <div className="relative mt-3 inline-block" ref={wrapRef}>
+        <button
+          type="button"
+          onClick={() => setMode((m) => (m === 'pickKind' ? 'idle' : 'pickKind'))}
+          aria-expanded={mode === 'pickKind'}
+          className={`inline-flex items-center gap-2 rounded-xl border border-dashed px-3.5 py-2 text-sm font-semibold transition ${
+            mode === 'pickKind'
+              ? 'border-[var(--bk-accent)] text-[var(--bk-accent)]'
+              : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]'
+          }`}
+        >
+          <Icon icon="line-md:plus-square-filled" width={18} height={18} />
+          {t('alAddRow')}
+        </button>
+        {mode === 'pickKind' && (
+          <div className="absolute left-0 top-full z-30 mt-1 w-60 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-1 shadow-[var(--bk-shadow)]">
+            <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
+              {t('alAddPickKind')}
+            </div>
+            {(['reconfirm', 'retry'] as const).map((k) => {
+              const kcfg = RR_KIND[k];
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => pickKind(k)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--bk-text)] transition hover:bg-[var(--bk-surface-2)]"
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    style={{ color: kcfg.color, background: `color-mix(in srgb, ${kcfg.color} 16%, transparent)` }}
+                  >
+                    <Icon icon={kcfg.icon} width={15} height={15} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{t(kcfg.typeKey)}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   }
 
+  // ── Bước fill: 1 dòng nhập (huy hiệu phân loại + chọn node + xác nhận + đóng) ──
   return (
     <div className="mt-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)] p-3 shadow-sm">
-      {/* 分類 */}
+      {/* Huy hiệu phân loại đã chọn — bấm để đổi lại (mở popover). */}
       <label className="flex flex-col gap-1">
         <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
           {t('alAddPickKind')}
         </span>
-        <div className="flex items-center gap-0.5 rounded-full border border-[var(--bk-border)] bg-[var(--bk-canvas)] p-0.5">
-          {(['reconfirm', 'retry'] as const).map((k) => {
-            const on = kind === k;
-            const kcfg = RR_KIND[k];
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setKind(k)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${
-                  on ? 'text-white shadow-sm' : 'text-[var(--bk-text-muted)] hover:text-[var(--bk-text)]'
-                }`}
-                style={on ? { background: kcfg.color } : undefined}
-              >
-                <Icon icon={kcfg.icon} width={13} height={13} />
-                {t(kcfg.typeKey)}
-              </button>
-            );
-          })}
-        </div>
+        <button
+          type="button"
+          onClick={() => setMode('pickKind')}
+          title={t('alAddPickKind')}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm"
+          style={{ background: cfg.color }}
+        >
+          <Icon icon={cfg.icon} width={13} height={13} />
+          {t(cfg.typeKey)}
+          <Icon icon="lucide:chevron-down" width={12} height={12} />
+        </button>
       </label>
       {/* Chọn node (search) */}
       <label className="flex min-w-[240px] flex-1 flex-col gap-1">
@@ -640,6 +685,19 @@ function AddRrForm({
       >
         <Icon icon="line-md:plus-circle" width={18} height={18} />
         {t('alAddConfirm')}
+      </button>
+      {/* Đóng dòng nhập */}
+      <button
+        type="button"
+        onClick={() => {
+          setMode('idle');
+          setNodeId('');
+        }}
+        title={t('alAddCancel')}
+        aria-label={t('alAddCancel')}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--bk-border)] text-[var(--bk-text-faint)] transition hover:text-[var(--bk-text)]"
+      >
+        <Icon icon="line-md:close-small" width={18} height={18} />
       </button>
     </div>
   );

@@ -420,6 +420,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     alAddPickNode: 'Chọn node…',
     alAddConfirm: 'Thêm node',
     alAddNoNode: 'Không còn node phù hợp',
+    alAddCancel: 'Đóng',
     // ── Trang bảng phụ (診療科一覧 / コースリスト) ──
     ctAddPage: 'Thêm trang',
     ctClinicalDept: 'Danh sách khoa khám',
@@ -910,6 +911,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     alAddPickNode: 'ノードを選択…',
     alAddConfirm: 'ノードを追加',
     alAddNoNode: '対象ノードがありません',
+    alAddCancel: '閉じる',
     // ── 診療科一覧 / コースリスト タブ ──
     ctAddPage: 'ページを追加',
     ctClinicalDept: '診療科一覧',
