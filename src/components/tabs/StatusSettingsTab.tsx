@@ -481,11 +481,10 @@ function DisplaySelect({ value, onChange }: { value: 'yes' | 'no'; onChange: (v:
         onClick={() => onChange(value === 'yes' ? 'no' : 'yes')}
         aria-label={face.label}
         title={face.label}
-        className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold transition hover:bg-[var(--bk-surface-2)] ${face.cls}`}
+        className={`inline-flex items-center justify-center rounded-lg p-1.5 transition hover:bg-[var(--bk-surface-2)] ${face.cls}`}
       >
         {/* key theo value để icon re-mount, chạy lại animation vẽ nét khi toggle */}
-        <Icon key={value} icon={face.icon} width={20} height={20} />
-        {face.label}
+        <Icon key={value} icon={face.icon} width={22} height={22} />
       </button>
     </div>
   );
