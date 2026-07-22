@@ -58,7 +58,8 @@ export interface CsSlot {
   // datetime
   dtKind?: CsDatetimeKind;
   ranges?: CsRange[]; // date | time
-  days?: DayKey[]; // day (tập user chọn; phần còn lại tự tính)
+  days?: DayKey[]; // day — LEGACY 1 nhóm (đọc lên -> gộp vào dayGroups[0]).
+  dayGroups?: DayKey[][]; // day — nhiều khung, mỗi khung 1 tập thứ; phần còn lại tự tính từ hợp mọi khung.
 }
 
 const NODE_SOURCE_PREFIX = 'node:';
@@ -78,6 +79,19 @@ function asStrings(v: unknown): string[] {
 }
 function asDays(v: unknown): DayKey[] {
   return asStrings(v).filter((d): d is DayKey => (DAY_KEYS as readonly string[]).includes(d));
+}
+// dayGroups = mảng các khung, mỗi khung là 1 tập thứ. Fallback: legacy `days` -> 1 khung;
+// nếu trống hẳn -> 1 khung rỗng (để UI luôn có sẵn 1 khung).
+function normalizeDayGroups(v: unknown, legacy: DayKey[]): DayKey[][] {
+  if (Array.isArray(v)) {
+    const groups = v.filter((g) => Array.isArray(g)).map((g) => asDays(g));
+    if (groups.length) return groups;
+  }
+  return legacy.length ? [legacy] : [[]];
+}
+// Hợp các thứ đã chọn qua mọi khung (khử trùng lặp, giữ thứ tự DAY_KEYS).
+function unionDays(groups: DayKey[][]): DayKey[] {
+  return DAY_KEYS.filter((d) => groups.some((g) => g.includes(d)));
 }
 
 export function readCsCount(data: Record<string, unknown>): number {
@@ -99,7 +113,8 @@ export function readCsSlots(data: Record<string, unknown>): CsSlot[] {
       slots.push({ kind, phoneKind: o.phoneKind === 'answered' ? 'answered' : 'incoming' });
     } else {
       const dtKind: CsDatetimeKind = o.dtKind === 'date' || o.dtKind === 'day' ? (o.dtKind as CsDatetimeKind) : 'time';
-      slots.push({ kind, dtKind, ranges: asRanges(o.ranges), days: asDays(o.days) });
+      const days = asDays(o.days);
+      slots.push({ kind, dtKind, ranges: asRanges(o.ranges), days, dayGroups: normalizeDayGroups(o.dayGroups, days) });
     }
   }
   return slots;
@@ -108,7 +123,7 @@ export function readCsSlots(data: Record<string, unknown>): CsSlot[] {
 // Điều kiện mặc định cho 1 nhóm データ.
 export function defaultSlot(kind: CsSlotKind, ir: FlowIR | null, selfId: string): CsSlot {
   if (kind === 'phone') return { kind, phoneKind: 'incoming' };
-  if (kind === 'datetime') return { kind, dtKind: 'time', ranges: [{ from: '09:00', to: '17:00' }], days: [] };
+  if (kind === 'datetime') return { kind, dtKind: 'time', ranges: [{ from: '09:00', to: '17:00' }], days: [], dayGroups: [[]] };
   const first = (ir?.nodes ?? []).find((n) => n.type === 'interaction' && n.id !== selfId);
   return { kind: 'hearing', nodeId: first ? first.id : '', values: [''] };
 }
@@ -185,10 +200,11 @@ export function slotValueLabels(slot: CsSlot): string[] {
     return (slot.ranges ?? []).filter((r) => r.from || r.to).map((r) => `${r.from || '?'}〜${r.to || '?'}`);
   }
   if (slot.dtKind === 'day') {
-    const sel = slot.days ?? [];
+    // Mỗi khung (nhóm thứ) không rỗng = 1 value; phần còn lại (tự động) tính từ HỢP mọi khung.
+    const groups = slot.dayGroups ?? (slot.days && slot.days.length ? [slot.days] : []);
     const out: string[] = [];
-    if (sel.length) out.push(joinDays(sel));
-    const rem = dayRemainder(sel);
+    for (const g of groups) if (g.length) out.push(joinDays(g));
+    const rem = dayRemainder(unionDays(groups));
     if (rem.length) out.push(`${joinDays(rem)}（残り）`);
     return out.length ? out : [`${joinDays([...DAY_KEYS])}（残り）`];
   }

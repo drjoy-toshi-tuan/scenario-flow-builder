@@ -58,6 +58,31 @@ describe('csLogic', () => {
     expect(labels[1]).toContain('水');
   });
 
+  it('slotValueLabels: 曜日 nhiều khung = mỗi khung 1 value + phần còn lại (hợp mọi khung)', () => {
+    const labels = slotValueLabels({
+      kind: 'datetime',
+      dtKind: 'day',
+      dayGroups: [
+        ['mon', 'tue'],
+        ['wed', 'thu'],
+      ],
+    });
+    expect(labels[0]).toBe('月・火');
+    expect(labels[1]).toBe('水・木');
+    // phần còn lại = các thứ chưa thuộc khung nào (金土日祝)
+    expect(labels[2]).toContain('残り');
+    expect(labels[2]).toContain('金');
+    expect(labels[2]).not.toContain('月');
+  });
+
+  it('readCsSlots: 曜日 legacy `days` -> gộp thành 1 khung dayGroups', () => {
+    const slots = readCsSlots({
+      csCount: 1,
+      csSlots: [{ kind: 'datetime', dtKind: 'day', days: ['mon', 'fri'] }],
+    });
+    expect(slots[0].dayGroups).toEqual([['mon', 'fri']]);
+  });
+
   it('slotValueLabels: 時間 = khung user + khung còn lại (qua nửa đêm)', () => {
     const labels = slotValueLabels({ kind: 'datetime', dtKind: 'time', ranges: [{ from: '08:00', to: '16:00' }] });
     expect(labels[0]).toBe('08:00〜16:00');

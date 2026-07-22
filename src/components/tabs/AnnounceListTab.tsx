@@ -328,7 +328,9 @@ export function AnnounceListTab() {
   const smsOptions = settings.smsFlags.map((s) => ({ value: String(s.flag), label: `${s.flag} - ${s.type || '—'}` }));
 
   // Grid template dùng chung cho header + dòng của màn phụ (3 cột + gutter thùng rác).
-  const SUB_GRID = 'grid-cols-[170px_minmax(0,1fr)_46%]';
+  // Cột 分類 rộng thêm ~20% (170→205px) để text 復唱/リトライ + chip không bị xô; bù lại
+  // 2 cột còn lại (項目 = 1fr, 発話文言 46%→44%) hẹp đi chút để giữ nguyên bề rộng bảng.
+  const SUB_GRID = 'grid-cols-[205px_minmax(0,1fr)_44%]';
 
   return (
     <div ref={scrollRef} className="h-full overflow-auto bg-[var(--bk-canvas)] p-5">

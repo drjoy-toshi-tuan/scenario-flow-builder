@@ -229,19 +229,22 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
   const lang = useLang((s) => s.lang);
   const dtKind = slot.dtKind ?? 'time';
   const ranges = slot.ranges ?? [];
-  const days = slot.days ?? [];
+  // 曜日: nhiều khung (nhóm thứ). Legacy `days` (1 nhóm) tự gộp vào khung đầu.
+  const dayGroups = slot.dayGroups ?? (slot.days && slot.days.length ? [slot.days] : [[]]);
 
   const setRanges = (r: CsRange[]) => onChange({ ...slot, ranges: r });
-  const setDays = (d: DayKey[]) => onChange({ ...slot, days: d });
+  const setDayGroups = (g: DayKey[][]) => onChange({ ...slot, dayGroups: g });
+  const toggleDay = (gi: number, d: DayKey) =>
+    setDayGroups(dayGroups.map((g, j) => (j === gi ? (g.includes(d) ? g.filter((x) => x !== d) : [...g, d]) : g)));
 
-  const remainderDays = dayRemainder(days);
+  const remainderDays = dayRemainder(dayGroups.flat());
   const remainderRanges = timeRemainderRanges(ranges);
 
   return (
     <div className="space-y-2">
       <div className="flex gap-1.5">
         <SubToggle label={t('clDate')} on={dtKind === 'date'} onClick={() => onChange({ kind: 'datetime', dtKind: 'date', ranges: [{ from: '', to: '' }], days: [] })} />
-        <SubToggle label={t('clDay')} on={dtKind === 'day'} onClick={() => onChange({ kind: 'datetime', dtKind: 'day', ranges: [], days: [] })} />
+        <SubToggle label={t('clDay')} on={dtKind === 'day'} onClick={() => onChange({ kind: 'datetime', dtKind: 'day', ranges: [], dayGroups: [[]] })} />
         <SubToggle label={t('clTime')} on={dtKind === 'time'} onClick={() => onChange({ kind: 'datetime', dtKind: 'time', ranges: [{ from: '09:00', to: '17:00' }], days: [] })} />
       </div>
 
@@ -273,20 +276,32 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
       )}
 
       {dtKind === 'day' && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-1.5">
-            {DAY_KEYS.map((d) => (
-              <DayCell
-                key={d}
-                day={d}
-                label={CS_DAY_LABELS[d][lang]}
-                on={days.includes(d)}
-                onClick={() => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])}
+        <div className="space-y-1.5">
+          {/* Mỗi khung = 1 nhóm thứ (bấm chọn); thêm/bớt khung giống 日付 / 時間. */}
+          {dayGroups.map((group, gi) => (
+            <div key={gi} className="flex items-start gap-1.5">
+              <div className="flex flex-1 flex-wrap gap-1.5">
+                {DAY_KEYS.map((d) => (
+                  <DayCell
+                    key={d}
+                    day={d}
+                    label={CS_DAY_LABELS[d][lang]}
+                    on={group.includes(d)}
+                    onClick={() => toggleDay(gi, d)}
+                  />
+                ))}
+              </div>
+              <IconBtn
+                icon="lucide:x"
+                title="×"
+                danger
+                disabled={dayGroups.length <= 1}
+                onClick={() => setDayGroups(dayGroups.filter((_, j) => j !== gi))}
               />
-            ))}
-          </div>
-          {/* Phần còn lại (tự động) — khung riêng, hiển thị y hệt mục chọn nhưng MỜ &
-              không sửa được. */}
+            </div>
+          ))}
+          {/* Phần còn lại (tự động) — tính từ HỢP mọi khung; hiển thị y hệt mục chọn
+              nhưng MỜ & không sửa được. */}
           {remainderDays.length > 0 && (
             <RemainderFrame>
               <div className="flex flex-wrap gap-1.5">
@@ -296,6 +311,8 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
               </div>
             </RemainderFrame>
           )}
+          {/* Nút thêm khung — icon, đặt DƯỚI cùng (giống 日付 / 時間). */}
+          <AddButton label={t('clAddRange')} onClick={() => setDayGroups([...dayGroups, []])} />
         </div>
       )}
 
@@ -405,8 +422,6 @@ export function CsLogicBranchList({ node }: { node: FlowNode }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-[var(--bk-text-faint)]">{t('branchFixedNote')}</p>
-
       {branches.length === 0 ? (
         <p className="px-1 text-sm text-[var(--bk-text-faint)]">{t('clNoValue')}</p>
       ) : (
