@@ -104,9 +104,10 @@ export function CsLogicPropertyEditor({ node }: { node: FlowNode }) {
 }
 
 const CATEGORY_META: { id: CsSlotKind; key: 'clHearing' | 'clPhone' | 'clDatetime'; icon: string }[] = [
-  { id: 'hearing', key: 'clHearing', icon: 'lucide:headphones' },
-  { id: 'phone', key: 'clPhone', icon: 'lucide:phone' },
-  { id: 'datetime', key: 'clDatetime', icon: 'lucide:calendar-clock' },
+  // 聴取内容 dùng icon giống node Hearing (interaction); 電話番号 / 着信日時 dùng icon riêng.
+  { id: 'hearing', key: 'clHearing', icon: 'mingcute:voice-fill' },
+  { id: 'phone', key: 'clPhone', icon: 'bx:dialpad-alt' },
+  { id: 'datetime', key: 'clDatetime', icon: 'griddy-icons:calendar-time-filled' },
 ];
 
 function SlotEditor({ node, slot, onChange }: { node: FlowNode; slot: CsSlot; onChange: (s: CsSlot) => void }) {
@@ -125,13 +126,13 @@ function SlotEditor({ node, slot, onChange }: { node: FlowNode; slot: CsSlot; on
             type="button"
             onClick={() => changeKind(c.id)}
             className={[
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11.5px] font-semibold transition',
+              'flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[13px] font-semibold transition',
               slot.kind === c.id
                 ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
                 : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)]',
             ].join(' ')}
           >
-            <Icon icon={c.icon} width={13} height={13} />
+            <Icon icon={c.icon} width={15} height={15} />
             {t(c.key)}
           </button>
         ))}

@@ -366,5 +366,29 @@ addCollection({
   },
 });
 
+// Icon bx: dialpad-alt (nút データ「電話番号」ở CS 分岐ロジック プロパティ設定) — bàn phím số.
+addCollection({
+  prefix: 'bx',
+  width: 24,
+  height: 24,
+  icons: {
+    'dialpad-alt': {
+      body: '<circle cx="12" cy="6" r="2" fill="currentColor"/><circle cx="6" cy="6" r="2" fill="currentColor"/><circle cx="18" cy="6" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="6" cy="12" r="2" fill="currentColor"/><circle cx="18" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="18" r="2" fill="currentColor"/>',
+    },
+  },
+});
+
+// Icon griddy-icons: calendar-time-filled (nút データ「着信日時」ở CS 分岐ロジック プロパティ設定) — lịch + đồng hồ.
+addCollection({
+  prefix: 'griddy-icons',
+  width: 24,
+  height: 24,
+  icons: {
+    'calendar-time-filled': {
+      body: '<path fill="currentColor" fill-rule="evenodd" d="M5.75 19.5h4.12c.29.545.645 1.045 1.055 1.5H5.75A2.755 2.755 0 0 1 3 18.25V5.75A2.755 2.755 0 0 1 5.75 3h.75V2H8v1h8V2h1.5v1h.75A2.755 2.755 0 0 1 21 5.75v4.265a7.5 7.5 0 0 0-1.5-.885V8.5h-15v9.75c0 .69.56 1.25 1.25 1.25m11.75-15H16V6h1.5zM8 4.5H6.5V6H8zM10.5 16c0-3.315 2.685-6 6-6s6 2.685 6 6s-2.685 6-6 6s-6-2.685-6-6m5.25.31l2.22 2.22l1.06-1.06l-1.78-1.78v-3.44h-1.5z" clip-rule="evenodd"/>',
+    },
+  },
+});
+
 // Re-export để cả app import 1 chỗ (đảm bảo addCollection đã chạy trước khi render).
 export { Icon };
