@@ -1,0 +1,408 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# シナリオ設計書（CS 画面フォーマット）— カレス記念病院 / 診療
+#
+# ★これは「レビュー用」の試作です。
+#   GF（gen_flow）の本番 設計書 YAML
+#   （output/scenarios/カレス記念病院_診療/設計書_カレス記念病院_診療.yaml）の業務フローを、
+#   SFB の CS 画面スキーマ（13 NodeType・noStart・CS 専用フィールド）で書き直したもの。
+#
+# ★noStart 規約: CS 画面のシナリオ設計書は技術的な Start ノードを持たない。
+#   先頭の announce（冒頭アナウンス）が開始点。Start（Get Header / wait /
+#   着信分類 / 受付時間判定）と 時間外・非通知 の分岐は TS 側が gen 時に組み立てる。
+#
+# ★CS が描くのは「業務フロー」。以下の技術的配線は CS 設計書には載せず TS/GF が付与:
+#   - 冒頭の wait / saveContextModel2DB / incoming-classifier / acceptance_times
+#   - WebRTC 既知値スキップ用の null_check（氏名/生年月日/連絡先/診療科/用件の事前判定）
+#   - 用件確認_事前判定・終話ルーターの <%classification%> 参照最適化
+#   - END_時間外 / END_非通知（着信段階の終話）
+# ─────────────────────────────────────────────────────────────────────────────
+flow:
+  name: "診療"
+  facility: "カレス記念病院"
+  author: "トシTuan"
+  createdAt: "2026-07-22 10:00"
+  updatedAt: "2026-07-22 10:00"
+  # start: なし（CS 設計書 = noStart。先頭 announce が開始点）
+  nodes:
+    # ── 冒頭 ────────────────────────────────────────────────────────
+    - id: welcome
+      type: announce
+      name: 冒頭アナウンス
+      text: "お電話ありがとうございます。カレス記念病院の診療専用AI電話です。"
+      next: welcome_recstart
+
+    # GF では {recstart}（録音開始ビープ）を挟むため 2 モジュールに分割。
+    - id: welcome_recstart
+      type: announce
+      name: 冒頭アナウンス2
+      text: "と音が鳴ったらお話しください。"
+      next: calc_available_date
+
+    # GF: clinic_day_default（認定部品）。聴取なしで「3診療日後」の受付開始日を自動計算し
+    # availableDateFull へ保存。SFB では logic(Script) で表現（TS が認定部品へマップ）。
+    - id: calc_available_date
+      type: logic
+      name: 受付開始日算出
+      moduleType: Script
+      scriptExplanation: "3診療日後の受付開始日を自動計算して availableDateFull に保存（GF: 認定部品 clinic_day_default）。"
+      next: ask_period
+
+    # ── 3診療日確認（はい/いいえ）──────────────────────────────────
+    - id: ask_period
+      type: interaction
+      name: 3診療日確認
+      announce: "こちらのお電話は、<%available_date_short%>以降の受診を希望されるお問い合わせでしょうか？「はい、そうです」または「いいえ、違います」でお話しください。"
+      inputType: STT
+      reconfirm: no
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、本日から3日以降の受診を希望されるお問い合わせでしょうか？「はい、そうです」または「いいえ、違います」でお話しください。"
+      next: period_gate
+      failed: hangup_daihyo    # retry 上限 → 代表案内
+
+    - id: period_gate
+      type: nexus
+      name: 3診療日確認_分岐
+      saveContext: yes
+      contextName: acceptancePeriodConfirm
+      contextType: CLASSIFICATION
+      branches:
+        - when: はい
+          to: youken
+          label: はい
+        - when: いいえ
+          default: hangup_daihyo
+          label: いいえ
+
+    # ── 用件確認（1予約 / 2変更 / 3キャンセル / 4その他お問い合わせ）──
+    - id: youken
+      type: interaction
+      name: 用件確認
+      announce: "ご用件を次の４つのうちのいずれかでお話しください。「1番、予約」「2番、変更」「3番、キャンセル」「4番、その他お問い合わせ」。ダイヤルプッシュでも入力いただけます。"
+      inputType: STT_DTMF
+      reconfirm: yes
+      reconfirmAnnounce: "ご用件は、<%classification%>でお間違いないでしょうか。"
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、ご用件を次の４つのうちのいずれかでお話しください。「1番、予約」「2番、変更」「3番、キャンセル」「4番、その他お問い合わせ」。"
+      next: youken_gate
+      failed: hangup_fail      # retry 上限 → 聴取失敗
+      # 注: GF ではここが intent(engine v2) ブロック。予約/変更/キャンセル/その他の
+      #     判定ロジック（evidence/rule）は TS/GF が生成する。CS は選択肢と分岐のみ描く。
+
+    - id: youken_gate
+      type: nexus
+      name: 用件_分岐
+      saveContext: yes
+      contextName: classification
+      contextType: CLASSIFICATION
+      branches:
+        - when: 予約
+          to: visit_history
+          label: 予約
+        - when: 変更
+          to: dept_change
+          label: 変更
+        - when: キャンセル
+          to: dept_change
+          label: キャンセル
+        - when: その他お問い合わせ
+          default: faq_inquiry
+          label: その他お問い合わせ
+
+    # ── A) 予約ルート ───────────────────────────────────────────────
+    - id: visit_history
+      type: interaction
+      name: 受診歴確認
+      announce: "ご希望される診療科での受診ははじめてですか？わからない場合は、「わからない。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、ご希望される診療科での受診ははじめてですか？わからない場合は、「わからない。」とお話しください。"
+      next: visit_gate
+      failed: hangup_daihyo
+
+    - id: visit_gate
+      type: nexus
+      name: 受診歴_分岐
+      saveContext: yes
+      contextName: firstVisit
+      contextType: CLASSIFICATION
+      branches:
+        # 再診（いいえ）は選定療養費案内をスキップして直接 診療科 へ
+        - when: いいえ
+          to: dept_reserve
+          label: 再診
+        # 初診・わからない は選定療養費アナウンスを挟む
+        - default: fee_announce
+          label: 初診
+          when: はい
+
+    - id: fee_announce
+      type: announce
+      name: 選定療養費アナウンス
+      text: "他の医療機関からの紹介状をお持ちでない患者様につきましては、通常の診療費とは別に、初診時選定療養費として7,700円を全額自己負担いただいております。予めご了承ください。"
+      next: dept_reserve
+
+    # GF: clinical_department（聴取＋辞書分類＋登録なし救済）を 1 ブロックに集約。
+    # SFB では聴取を interaction で描く（分類は TS/GF が付与）。
+    - id: dept_reserve
+      type: interaction
+      name: 診療科
+      announce: "受診を希望される診療科をお話しください。わからない場合は、「わからない。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、受診を希望される診療科をお話しください。わからない場合は、「わからない。」とお話しください。"
+      next: desired_date
+
+    - id: desired_date
+      type: interaction
+      name: 予約希望日
+      announce: "ご予約ご希望日をお話しください。ない場合は「ありません。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、ご予約ご希望日をお話しください。ない場合は「ありません。」とお話しください。"
+      next: ask_question
+
+    # ── B) 変更 / C) キャンセル 共通ルート ─────────────────────────
+    - id: dept_change
+      type: interaction
+      name: 診療科_変更キャンセル
+      announce: "予約されている診療科をお話しください。わからない場合は、「わからない。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、予約されている診療科をお話しください。わからない場合は、「わからない。」とお話しください。"
+      next: doctor
+
+    - id: doctor
+      type: interaction
+      name: 主治医の先生
+      announce: "主治医の先生をお話しください。わからない場合は、「わからない。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、主治医の先生をお話しください。わからない場合は、「わからない。」とお話しください。"
+      next: reservation_date
+
+    - id: reservation_date
+      type: interaction
+      name: 予約日聴取
+      announce: "現在のご予約日をお話しください。"
+      inputType: STT_DTMF
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、現在のご予約日をお話しください。"
+      next: reason_gate
+
+    - id: reason_gate
+      type: nexus
+      name: 理由ルーター
+      saveContext: no
+      contextName: classification
+      contextType: CLASSIFICATION
+      branches:
+        - when: キャンセル
+          to: reason_cancel
+          label: キャンセル
+        - default: reason_change
+          label: 変更
+
+    # 変更ルート: 理由 → 予約希望日時 → 薬処方確認（残薬確認なし）→ 質問
+    - id: reason_change
+      type: interaction
+      name: 理由_変更
+      announce: "変更の理由をお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、変更の理由をお話しください。"
+      next: desired_datetime
+
+    - id: desired_datetime
+      type: interaction
+      name: 予約希望日時
+      announce: "変更後のご希望日をお話しください。ない場合は「ありません。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、変更後のご希望日をお話しください。ない場合は「ありません。」とお話しください。"
+      next: med_change
+
+    - id: med_change
+      type: interaction
+      name: 薬処方確認_変更
+      announce: "病院からお薬を処方されている方は、「はい、飲んでいます」と、されていない方は「いいえ、飲んでいません」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、お薬を処方されている方は「はい、飲んでいます」、されていない方は「いいえ、飲んでいません」とお話しください。"
+      next: ask_question    # 変更は残薬確認なし → 常に 質問 へ
+
+    # キャンセルルート: 理由 → 薬処方確認 →(飲んでいる)残薬確認 → 質問 / 残薬不足案内
+    - id: reason_cancel
+      type: interaction
+      name: 理由_キャンセル
+      announce: "キャンセルの理由をお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、キャンセルの理由をお話しください。"
+      next: med_cancel
+
+    - id: med_cancel
+      type: interaction
+      name: 薬処方確認_変更キャンセル
+      announce: "病院からお薬を処方されている方は、「はい、飲んでいます」と、されていない方は「いいえ、飲んでいません」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、お薬を処方されている方は「はい、飲んでいます」、されていない方は「いいえ、飲んでいません」とお話しください。"
+      next: med_gate
+
+    - id: med_gate
+      type: nexus
+      name: 薬処方_分岐
+      saveContext: yes
+      contextName: medicationTaking
+      contextType: CLASSIFICATION
+      branches:
+        - when: 飲んでいる
+          to: remaining_drugs
+          label: 飲んでいる
+        - default: ask_question
+          label: 飲んでいない
+
+    - id: remaining_drugs
+      type: interaction
+      name: 残薬確認
+      announce: "残薬について確認をいたします。残薬がある場合は「はい、あります」、無い場合は「いいえ、ありません」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、残薬について確認をいたします。残薬がある場合は「はい、あります」、無い場合は「いいえ、ありません」とお話しください。"
+      next: remaining_gate
+
+    - id: remaining_gate
+      type: nexus
+      name: 残薬_分岐
+      saveContext: yes
+      contextName: remainingDrugs
+      contextType: CLASSIFICATION
+      branches:
+        - when: はい
+          to: ask_question
+          label: あり
+        - default: hangup_zanyaku
+          label: なし
+
+    # ── D) その他お問い合わせルート（FAQ）──────────────────────────
+    - id: faq_inquiry
+      type: faq
+      name: 問い合わせ内容
+      announce: "お問い合わせ内容をお話しください。"
+      retryCount: "2"
+      next: ask_question       # ANSWER（回答できた）→ 質問へ
+      failed: faq_mismatch     # NO_RESULT（回答できず）→ 不一致アナウンス
+
+    - id: faq_mismatch
+      type: announce
+      name: FAQ不一致アナウンス
+      text: ""
+      next: ask_question
+
+    # ── 共通の締めくくり（全ルート合流）────────────────────────────
+    - id: ask_question
+      type: interaction
+      name: 質問
+      announce: "そのほかに何かお問い合わせはありますか。ない場合は「ありません。」とお話しください。"
+      inputType: STT
+      retryCount: "2"
+      retryAnnounce: "恐れ入りますが再度、そのほかに何かお問い合わせはありますか。ない場合は「ありません。」とお話しください。"
+      next: ask_name
+
+    # 個人情報（氏名/生年月日/連絡先）は 100% 必須項目。
+    # GF では patient_name / dob / phone スロットに決定論インライン展開される。
+    - id: ask_name
+      type: interaction
+      name: 氏名
+      announce: "お名前をフルネームでお話しください。"
+      inputType: STT
+      reconfirm: no
+      retryCount: "2"
+      next: ask_dob
+
+    - id: ask_dob
+      type: interaction
+      name: 生年月日
+      announce: "生年月日をお話しください。"
+      inputType: STT_DTMF
+      reconfirm: no          # GF: echo_back false（復唱なし）
+      retryCount: "2"
+      next: ask_phone
+
+    - id: ask_phone
+      type: interaction
+      name: 連絡先番号確認
+      announce: "ご連絡先のお電話番号を確認します。今おかけのお電話番号でよろしければ「はい」、別の番号をご希望の場合は番号をお話しください。"
+      inputType: STT_DTMF
+      reconfirm: no
+      retryCount: "2"
+      next: end_router
+
+    # 用件（classification）に応じて終話メッセージを出し分け。
+    - id: end_router
+      type: nexus
+      name: 終話ルーター
+      saveContext: no
+      contextName: classification
+      contextType: CLASSIFICATION
+      branches:
+        - when: 予約
+          to: hangup_reserve
+          label: 予約
+        - when: 変更
+          to: hangup_reserve
+          label: 変更
+        - when: キャンセル
+          to: hangup_cancel
+          label: キャンセル
+        # その他お問い合わせ は GF では faqAnswered で終話①/②を出し分け（問い合わせ終話ルーター）。
+        # CS ではひとまず 予約変更問合せ終話 に寄せる（TS が faqAnswered 分岐を付与）。
+        - when: その他お問い合わせ
+          default: hangup_reserve
+          label: その他
+
+    # ── 終話（hangup: announce + Status/SMS フラグ）────────────────
+    - id: hangup_daihyo
+      type: hangup
+      name: END_代表案内
+      announce: "大変申し訳ございません。直近の診療に関するご用件はAI電話では承っておりません。恐れ入りますが、代表電話にお電話をお願いいたします。お電話ありがとうございました。それでは失礼いたします。"
+      statusFlag: 2
+      smsFlag: -2
+
+    - id: hangup_zanyaku
+      type: hangup
+      name: END_残薬不足案内
+      announce: "大変申し訳ございません。お薬が足りない場合はAI電話では承っておりません。恐れ入りますが、代表電話にお電話をお願いいたします。お電話ありがとうございました。それでは失礼いたします。"
+      statusFlag: 2
+      smsFlag: -2
+
+    - id: hangup_reserve
+      type: hangup
+      name: 終話_予約変更問合せ
+      announce: "<%classification%>の申し込みを受付いたしました。3診療日以内に担当者から折り返し電話、もしくはショートメールにてご連絡いたします。お電話ありがとうございました。それでは失礼いたします。"
+      statusFlag: 1
+      smsFlag: 1
+
+    - id: hangup_cancel
+      type: hangup
+      name: 終話_キャンセル問合せ
+      announce: "<%classification%>の申し込みを受付いたしました。確認事項がある場合のみ3診療日以内に担当者から折り返し電話、もしくはショートメールにてご連絡いたします。お電話ありがとうございました。それでは失礼いたします。"
+      statusFlag: 1
+      smsFlag: 1
+
+    - id: hangup_fail
+      type: hangup
+      name: END_聴取失敗
+      announce: ""
+      statusFlag: 2
+      smsFlag: -2
+
+  # ── シナリオ設定（Status Settings 相当。終話ノードの Status/SMS が参照）──
+  settings:
+    statuses:
+      - { name: 受付完了, flag: 1 }
+      - { name: 代表案内・AI対応不可, flag: 2 }
+      - { name: 受付時間外, flag: 6 }
+    smsFlags:
+      - { type: 送信あり, flag: 1, content: "この度はお電話ありがとうございました。" }
+      - { type: 送信なし, flag: -2, fixed: true }

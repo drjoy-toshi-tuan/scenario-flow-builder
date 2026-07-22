@@ -1,33 +1,46 @@
 import { useFlowStore } from '../store/flowStore';
-import type { FlowNode } from '../ir/types';
+import type { FlowIR, FlowNode } from '../ir/types';
 import {
   csBranchesToDataBranches,
   csBranchSentence,
-  csSourceGroups,
+  csDataCategory,
+  datetimeKindOf,
+  defaultConditionForCategory,
+  hearingSourceOptions,
   newCsCondition,
   nextCsBranchId,
   nextCsBranchName,
   operatorOf,
   operatorsFor,
+  phoneKindOf,
+  phoneValuesFor,
   readCsBranches,
-  sourceValueType,
   CS_DAY_SETS,
   CS_ELSE_LABEL,
   type CsBranch,
   type CsCondition,
+  type CsDataCategory,
 } from '../ui/csLogic';
 import { Icon } from '../ui/icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab 分岐設定 của node 分岐ロジック (màn CS): thay ô regex bằng "câu điều kiện"
-// chọn từ pulldown — 1 nhánh = 1 thẻ, đánh giá TỪ TRÊN xuống, else その他 cố định.
-// Mọi chỉnh sửa ghi vào DRAFT (giống các tab khác): setDraftField('csConditions')
-// + sync data.branches để handle/dây/commit dùng lại cơ chế sẵn có.
-// Nhãn UI tiếng Nhật cố định theo spec CS (không qua i18n) — xem ui/csLogic.ts.
+// Tab プロパティ設定 của node 分岐ロジック (màn CS): "câu điều kiện" có cấu trúc.
+// 1 nhánh = 1 thẻ. Trong thẻ:
+//   - 条件の数 (1/2/3): nút on/off chọn số điều kiện kết hợp.
+//   - mỗi điều kiện: chọn データ (聴取内容 / 電話番号 / 着信日時) → cascade riêng.
+//   - AND/OR chỉ hiện khi ≥ 2 điều kiện.
+// Đánh giá TỪ TRÊN xuống; else その他 cố định. Ghi vào DRAFT: csConditions +
+// data.branches (bản sync để handle/dây/commit dùng lại cơ chế sẵn có).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const inputClass =
   'w-full rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-2.5 py-1.5 text-sm text-[var(--bk-text)] outline-none transition focus:border-[var(--bk-accent)]';
+
+const CATEGORY_META: { id: CsDataCategory; label: string; icon: string }[] = [
+  { id: 'hearing', label: '聴取内容', icon: 'lucide:headphones' },
+  { id: 'phone', label: '電話番号', icon: 'lucide:phone' },
+  { id: 'datetime', label: '着信日時', icon: 'lucide:calendar-clock' },
+];
 
 export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
   const ir = useFlowStore((s) => s.ir);
@@ -36,10 +49,8 @@ export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
 
   const data = draft?.data ?? node.data;
   const branches = readCsBranches(data);
-  const groups = csSourceGroups(ir, node.id);
 
   // Ghi cả 2 key trong 1 lượt: csConditions (nguồn sự thật CS) + branches (bản sync).
-  // 2 lời gọi setDraftField nối tiếp đều đọc draft mới nhất từ store nên an toàn.
   const apply = (next: CsBranch[]) => {
     setDraftField('csConditions', next);
     setDraftField('branches', csBranchesToDataBranches(next));
@@ -67,10 +78,19 @@ export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
       },
     ]);
 
-  const updateCond = (bi: number, ci: number, patch: Partial<CsCondition>) =>
+  const updateCond = (bi: number, ci: number, cond: CsCondition) =>
     updateBranch(bi, {
-      conditions: branches[bi].conditions.map((c, i) => (i === ci ? { ...c, ...patch } : c)),
+      conditions: branches[bi].conditions.map((c, i) => (i === ci ? cond : c)),
     });
+
+  // 条件の数 (1/2/3): thêm/bớt số điều kiện của nhánh cho khớp N.
+  const setConditionCount = (bi: number, count: number) => {
+    const cur = branches[bi].conditions;
+    let next: CsCondition[];
+    if (count <= cur.length) next = cur.slice(0, count);
+    else next = [...cur, ...Array.from({ length: count - cur.length }, () => newCsCondition())];
+    updateBranch(bi, { conditions: next });
+  };
 
   return (
     <div className="space-y-3">
@@ -111,14 +131,37 @@ export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
           </div>
 
           <div className="space-y-2 p-2.5">
+            {/* 条件の数 — nút on/off 1/2/3. */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[var(--bk-text-muted)]">条件の数</span>
+              <span className="flex overflow-hidden rounded-full border border-[var(--bk-border)]">
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setConditionCount(bi, n)}
+                    className={[
+                      'px-3 py-1 text-[11px] font-bold transition',
+                      branch.conditions.length === n
+                        ? 'bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
+                        : 'text-[var(--bk-text-faint)] hover:text-[var(--bk-text)]',
+                    ].join(' ')}
+                  >
+                    {n}条件
+                  </button>
+                ))}
+              </span>
+            </div>
+
             {branch.conditions.map((cond, ci) => (
               <ConditionRow
                 key={ci}
+                ir={ir}
+                selfId={node.id}
                 branch={branch}
                 cond={cond}
                 index={ci}
-                groups={groups}
-                onChange={(patch) => updateCond(bi, ci, patch)}
+                onChange={(cnext) => updateCond(bi, ci, cnext)}
                 onRemove={
                   branch.conditions.length > 1
                     ? () => updateBranch(bi, { conditions: branch.conditions.filter((_, i) => i !== ci) })
@@ -127,17 +170,9 @@ export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
               />
             ))}
 
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => updateBranch(bi, { conditions: [...branch.conditions, newCsCondition()] })}
-                className="flex items-center gap-1.5 rounded-full border border-dashed border-[var(--bk-border)] px-3 py-1 text-xs font-semibold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
-              >
-                <Icon icon="lucide:plus" width={13} height={13} />
-                条件を追加
-              </button>
-              {/* AND/OR chỉ có nghĩa khi ≥ 2 điều kiện. */}
-              {branch.conditions.length > 1 && (
+            {/* AND/OR chỉ có nghĩa khi ≥ 2 điều kiện. */}
+            {branch.conditions.length > 1 && (
+              <div className="flex justify-end">
                 <span className="flex overflow-hidden rounded-full border border-[var(--bk-border)]">
                   <CombButton
                     label="すべて満たす"
@@ -150,13 +185,13 @@ export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
                     onClick={() => updateBranch(bi, { combinator: 'or' })}
                   />
                 </span>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Câu tóm tắt tự sinh — CS đọc để tự kiểm tra, TS đọc như spec. */}
-            <div className="rounded-lg border border-[color-mix(in_srgb,#10b981_30%,var(--bk-border))] bg-[color-mix(in_srgb,#10b981_8%,var(--bk-surface))] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--bk-text)]">
+            <div className="rounded-lg border border-[color-mix(in_srgb,#16a34a_30%,var(--bk-border))] bg-[color-mix(in_srgb,#16a34a_8%,var(--bk-surface))] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--bk-text)]">
               {csBranchSentence(branch, ir)}
-              <span className="mx-1 font-bold text-[#10b981]">→</span>
+              <span className="mx-1 font-bold text-[#16a34a]">→</span>
               <span className="font-semibold">「{branch.name || '（無題）'}」へ進む</span>
             </div>
           </div>
@@ -188,101 +223,208 @@ export function CsLogicBranchEditor({ node }: { node: FlowNode }) {
   );
 }
 
-// 1 dòng điều kiện: [もし/かつ/または] [データ] [比較] [値] [xoá].
+// 1 điều kiện: [lead] [データ nhóm] → cascade theo nhóm.
 function ConditionRow({
+  ir,
+  selfId,
   branch,
   cond,
   index,
-  groups,
   onChange,
   onRemove,
 }: {
+  ir: FlowIR | null;
+  selfId: string;
   branch: CsBranch;
   cond: CsCondition;
   index: number;
-  groups: ReturnType<typeof csSourceGroups>;
-  onChange: (patch: Partial<CsCondition>) => void;
+  onChange: (cond: CsCondition) => void;
   onRemove?: () => void;
 }) {
-  const op = operatorOf(cond);
   const lead = index === 0 ? 'もし' : branch.combinator === 'and' ? 'かつ' : 'または';
+  const category = csDataCategory(cond.source);
 
-  // Đổi nguồn dữ liệu -> toán tử về mặc định của loại mới, xoá giá trị cũ (lệch kiểu).
-  const changeSource = (source: string) => {
-    if (sourceValueType(source) === sourceValueType(cond.source)) onChange({ source });
-    else onChange({ source, operator: operatorsFor(source)[0].id, value: '', value2: '' });
+  const changeCategory = (next: CsDataCategory) => {
+    if (next === category) return;
+    onChange(defaultConditionForCategory(next, ir, selfId));
   };
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className={`w-9 flex-none text-center text-[11px] font-bold ${
-          index === 0 ? 'text-[var(--bk-text-faint)]' : 'text-[var(--bk-accent)]'
-        }`}
-      >
-        {lead}
-      </span>
-      <select
-        className={`${inputClass} min-w-0 flex-[1.4]`}
-        value={cond.source}
-        aria-label="データ"
-        onChange={(e) => changeSource(e.target.value)}
-      >
-        {groups.map((g) => (
-          <optgroup key={g.label} label={g.label}>
-            {g.items.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </optgroup>
+    <div className="rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span
+          className={`text-[11px] font-bold ${index === 0 ? 'text-[var(--bk-text-faint)]' : 'text-[var(--bk-accent)]'}`}
+        >
+          {lead}
+        </span>
+        {onRemove ? <IconBtn icon="lucide:x" title="条件を削除" danger onClick={onRemove} /> : null}
+      </div>
+
+      {/* データ nhóm — 3 nút chọn. */}
+      <div className="mb-2 flex gap-1.5">
+        {CATEGORY_META.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => changeCategory(c.id)}
+            className={[
+              'flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11.5px] font-semibold transition',
+              category === c.id
+                ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
+                : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)]',
+            ].join(' ')}
+          >
+            <Icon icon={c.icon} width={13} height={13} />
+            {c.label}
+          </button>
         ))}
-      </select>
-      <select
-        className={`${inputClass} min-w-0 flex-1`}
-        value={op.id}
-        aria-label="比較"
-        onChange={(e) => onChange({ operator: e.target.value, value2: '' })}
-      >
-        {operatorsFor(cond.source).map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ValueField cond={cond} onChange={onChange} />
-      {onRemove ? (
-        <IconBtn icon="lucide:x" title="条件を削除" danger onClick={onRemove} />
-      ) : (
-        <span className="w-7 flex-none" aria-hidden />
-      )}
+      </div>
+
+      {category === 'hearing' && <HearingCascade ir={ir} selfId={selfId} cond={cond} onChange={onChange} />}
+      {category === 'phone' && <PhoneCascade cond={cond} onChange={onChange} />}
+      {category === 'datetime' && <DatetimeCascade cond={cond} onChange={onChange} />}
     </div>
   );
 }
 
-// Ô nhập giá trị đổi theo toán tử: text / khoảng thời gian (〜) / nhóm ngày / không cần.
-function ValueField({
+// 聴取内容: chọn node 聴取 → toán tử → giá trị.
+function HearingCascade({
+  ir,
+  selfId,
   cond,
   onChange,
 }: {
+  ir: FlowIR | null;
+  selfId: string;
   cond: CsCondition;
-  onChange: (patch: Partial<CsCondition>) => void;
+  onChange: (cond: CsCondition) => void;
 }) {
+  const options = hearingSourceOptions(ir, selfId);
+  const ops = operatorsFor(cond.source);
   const op = operatorOf(cond);
-  switch (op.value) {
-    case 'none':
-      return (
-        <span className="min-w-0 flex-1 rounded-lg border border-dashed border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-2 py-1.5 text-center text-xs text-[var(--bk-text-faint)]">
-          値の入力は不要
-        </span>
-      );
-    case 'dayset':
-      return (
+  return (
+    <div className="space-y-1.5">
+      <select
+        className={inputClass}
+        value={cond.source}
+        aria-label="どの聴取の回答"
+        onChange={(e) => onChange({ ...cond, source: e.target.value })}
+      >
+        {options.length === 0 && <option value={cond.source}>（聴取ノードがありません）</option>}
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            聴取「{o.label}」の結果
+          </option>
+        ))}
+      </select>
+      <div className="flex gap-1.5">
         <select
-          className={`${inputClass} min-w-0 flex-1`}
+          className={`${inputClass} flex-1`}
+          value={op.id}
+          aria-label="比較"
+          onChange={(e) => onChange({ ...cond, operator: e.target.value, value: '' })}
+        >
+          {ops.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {op.value !== 'none' ? (
+          <input
+            type="text"
+            className={`${inputClass} flex-1`}
+            value={cond.value}
+            placeholder="値を入力（例: 予約）"
+            aria-label="値"
+            onChange={(e) => onChange({ ...cond, value: e.target.value })}
+          />
+        ) : (
+          <span className="flex-1 rounded-lg border border-dashed border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-2 py-1.5 text-center text-xs text-[var(--bk-text-faint)]">
+            値の入力は不要
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 電話番号: 着信 / 聴取 → 種別 CỐ ĐỊNH (enum, không thêm/sửa/xoá).
+function PhoneCascade({ cond, onChange }: { cond: CsCondition; onChange: (cond: CsCondition) => void }) {
+  const kind = phoneKindOf(cond.source);
+  const values = phoneValuesFor(cond.source);
+  const setKind = (next: 'incoming' | 'answered') => {
+    const source = next === 'answered' ? 'answeredPhone' : 'incomingPhone';
+    const list = phoneValuesFor(source);
+    const value = list.includes(cond.value) ? cond.value : list[list.length - 1];
+    onChange({ source, operator: 'is', value, value2: '' });
+  };
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        <SubToggle label="着信電話番号" on={kind === 'incoming'} onClick={() => setKind('incoming')} />
+        <SubToggle label="聴取電話番号" on={kind === 'answered'} onClick={() => setKind('answered')} />
+      </div>
+      <div className="flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--bk-text-faint)]">
+        <Icon icon="lucide:lock" width={11} height={11} />
+        種別は固定（選択・編集・削除できません）
+      </div>
+      <select
+        className={inputClass}
+        value={cond.value}
+        aria-label="種別"
+        onChange={(e) => onChange({ ...cond, value: e.target.value })}
+      >
+        {values.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// 着信日時: 日付(range) / 曜日(dayset) / 時間(range).
+function DatetimeCascade({ cond, onChange }: { cond: CsCondition; onChange: (cond: CsCondition) => void }) {
+  const kind = datetimeKindOf(cond.source);
+  const setKind = (next: 'date' | 'day' | 'time') => {
+    if (next === 'date') onChange({ source: 'callDate', operator: 'between', value: '', value2: '' });
+    else if (next === 'day') onChange({ source: 'callDay', operator: 'is', value: CS_DAY_SETS[0], value2: '' });
+    else onChange({ source: 'callTime', operator: 'between', value: '09:00', value2: '17:00' });
+  };
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        <SubToggle label="日付" on={kind === 'date'} onClick={() => setKind('date')} />
+        <SubToggle label="曜日" on={kind === 'day'} onClick={() => setKind('day')} />
+        <SubToggle label="時間" on={kind === 'time'} onClick={() => setKind('time')} />
+      </div>
+      {kind === 'date' && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            className={`${inputClass} min-w-0 flex-1`}
+            value={cond.value}
+            aria-label="開始日"
+            onChange={(e) => onChange({ ...cond, value: e.target.value })}
+          />
+          <span className="flex-none text-xs text-[var(--bk-text-faint)]">〜</span>
+          <input
+            type="date"
+            className={`${inputClass} min-w-0 flex-1`}
+            value={cond.value2}
+            aria-label="終了日"
+            onChange={(e) => onChange({ ...cond, value2: e.target.value })}
+          />
+        </div>
+      )}
+      {kind === 'day' && (
+        <select
+          className={inputClass}
           value={cond.value || CS_DAY_SETS[0]}
-          aria-label="値"
-          onChange={(e) => onChange({ value: e.target.value })}
+          aria-label="曜日"
+          onChange={(e) => onChange({ ...cond, value: e.target.value })}
         >
           {CS_DAY_SETS.map((d) => (
             <option key={d} value={d}>
@@ -290,41 +432,47 @@ function ValueField({
             </option>
           ))}
         </select>
-      );
-    case 'range':
-      return (
-        <span className="flex min-w-0 flex-1 items-center gap-1">
+      )}
+      {kind === 'time' && (
+        <div className="flex items-center gap-1.5">
           <input
             type="text"
-            className={`${inputClass} min-w-0`}
+            className={`${inputClass} min-w-0 flex-1`}
             value={cond.value}
             placeholder="09:00"
-            aria-label="値（から）"
-            onChange={(e) => onChange({ value: e.target.value })}
+            aria-label="開始時刻"
+            onChange={(e) => onChange({ ...cond, value: e.target.value })}
           />
           <span className="flex-none text-xs text-[var(--bk-text-faint)]">〜</span>
           <input
             type="text"
-            className={`${inputClass} min-w-0`}
+            className={`${inputClass} min-w-0 flex-1`}
             value={cond.value2}
-            placeholder="12:00"
-            aria-label="値（まで）"
-            onChange={(e) => onChange({ value2: e.target.value })}
+            placeholder="17:00"
+            aria-label="終了時刻"
+            onChange={(e) => onChange({ ...cond, value2: e.target.value })}
           />
-        </span>
-      );
-    default:
-      return (
-        <input
-          type="text"
-          className={`${inputClass} min-w-0 flex-1`}
-          value={cond.value}
-          placeholder={sourceValueType(cond.source) === 'phone' ? '例: 090' : '値を入力'}
-          aria-label="値"
-          onChange={(e) => onChange({ value: e.target.value })}
-        />
-      );
-  }
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubToggle({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'flex-1 rounded-lg border px-2 py-1.5 text-[11.5px] font-bold transition',
+        on
+          ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
+          : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)]',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  );
 }
 
 // Nút toggle すべて満たす (AND) / いずれか満たす (OR) trong thẻ nhánh.

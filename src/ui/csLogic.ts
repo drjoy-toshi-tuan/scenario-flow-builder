@@ -13,17 +13,42 @@ import { CATCH_ALL_ID, type DataBranch } from './nodeSchema';
 //
 // Mọi nhãn ở đây là TIẾNG NHẬT CỐ ĐỊNH (spec UI của team CS, không theo i18n).
 // Module thuần (không import React) — dùng chung cho panel + BaseNode preview.
+//
+// ── Cấu trúc chọn dữ liệu (データ) 3 nhóm (spec CS 2026-07) ───────────────────
+//   聴取内容   (hearing)  : kết quả 1 node 聴取 (interaction) → so khớp text.
+//   電話番号   (phone)    : 着信電話番号 / 聴取電話番号 — GIÁ TRỊ CỐ ĐỊNH (enum),
+//                          không thêm/sửa/xoá option. Chọn 1 種別 cho điều kiện.
+//   着信日時   (datetime) : 日付(range) / 曜日(dayset) / 時間(range).
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Loại giá trị của 1 nguồn dữ liệu — quyết định bộ toán tử + kiểu ô nhập.
-export type CsValueType = 'phone' | 'time' | 'day' | 'text';
+export type CsValueType =
+  | 'phone' // legacy 発信元電話番号 (giữ để tương thích flow cũ)
+  | 'phoneIncoming' // 着信電話番号 — enum cố định 6 種別
+  | 'phoneAnswered' // 聴取電話番号 — enum cố định 3 種別
+  | 'date' // 着信日付 — khoảng ngày
+  | 'time'
+  | 'day'
+  | 'text';
+
+// Nhóm データ cấp cao (3 nút chọn trên panel).
+export type CsDataCategory = 'hearing' | 'phone' | 'datetime';
 
 // Nguồn 通話情報 (không thuộc node nào) — id lưu trong CsCondition.source.
 export const CS_CALL_SOURCES: readonly { id: string; label: string; type: CsValueType }[] = [
-  { id: 'callerNumber', label: '発信元電話番号', type: 'phone' },
+  { id: 'callerNumber', label: '発信元電話番号', type: 'phone' }, // legacy (flow cũ)
+  { id: 'incomingPhone', label: '着信電話番号', type: 'phoneIncoming' },
+  { id: 'answeredPhone', label: '聴取電話番号', type: 'phoneAnswered' },
+  { id: 'callDate', label: '着信日付', type: 'date' },
   { id: 'callTime', label: '受電時刻', type: 'time' },
   { id: 'callDay', label: '受電曜日', type: 'day' },
 ];
+
+// Giá trị種別 CỐ ĐỊNH của điện thoại (không thêm/sửa/xoá — spec CS).
+//   着信電話番号 (số gọi đến): 6 種別 (Incoming Classifier).
+//   聴取電話番号 (số khách đọc): 3 種別 (Phone Type Classifier).
+export const INCOMING_PHONE_VALUES: readonly string[] = ['その他', '非通知', '海外', 'WebRTC', '固定', '携帯'];
+export const ANSWERED_PHONE_VALUES: readonly string[] = ['その他', '固定', '携帯'];
 
 // Nguồn "kết quả node trước": lưu dạng 'node:<nodeId>' để đổi tên node không vỡ rule.
 const NODE_SOURCE_PREFIX = 'node:';
@@ -39,6 +64,8 @@ export type CsOperatorValue =
   | 'none' // không cần nhập giá trị (vd 携帯電話である)
   | 'text' // 1 ô text
   | 'range' // 2 ô (từ〜đến) — dùng cho 受電時刻の間
+  | 'daterange' // 2 ô ngày (từ〜đến) — 着信日付
+  | 'enum' // pulldown chọn 1 種別 cố định (電話番号)
   | 'dayset'; // pulldown chọn nhóm ngày (平日/土日祝/…)
 
 export interface CsOperator {
@@ -57,6 +84,10 @@ export const CS_OPERATORS: Record<CsValueType, readonly CsOperator[]> = {
     { id: 'isLandline', label: '固定電話である', value: 'none' },
     { id: 'isAnonymous', label: '非通知である', value: 'none' },
   ],
+  // 電話番号 種別: 1 toán tử 'である', giá trị chọn từ enum cố định.
+  phoneIncoming: [{ id: 'is', label: 'である', value: 'enum' }],
+  phoneAnswered: [{ id: 'is', label: 'である', value: 'enum' }],
+  date: [{ id: 'between', label: 'の期間', value: 'daterange' }],
   time: [
     { id: 'between', label: 'の間', value: 'range' },
     { id: 'before', label: 'より前', value: 'text' },
@@ -92,8 +123,8 @@ export const CS_ELSE_LABEL = 'その他';
 export interface CsCondition {
   source: string; // id trong CS_CALL_SOURCES hoặc 'node:<nodeId>'
   operator: string; // id trong CS_OPERATORS theo loại của source
-  value: string;
-  value2: string; // chỉ dùng cho toán tử 'range' (の間)
+  value: string; // enum: 種別 / range: từ / text: giá trị
+  value2: string; // chỉ dùng cho toán tử 'range' | 'daterange' (đến)
 }
 
 // 1 nhánh = 1 thẻ trong panel: các điều kiện kết hợp AND (すべて) / OR (いずれか).
@@ -109,6 +140,32 @@ export function sourceValueType(source: string): CsValueType {
   return CS_CALL_SOURCES.find((s) => s.id === source)?.type ?? 'text';
 }
 
+// Nhóm データ cấp cao của 1 source (cho 3 nút chọn trên panel).
+export function csDataCategory(source: string): CsDataCategory {
+  if (source.startsWith(NODE_SOURCE_PREFIX)) return 'hearing';
+  const t = sourceValueType(source);
+  if (t === 'phone' || t === 'phoneIncoming' || t === 'phoneAnswered') return 'phone';
+  if (t === 'date' || t === 'time' || t === 'day') return 'datetime';
+  return 'hearing';
+}
+
+// Loại điện thoại của source (着信/聴取). legacy callerNumber coi như 着信.
+export function phoneKindOf(source: string): 'incoming' | 'answered' {
+  return source === 'answeredPhone' ? 'answered' : 'incoming';
+}
+
+// Loại 着信日時 của source.
+export function datetimeKindOf(source: string): 'date' | 'day' | 'time' {
+  if (source === 'callDate') return 'date';
+  if (source === 'callDay') return 'day';
+  return 'time';
+}
+
+// Danh sách種別 cố định của 1 source điện thoại.
+export function phoneValuesFor(source: string): readonly string[] {
+  return phoneKindOf(source) === 'answered' ? ANSWERED_PHONE_VALUES : INCOMING_PHONE_VALUES;
+}
+
 // Bộ toán tử áp dụng cho 1 source.
 export function operatorsFor(source: string): readonly CsOperator[] {
   return CS_OPERATORS[sourceValueType(source)];
@@ -120,9 +177,19 @@ export function operatorOf(cond: CsCondition): CsOperator {
   return ops.find((o) => o.id === cond.operator) ?? ops[0];
 }
 
-// Điều kiện mặc định khi bấm "＋ 条件を追加".
+// Điều kiện mặc định khi bấm "＋ 条件を追加" (mặc định: 着信電話番号 → 携帯).
 export function newCsCondition(): CsCondition {
-  return { source: 'callerNumber', operator: 'startsWith', value: '', value2: '' };
+  return { source: 'incomingPhone', operator: 'is', value: '携帯', value2: '' };
+}
+
+// Điều kiện mặc định cho 1 nhóm データ (khi bấm nút nhóm trên panel).
+export function defaultConditionForCategory(category: CsDataCategory, ir: FlowIR | null, selfId: string): CsCondition {
+  if (category === 'hearing') {
+    const first = (ir?.nodes ?? []).find((n) => n.type === 'interaction' && n.id !== selfId);
+    return { source: first ? nodeSource(first.id) : 'node:', operator: 'equals', value: '', value2: '' };
+  }
+  if (category === 'phone') return { source: 'incomingPhone', operator: 'is', value: '携帯', value2: '' };
+  return { source: 'callTime', operator: 'between', value: '09:00', value2: '17:00' };
 }
 
 // Đọc data.csConditions (an toàn kiểu — dữ liệu từ YAML có thể lệch dạng).
@@ -138,8 +205,8 @@ export function readCsBranches(data: Record<string, unknown>): CsBranch[] {
       ? (o.conditions as unknown[])
           .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
           .map((c) => ({
-            source: typeof c.source === 'string' ? c.source : 'callerNumber',
-            operator: typeof c.operator === 'string' ? c.operator : 'startsWith',
+            source: typeof c.source === 'string' ? c.source : 'incomingPhone',
+            operator: typeof c.operator === 'string' ? c.operator : 'is',
             value: typeof c.value === 'string' ? c.value : '',
             value2: typeof c.value2 === 'string' ? c.value2 : '',
           }))
@@ -204,6 +271,13 @@ export function csSourceGroups(ir: FlowIR | null, selfId: string): CsSourceGroup
   ];
 }
 
+// Danh sách node 聴取 (cho pulldown khi データ = 聴取内容).
+export function hearingSourceOptions(ir: FlowIR | null, selfId: string): CsSourceOption[] {
+  return (ir?.nodes ?? [])
+    .filter((n) => n.type === 'interaction' && n.id !== selfId)
+    .map((n) => ({ id: nodeSource(n.id), label: n.label.trim() || n.id }));
+}
+
 // Nhãn hiển thị của 1 source (node đã bị xoá → hiện id thô để người dùng biết sửa).
 export function csSourceLabel(source: string, ir: FlowIR | null): string {
   const fixed = CS_CALL_SOURCES.find((s) => s.id === source);
@@ -224,6 +298,7 @@ export function csConditionSentence(cond: CsCondition, ir: FlowIR | null): strin
     case 'none':
       return `${src}が${op.label}`;
     case 'range':
+    case 'daterange':
       return `${src}が ${cond.value || '–'}〜${cond.value2 || '–'} ${op.label}`;
     default:
       return `${src}が「${cond.value || '–'}」${op.label}`;
