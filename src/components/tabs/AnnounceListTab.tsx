@@ -337,9 +337,9 @@ export function AnnounceListTab() {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 whitespace-nowrap text-[15px] font-bold text-[var(--bk-text)]">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
-              <Icon icon={view === 'main' ? 'lucide:volume-2' : 'line-md:chat-filled'} width={17} height={17} />
+              <Icon icon="lucide:volume-2" width={17} height={17} />
             </span>
-            {view === 'main' ? t('ctAnnounce') : t('alSubTitle')}
+            {t('ctAnnounce')}
           </div>
           {/* Segmented switch: viên thuốc 2 nút (KHÔNG icon), nút active nền accent nhạt. */}
           <div className="flex items-center gap-0.5 rounded-full border border-[var(--bk-border)] bg-[var(--bk-surface)] p-0.5 shadow-sm">
@@ -556,7 +556,7 @@ export function AnnounceListTab() {
                       >
                         <Icon icon={cfg.icon} width={13} height={13} />
                       </span>
-                      <span className="font-semibold text-[var(--bk-text)]">{t(cfg.typeKey)}</span>
+                      <span className="text-sm font-semibold text-[var(--bk-text)]">{t(cfg.typeKey)}</span>
                       {row.catchAll && (
                         <span className="inline-flex items-center rounded-full bg-[var(--bk-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--bk-accent)]">
                           {t('alDefault')}

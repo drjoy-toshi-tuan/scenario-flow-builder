@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from 'react';
 import { useFlowStore } from '../store/flowStore';
 import type { FlowNode } from '../ir/types';
 import { DAY_KEYS, type DayKey } from '../ir/types';
@@ -13,20 +14,22 @@ import {
   readCsSlots,
   timeRemainderRanges,
   CS_DAY_LABELS,
-  CS_ELSE_LABEL,
   MAX_CS_CONDITIONS,
   type CsRange,
   type CsSlot,
   type CsSlotKind,
 } from '../ui/csLogic';
+import { NODE_CONFIG } from '../ui/nodeConfig';
 import { Icon } from '../ui/icons';
 import { useLang, useT } from '../ui/i18n';
+import { HoverTip } from './HoverTip';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Node 分岐ロジック (CS). 2 tab:
 //   - プロパティ設定: CsLogicPropertyEditor — số điều kiện (1/2/3) + mỗi điều kiện
 //     (聴取内容 / 電話番号 / 着信日時) với tập giá trị.
-//   - 分岐設定: CsLogicBranchList — liệt kê nhánh = tích các tập giá trị.
+//   - 分岐設定: CsLogicBranchList — liệt kê nhánh = tích các tập giá trị (READ-ONLY,
+//     bố cục 条件 → ノード giống các node khác; KHÔNG có nhánh catch-all).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -205,10 +208,6 @@ function PhoneSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) => 
         <SubToggle label={t('clIncoming')} on={kind === 'incoming'} onClick={() => onChange({ ...slot, phoneKind: 'incoming' })} />
         <SubToggle label={t('clAnswered')} on={kind === 'answered'} onClick={() => onChange({ ...slot, phoneKind: 'answered' })} />
       </div>
-      <div className="flex items-center gap-1.5 text-[10.5px] font-semibold text-[var(--bk-text-faint)]">
-        <Icon icon="lucide:lock" width={11} height={11} />
-        {t('clPhoneAllNote')}
-      </div>
       <div className="flex flex-wrap gap-1.5">
         {values.map((v) => (
           <span
@@ -234,6 +233,9 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
   const setRanges = (r: CsRange[]) => onChange({ ...slot, ranges: r });
   const setDays = (d: DayKey[]) => onChange({ ...slot, days: d });
 
+  const remainderDays = dayRemainder(days);
+  const remainderRanges = timeRemainderRanges(ranges);
+
   return (
     <div className="space-y-2">
       <div className="flex gap-1.5">
@@ -246,7 +248,6 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
         <div className="space-y-1.5">
           {ranges.map((r, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <Icon icon="lucide:clock" width={14} height={14} className="shrink-0 text-[var(--bk-text-faint)]" />
               <input
                 type="date"
                 className={`${inputClass} min-w-0 flex-1`}
@@ -265,6 +266,7 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
               <IconBtn icon="lucide:x" title="×" danger onClick={() => setRanges(ranges.filter((_, j) => j !== i))} />
             </div>
           ))}
+          {/* Nút thêm khung — icon, đặt DƯỚI cùng. */}
           <AddButton label={t('clAddRange')} onClick={() => setRanges([...ranges, { from: '', to: '' }])} />
         </div>
       )}
@@ -272,26 +274,27 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
       {dtKind === 'day' && (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5">
-            {DAY_KEYS.map((d) => {
-              const on = days.includes(d);
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDays(on ? days.filter((x) => x !== d) : [...days, d])}
-                  className={[
-                    'h-8 w-9 rounded-lg border text-xs font-bold transition',
-                    on
-                      ? 'border-[var(--bk-accent)] bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]'
-                      : 'border-[var(--bk-border)] text-[var(--bk-text-muted)] hover:border-[var(--bk-accent)]',
-                  ].join(' ')}
-                >
-                  {CS_DAY_LABELS[d][lang]}
-                </button>
-              );
-            })}
+            {DAY_KEYS.map((d) => (
+              <DayCell
+                key={d}
+                day={d}
+                label={CS_DAY_LABELS[d][lang]}
+                on={days.includes(d)}
+                onClick={() => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d])}
+              />
+            ))}
           </div>
-          <RemainderRow label={t('clRemainder')} text={dayRemainder(days).map((d) => CS_DAY_LABELS[d][lang]).join('・') || '—'} />
+          {/* Phần còn lại (tự động) — khung riêng, hiển thị y hệt mục chọn nhưng MỜ &
+              không sửa được. */}
+          {remainderDays.length > 0 && (
+            <RemainderFrame>
+              <div className="flex flex-wrap gap-1.5">
+                {remainderDays.map((d) => (
+                  <DayCell key={d} day={d} label={CS_DAY_LABELS[d][lang]} on dim />
+                ))}
+              </div>
+            </RemainderFrame>
+          )}
         </div>
       )}
 
@@ -317,28 +320,67 @@ function DatetimeSlot({ slot, onChange }: { slot: CsSlot; onChange: (s: CsSlot) 
               <IconBtn icon="lucide:x" title="×" danger onClick={() => setRanges(ranges.filter((_, j) => j !== i))} />
             </div>
           ))}
+          {/* Phần còn lại (tự động) — khung riêng, hiển thị y hệt mục chọn nhưng MỜ &
+              không sửa được. */}
+          {remainderRanges.length > 0 && (
+            <RemainderFrame>
+              <div className="space-y-1.5">
+                {remainderRanges.map((r, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input type="time" readOnly tabIndex={-1} className={`${inputClass} min-w-0 flex-1`} value={r.from} aria-label="remainder from" />
+                    <span className="shrink-0 text-xs text-[var(--bk-text-faint)]">〜</span>
+                    <input type="time" readOnly tabIndex={-1} className={`${inputClass} min-w-0 flex-1`} value={r.to} aria-label="remainder to" />
+                  </div>
+                ))}
+              </div>
+            </RemainderFrame>
+          )}
+          {/* Nút thêm khung — icon, đặt DƯỚI phần cover khoảng còn lại. */}
           <AddButton label={t('clAddRange')} onClick={() => setRanges([...ranges, { from: '', to: '' }])} />
-          {timeRemainderRanges(ranges).map((r, i) => (
-            <RemainderRow key={i} label={t('clRemainder')} text={`${r.from} 〜 ${r.to}`} />
-          ))}
         </div>
       )}
     </div>
   );
 }
 
-function RemainderRow({ label, text }: { label: string; text: string }) {
+// Khung "phần còn lại (tự động)" — viền đứt + nền chìm + mờ + khoá tương tác. Nội dung
+// bên trong trông y hệt mục chọn của user, chỉ khác là mờ đi & không sửa được.
+function RemainderFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-2.5 py-1.5 text-xs text-[var(--bk-text-faint)]">
-      <span className="rounded bg-[var(--bk-border)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--bk-text-muted)]">
-        {label}
-      </span>
-      <span className="text-[var(--bk-text)]">{text}</span>
+    <div className="pointer-events-none rounded-xl border border-dashed border-[var(--bk-border)] bg-[var(--bk-surface-2)] p-2 opacity-60">
+      {children}
     </div>
   );
 }
 
-// ── Tab 分岐設定: danh sách nhánh = tích các điều kiện ────────────────────────
+// 1 ô thứ (T2〜NL). Màu như 稼働スケジュール của General Settings: ngày thường xanh,
+// cuối tuần & ngày lễ đỏ. dim = ô "còn lại (tự động)" — hiện màu nhưng mờ & không bấm.
+function DayCell({ day, label, on, dim, onClick }: { day: DayKey; label: string; on: boolean; dim?: boolean; onClick?: () => void }) {
+  const isRedDay = day === 'sat' || day === 'sun' || day === 'holiday';
+  return (
+    <button
+      type="button"
+      disabled={dim}
+      onClick={onClick}
+      aria-pressed={on}
+      className={[
+        'h-8 w-9 rounded-lg border text-xs font-bold transition',
+        on
+          ? isRedDay
+            ? 'border-[#ef4444] bg-[#ef4444] text-white'
+            : 'border-[#059669] bg-[#059669] text-white'
+          : 'border-[var(--bk-border)] bg-[var(--bk-surface-2)] text-[var(--bk-text-faint)] hover:border-[var(--bk-accent)] hover:text-[var(--bk-text)]',
+        dim ? 'cursor-default' : '',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ── Tab 分岐設定: danh sách nhánh = tích các điều kiện (READ-ONLY) ─────────────
+// Bố cục 条件 → ノード giống các node khác (bk-branch-row); KHÔNG có nhánh catch-all,
+// chỉ các nhánh sinh từ điều kiện ở プロパティ設定.
 export function CsLogicBranchList({ node }: { node: FlowNode }) {
   const t = useT();
   const draft = useFlowStore((s) => s.draft);
@@ -347,43 +389,50 @@ export function CsLogicBranchList({ node }: { node: FlowNode }) {
   const slots = readCsSlots(data);
   const branches = csProductBranches(slots);
 
+  // Đích của 1 nhánh = target của edge xuất phát từ handle đó (IR đã commit).
+  const targetInfo = (handleId: string): { label: string; color: string } | null => {
+    const edge = ir?.edges.find((e) => e.source === node.id && (e.sourceHandle ?? 'default') === handleId);
+    if (!edge) return null;
+    const target = ir?.nodes.find((n) => n.id === edge.target);
+    return {
+      label: target?.label ?? edge.target,
+      color: target ? NODE_CONFIG[target.type].color : 'var(--bk-text-faint)',
+    };
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2 text-xs text-[var(--bk-text-muted)]">
-        <Icon icon="lucide:git-fork" width={14} height={14} className="shrink-0 text-[var(--bk-accent)]" />
-        {t('clBranchAuto')}
-      </div>
+      <p className="text-xs text-[var(--bk-text-faint)]">{t('branchFixedNote')}</p>
 
       {branches.length === 0 ? (
         <p className="px-1 text-sm text-[var(--bk-text-faint)]">{t('clNoValue')}</p>
       ) : (
-        <div className="space-y-1.5">
-          {branches.map((b, i) => (
-            <div
-              key={b.id}
-              className="flex items-start gap-2 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-2.5 py-2"
-            >
-              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-[var(--bk-accent-soft)] px-1 text-[11px] font-bold text-[var(--bk-accent)]">
-                {i + 1}
-              </span>
-              <span className="flex flex-wrap items-center gap-1.5 text-sm text-[var(--bk-text)]">
-                {b.parts.map((p, j) => (
-                  <span key={j} className="inline-flex items-center gap-1.5">
-                    {j > 0 && <span className="text-[var(--bk-text-faint)]">×</span>}
-                    <span className="rounded-md border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-2 py-0.5 text-xs font-semibold">
-                      {p}
+        <div className="space-y-2.5">
+          <div className="bk-branch-row bk-branch-head">
+            <div className="bk-branch-cond">{t('branchColCondition')}</div>
+            <span className="bk-branch-arrow-spacer" aria-hidden />
+            <div className="bk-branch-target bk-branch-target--left">{t('branchColNode')}</div>
+          </div>
+          {branches.map((b) => (
+            <div key={b.id} className="bk-branch-row">
+              <div className="bk-branch-cond">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {b.parts.map((p, j) => (
+                    <span key={j} className="inline-flex items-center gap-1.5">
+                      {j > 0 && <span className="text-[var(--bk-text-faint)]">×</span>}
+                      <span className="rounded-md border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-2 py-1 text-xs font-semibold text-[var(--bk-text)]">
+                        {p}
+                      </span>
                     </span>
-                  </span>
-                ))}
-              </span>
+                  ))}
+                </div>
+              </div>
+              <Icon icon="fluent:flow-dot-20-filled" width={18} height={18} className="bk-branch-arrow" />
+              <div className="bk-branch-target bk-branch-target--left">
+                <BranchTargetChip info={targetInfo(b.id)} />
+              </div>
             </div>
           ))}
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--bk-border)] px-2.5 py-2 text-sm text-[var(--bk-text-muted)]">
-            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-[var(--bk-surface-2)] px-1 text-[11px] font-bold text-[var(--bk-text-faint)]">
-              {branches.length + 1}
-            </span>
-            {CS_ELSE_LABEL}
-          </div>
         </div>
       )}
 
@@ -397,6 +446,17 @@ export function CsLogicBranchList({ node }: { node: FlowNode }) {
         </p>
       )}
     </div>
+  );
+}
+
+// Tag node đích — đồng bộ style với BranchTarget của các node khác (bk-branch-tag).
+function BranchTargetChip({ info }: { info: { label: string; color: string } | null }) {
+  const t = useT();
+  if (!info) return <span className="bk-branch-none">{t('branchTargetNone')}</span>;
+  return (
+    <HoverTip className="bk-branch-tag" style={{ '--tagc': info.color } as CSSProperties} content={info.label}>
+      {info.label}
+    </HoverTip>
   );
 }
 
@@ -418,15 +478,17 @@ function SubToggle({ label, on, onClick }: { label: string; on: boolean; onClick
   );
 }
 
+// Nút thêm — CHỈ icon (title/aria-label giữ nhãn cho a11y).
 function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[var(--bk-border)] px-3 py-1.5 text-xs font-semibold text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
+      title={label}
+      aria-label={label}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-dashed border-[var(--bk-border)] text-[var(--bk-text-muted)] transition hover:border-[var(--bk-accent)] hover:text-[var(--bk-accent)]"
     >
-      <Icon icon="lucide:plus" width={12} height={12} />
-      {label}
+      <Icon icon="lucide:plus" width={14} height={14} />
     </button>
   );
 }

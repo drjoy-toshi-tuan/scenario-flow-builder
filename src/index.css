@@ -607,8 +607,9 @@ body {
   top: 0;
 }
 
-/* Icon đồng hồ/lịch của input time: theme tối invert lại cho khỏi đen xì. */
-.dark input[type='time']::-webkit-calendar-picker-indicator {
+/* Icon đồng hồ/lịch của input time & date: theme tối invert lại cho khỏi đen xì. */
+.dark input[type='time']::-webkit-calendar-picker-indicator,
+.dark input[type='date']::-webkit-calendar-picker-indicator {
   filter: invert(1) opacity(0.75);
 }
 
