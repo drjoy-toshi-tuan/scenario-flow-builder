@@ -111,9 +111,10 @@ export function AddModulePanel() {
           <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--bk-text-faint)]">
             {t('chooseType')}
           </div>
-          {/* Giới hạn chiều cao ~6 node + cuộn dọc: danh sách node dài hơn 1 màn hình
-              (nhất là màn TS đủ loại node) trước đây tràn khỏi khung nhìn. */}
-          <div className="max-h-[19rem] overflow-y-auto overscroll-contain">
+          {/* Giới hạn chiều cao ~8 node + cuộn dọc: danh sách node dài hơn 1 màn hình
+              (nhất là màn TS đủ loại node) trước đây tràn khỏi khung nhìn.
+              Mỗi hàng ~3rem (icon h-8 + py-2) -> 8 node ≈ 24rem. */}
+          <div className="max-h-[24rem] overflow-y-auto overscroll-contain">
           {addableTypes.map((type) => {
             const cfg = NODE_CONFIG[type];
             const disabled = isDisabled(type);

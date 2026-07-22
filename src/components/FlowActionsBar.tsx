@@ -33,23 +33,17 @@ export function FlowActionsBar() {
   const csMode = useWorkspaceStore((s) => s.mode === 'cs');
   const t = useT();
 
-  const [busy, setBusy] = useState(false);
   const { saving, saveError, canSave, saveToRepo } = useSaveFlow();
 
-  const handleAutoLayout = async () => {
-    setBusy(true);
-    try {
-      await autoLayout();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   // Auto Layout thao tác trên canvas -> màn CS chỉ bật ở tab Flow Diagram.
-  const autoLayoutDisabled = busy || !ir || (csMode && canvasTab !== 'flow');
+  // Không đổi icon/nhãn khi bấm: trước đây swap sang icon loading + spin nhưng
+  // bị kẹt trạng thái (giữ nguyên đến lần bấm sau), nên bỏ hẳn phần đổi icon.
+  const autoLayoutDisabled = !ir || (csMode && canvasTab !== 'flow');
 
   // ── Export ──
+  // Màn CS: chọn định dạng (YAML / XML). Màn TS: xác nhận trước khi tải YAML.
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showTsExportConfirm, setShowTsExportConfirm] = useState(false);
 
   // Tên file export = "施設名_シナリオ名"; bỏ facility nếu trống.
   const exportBaseName = () => {
@@ -73,6 +67,7 @@ export function FlowActionsBar() {
   const handleExportYaml = () => {
     downloadFile(exportYaml(), `${exportBaseName()}.yaml`, 'text/yaml;charset=utf-8');
     setShowExportModal(false);
+    setShowTsExportConfirm(false);
   };
 
   const handleExportDrawio = () => {
@@ -80,10 +75,10 @@ export function FlowActionsBar() {
     setShowExportModal(false);
   };
 
-  // Màn TS: tải YAML luôn; màn CS: mở modal chọn YAML / XML Draw.io.
+  // Màn CS: mở modal chọn YAML / XML Draw.io; màn TS: mở modal xác nhận export.
   const handleExport = () => {
     if (csMode) setShowExportModal(true);
-    else handleExportYaml();
+    else setShowTsExportConfirm(true);
   };
 
   // Nhãn nút Lưu đổi theo trạng thái (đang lưu / bình thường).
@@ -92,17 +87,12 @@ export function FlowActionsBar() {
   return (
     <div className="flex items-center gap-0.5">
       <HoverLabelButton
-        label={busy ? t('autoLayoutBusy') : t('autoLayout')}
+        label={t('autoLayout')}
         className={ACTION_BTN}
         disabled={autoLayoutDisabled}
-        onClick={() => void handleAutoLayout()}
+        onClick={() => void autoLayout()}
       >
-        <Icon
-          icon={busy ? 'lucide:loader-circle' : 'tabler:layout-filled'}
-          width={20}
-          height={20}
-          className={busy ? 'animate-spin' : ''}
-        />
+        <Icon icon="tabler:layout-filled" width={20} height={20} />
       </HoverLabelButton>
 
       {currentFile && (
@@ -176,6 +166,43 @@ export function FlowActionsBar() {
                 className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
               >
                 {t('btnCancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận export (màn TS): tránh tải nhầm khi lỡ bấm (trước đây one click). */}
+      {showTsExportConfirm && (
+        <div
+          className="bk-modal-overlay bk-modal-overlay--fixed"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowTsExportConfirm(false)}
+        >
+          <div className="bk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--bk-text)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bk-accent-soft)] text-[var(--bk-accent)]">
+                <Icon icon="lucide:download" width={15} height={15} />
+              </span>
+              {t('exportConfirmTitle')}
+            </div>
+            <p className="text-sm text-[var(--bk-text-muted)]">{t('exportConfirmMsg')}</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowTsExportConfirm(false)}
+                className="rounded-lg border border-[var(--bk-border)] px-4 py-2 text-sm font-semibold text-[var(--bk-text-muted)] transition hover:bg-[var(--bk-surface-2)] hover:text-[var(--bk-text)]"
+              >
+                {t('btnCancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportYaml}
+                className="flex items-center gap-2 rounded-lg bg-[var(--bk-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              >
+                <Icon icon="tabler:file-download-filled" width={16} height={16} />
+                {t('exportConfirmBtn')}
               </button>
             </div>
           </div>

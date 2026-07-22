@@ -28,6 +28,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     exportOptYamlDesc: 'File YAML cho hệ thống AI電話',
     exportOptXml: 'XML (Draw.io)',
     exportOptXmlDesc: 'Sơ đồ flow mở được bằng Draw.io (diagrams.net)',
+    // Xác nhận export (màn TS): trước đây bấm là tải luôn (one click).
+    exportConfirmTitle: 'Export YAML',
+    exportConfirmMsg: 'Tải file YAML của flow này về máy?',
+    exportConfirmBtn: 'Export',
     logout: 'Đăng xuất',
     themeLight: 'Chế độ sáng',
     themeDark: 'Chế độ tối',
@@ -537,6 +541,10 @@ const DICT: Record<Lang, Record<string, string>> = {
     exportOptYamlDesc: 'AI電話システム用のYAMLファイル',
     exportOptXml: 'XML (Draw.io)',
     exportOptXmlDesc: 'Draw.io（diagrams.net）で開けるフロー図',
+    // Xác nhận export (màn TS): trước đây bấm là tải luôn (one click).
+    exportConfirmTitle: 'YAML エクスポート',
+    exportConfirmMsg: 'このフローの YAML ファイルをダウンロードしますか？',
+    exportConfirmBtn: 'エクスポート',
     logout: 'ログアウト',
     themeLight: 'ライトモード',
     themeDark: 'ダークモード',
