@@ -4,13 +4,13 @@ import type { FlowIR, FlowNode } from './types';
 // Sinh nội dung "IVR Property" (chỉ để HIỂN THỊ, read-only) từ IR + cấu hình flow.
 // Hàm thuần, KHÔNG import React. Nội dung liên động với:
 //   - facility / office id / environment (header form)
-//   - TTS engine  -> token {tts_g:…} (Amivoice) hoặc {tts_ai:…} (AI Talk)
+//   - TTS engine  -> token {tts_g:…} (Google) hoặc {tts_ai:…} (AI Talk)
 //   - STT engine  -> khối "# Amivoice" (Amivoice) hoặc "# Soniox"
 //   - câu announce của các node trong flow (announce / input / llm)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type IvrEnvironment = 'demo' | 'master';
-export type TtsEngine = 'amivoice' | 'aitalk';
+export type TtsEngine = 'google' | 'aitalk';
 export type SttEngine = 'amivoice' | 'soniox';
 
 export interface IvrSettings {
@@ -25,7 +25,7 @@ export const DEFAULT_IVR_SETTINGS: IvrSettings = {
   facilityName: '',
   officeId: '',
   environment: 'demo',
-  ttsEngine: 'amivoice',
+  ttsEngine: 'google',
   sttEngine: 'amivoice',
 };
 

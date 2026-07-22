@@ -3,6 +3,8 @@ import { useFlowStore } from '../store/flowStore';
 import { buildIvrProperty, type IvrSettings } from '../ir/ivrProperty';
 import { Icon } from '../ui/icons';
 import { AiTalkLogo } from '../ui/AiTalkLogo';
+import { GoogleTtsLogo } from '../ui/GoogleTtsLogo';
+import { AmivoiceLogo } from '../ui/AmivoiceLogo';
 import { useT, type TKey } from '../ui/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,7 +38,13 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
     { value: 'master', labelKey: 'ivrEnvMaster', icon: 'material-symbols:contacts-product', color: '#f97316' },
   ];
   const ttsOptions: OptionDef[] = [
-    { value: 'amivoice', labelKey: 'ivrTtsAmivoice', icon: 'mingcute:voice-fill', color: 'var(--bk-accent)' },
+    {
+      value: 'google',
+      labelKey: 'ivrTtsGoogle',
+      icon: 'mingcute:voice-fill',
+      iconNode: <GoogleTtsLogo width={18} height={15} />,
+      color: 'var(--bk-accent)',
+    },
     {
       value: 'aitalk',
       labelKey: 'ivrTtsAiTalk',
@@ -46,7 +54,13 @@ export function IvrPropertyModal({ onClose }: { onClose: () => void }) {
     },
   ];
   const sttOptions: OptionDef[] = [
-    { value: 'amivoice', labelKey: 'ivrSttAmivoice', icon: 'mingcute:voice-fill', color: 'var(--bk-accent)' },
+    {
+      value: 'amivoice',
+      labelKey: 'ivrSttAmivoice',
+      icon: 'mingcute:voice-fill',
+      iconNode: <AmivoiceLogo width={18} height={15} />,
+      color: 'var(--bk-accent)',
+    },
     { value: 'soniox', labelKey: 'ivrSttSoniox', icon: 'noto:letter-s', color: 'var(--bk-accent)' },
   ];
 
