@@ -18,6 +18,9 @@ import { DEFAULT_STATUS_FLAG, DEFAULT_SMS_FLAG } from './settings';
 export interface InheritedFlags {
   statusFlag?: string;
   smsFlag?: string;
+  // Node ĐẦU TIÊN (entry): mang giá trị mặc định baseline (0 / -2) NHƯNG không phải
+  // "kế thừa" từ node nào -> UI hiện giá trị mặc định PLAIN, KHÔNG stamp 継続/Carried.
+  isEntry?: boolean;
 }
 
 const asFlag = (v: unknown): string | undefined => {
@@ -59,8 +62,9 @@ export function computeInheritedFlags(ir: FlowIR | null | undefined): Map<string
   };
 
   // Node ĐẦU TIÊN (entry): node thật KHÔNG có dây vào từ node thật khác (điểm bắt đầu
-  // luồng gọi). Vì phía trên không có gì để "継続/Carried" nên inherited = RỖNG (không
-  // hiện stamp) — nhưng nó vẫn khởi nguồn baseline mặc định cho các node phía sau.
+  // luồng gọi). Node đầu tiên LUÔN mặc định status 0 + SMS -2 (baseline) để 2 pulldown
+  // có sẵn giá trị mặc định — nhưng vì phía trên không có gì để "継続/Carried" nên nó
+  // được đánh dấu isEntry -> UI hiện PLAIN, KHÔNG stamp 継続/Carried.
   const entries = ir.nodes.filter((n) => n.id !== SYNTHETIC_START_ID && !realIncoming.has(n.id));
 
   // BFS mang flag kế thừa xuôi dòng; mỗi node xử lý 1 lần (first-arrival) để chặn vòng lặp.
@@ -74,8 +78,9 @@ export function computeInheritedFlags(ir: FlowIR | null | undefined): Map<string
     const { id, carry, isEntry } = queue.shift()!;
     if (seen.has(id)) continue;
     seen.add(id);
-    // Node đầu tiên -> RỖNG (không stamp Carried); node sau -> flag kế thừa thật.
-    result.set(id, isEntry ? {} : carry);
+    // Node đầu tiên -> baseline mặc định (0 / -2) + isEntry (hiện PLAIN, không stamp);
+    // node sau -> flag kế thừa thật (hiện stamp 継続/Carried).
+    result.set(id, isEntry ? { ...baseCarry, isEntry: true } : carry);
 
     const node = nodeById.get(id);
     const own = node ? ownFlags(node.type, node.data) : {};

@@ -29,6 +29,7 @@ export function FlagSelect({
   options,
   inheritedValue,
   inheritedLabel = '',
+  inheritedStamp = true,
   emptyLabel,
   buttonClass,
   size = 'sm',
@@ -39,6 +40,9 @@ export function FlagSelect({
   /** Flag kế thừa từ node phía trên (tự fill khi node chưa tự đặt). */
   inheritedValue?: string;
   inheritedLabel?: string;
+  /** Node đầu tiên: có giá trị mặc định (0 / -2) nhưng KHÔNG "kế thừa" từ ai -> false
+   *  để hiện giá trị PLAIN, không stamp 継続/Carried. Mặc định true. */
+  inheritedStamp?: boolean;
   /** Nhãn ô rỗng khi KHÔNG có flag kế thừa (未選択 / ー). */
   emptyLabel: string;
   /** Style mặt pulldown (đóng) — truyền class sẵn có của từng màn để giữ giao diện. */
@@ -120,7 +124,7 @@ export function FlagSelect({
             đã chọn flag riêng -> nhãn option; rỗng không kế thừa -> nhãn rỗng. */}
         {onInheritedRow && inheritedValue ? (
           <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            <FlagInheritStamp />
+            {inheritedStamp && <FlagInheritStamp />}
             <span className="min-w-0 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
           </span>
         ) : selected ? (
@@ -145,13 +149,13 @@ export function FlagSelect({
               type="button"
               role="option"
               aria-selected={onInheritedRow}
-              title={inheritedValue ? `${t('flagInheritHint')}: ${inheritedLabel}` : undefined}
+              title={inheritedValue && inheritedStamp ? `${t('flagInheritHint')}: ${inheritedLabel}` : undefined}
               onClick={() => pick('')}
               className={`${rowBase} ${onInheritedRow ? 'bg-[var(--bk-accent-soft)]' : ''}`}
             >
               {inheritedValue ? (
                 <>
-                  <FlagInheritStamp />
+                  {inheritedStamp && <FlagInheritStamp />}
                   <span className="min-w-0 flex-1 truncate text-[var(--bk-text-muted)]">{inheritedLabel}</span>
                 </>
               ) : (

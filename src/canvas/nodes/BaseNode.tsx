@@ -423,6 +423,11 @@ function NodePreview({
                 <HoverTip className="bk-node-preview-val" content={labelOf(own)}>
                   {labelOf(own)}
                 </HoverTip>
+              ) : inheritedVal && inherited?.isEntry ? (
+                // Node đầu tiên: hiện giá trị mặc định (0 / -2) PLAIN, KHÔNG stamp Carried.
+                <HoverTip className="bk-node-preview-val" content={labelOf(inheritedVal)}>
+                  {labelOf(inheritedVal)}
+                </HoverTip>
               ) : inheritedVal ? (
                 <HoverTip
                   className="bk-node-preview-val"

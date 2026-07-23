@@ -635,13 +635,13 @@ function SettingsSelect({
   // Status/SMS flag KẾ THỪA từ node phía trên (tự fill): khi node chưa tự đặt flag, ô
   // "chưa chọn" hiển thị flag kế thừa để người dùng biết giá trị mặc định đang áp dụng.
   const inherited = useMemo(() => computeInheritedFlags(ir), [ir]);
-  const inheritedValue =
-    field.settingsOptions === 'smsFlags'
-      ? inherited.get(node.id)?.smsFlag
-      : inherited.get(node.id)?.statusFlag;
+  const inh = inherited.get(node.id);
+  const inheritedValue = field.settingsOptions === 'smsFlags' ? inh?.smsFlag : inh?.statusFlag;
   const inheritedLabel = inheritedValue
     ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
     : '';
+  // Node đầu tiên: giá trị mặc định (0 / -2) hiện PLAIN, KHÔNG stamp 継続/Carried.
+  const inheritedStamp = !inh?.isEntry;
   // Pulldown TỰ VẼ (FlagSelect): mặt đóng + dòng đầu list đều hiện stamp 継続/Carried
   // kèm "<flag> - <tên>" (không gạch phân cách, không dòng lặp flag kế thừa).
   return (
@@ -651,6 +651,7 @@ function SettingsSelect({
       options={options}
       inheritedValue={inheritedValue}
       inheritedLabel={inheritedLabel}
+      inheritedStamp={inheritedStamp}
       emptyLabel={t('alUnset')}
       buttonClass={inputClass}
       size="sm"

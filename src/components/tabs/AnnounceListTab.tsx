@@ -288,11 +288,13 @@ export function AnnounceListTab() {
     label: string,
     options: { value: string; label: string }[],
   ) => {
-    const inheritedValue =
-      kind === 'status' ? inheritedFlags.get(node.id)?.statusFlag : inheritedFlags.get(node.id)?.smsFlag;
+    const inh = inheritedFlags.get(node.id);
+    const inheritedValue = kind === 'status' ? inh?.statusFlag : inh?.smsFlag;
     const inheritedLabel = inheritedValue
       ? options.find((o) => o.value === inheritedValue)?.label ?? inheritedValue
       : '';
+    // Node đầu tiên: giá trị mặc định (0 / -2) hiện PLAIN, KHÔNG stamp 継続/Carried.
+    const inheritedStamp = !inh?.isEntry;
     return (
     <label className="flex items-center gap-1.5">
       {/* Chip nhãn BỀ NGANG CỐ ĐỊNH -> 2 pulldown Status / SMS Flag rộng bằng nhau. */}
@@ -312,6 +314,7 @@ export function AnnounceListTab() {
           options={options}
           inheritedValue={inheritedValue}
           inheritedLabel={inheritedLabel}
+          inheritedStamp={inheritedStamp}
           emptyLabel="ー"
           buttonClass="w-full min-w-0 rounded-lg border border-[var(--bk-border)] bg-[var(--bk-surface)] px-1.5 py-1 text-xs text-[var(--bk-text)]"
           size="xs"
