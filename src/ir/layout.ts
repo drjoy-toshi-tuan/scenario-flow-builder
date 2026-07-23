@@ -186,7 +186,163 @@ function layoutSubtree(tree: TreeNode): SubtreeLayout {
   return { contour, placements };
 }
 
-export async function layout(ir: FlowIR): Promise<FlowIR> {
+export interface LayoutOpts {
+  // Màn CS: bố cục "thoáng" kiểu bản thiết kế PDF — nhánh hợp lưu (merge) CHÌM xuống
+  // DƯỚI mọi nhánh nuôi nó rồi CĂN GIỮA, để phần đuôi chung thành 1 cột dọc ở giữa
+  // (thay vì bám cột của nhánh đầu tiên chạm tới). Xem airifyCs().
+  cs?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Post-pass CHỈ cho màn CS: nắn bố cục cây cho "thoáng" giống bản thiết kế PDF.
+//   - Y theo LONGEST-PATH depth: node hợp lưu (nhiều nhánh chảy vào) chìm xuống dưới
+//     TẦNG SÂU NHẤT trong các nhánh nuôi nó -> đuôi chung (質問→…→終話) nằm hẳn dưới
+//     mọi nhánh, đọc như 1 cột dọc, không bị kéo lên ngang hàng nửa chừng.
+//   - X: giữ vị trí fan của cây cho phần nhánh; riêng node MERGE (≥2 nhánh cha) được
+//     căn GIỮA theo tâm các node cha, kéo theo cả đuôi phía dưới (đuôi nằm dưới mọi
+//     nhánh nên dịch ngang không đụng nhánh nào).
+// Cạnh vòng ngược (retry/loop) bị loại khỏi tính rank (như buildTree).
+// ─────────────────────────────────────────────────────────────────────────────
+function airifyCs(laid: FlowIR, rawEdges: FlowEdge[]): FlowIR {
+  const nodeIds = new Set(laid.nodes.map((n) => n.id));
+  const key = (s: string, t: string) => `${s} ${t}`;
+  // Cạnh forward duy nhất (bỏ self-loop, node treo, và edge trùng source→target vd
+  // next+failed cùng đích -> KHÔNG tính là 2 nhánh cha).
+  const seenPair = new Set<string>();
+  const edges: FlowEdge[] = [];
+  for (const e of rawEdges) {
+    if (!nodeIds.has(e.source) || !nodeIds.has(e.target) || e.source === e.target) continue;
+    const k = key(e.source, e.target);
+    if (seenPair.has(k)) continue;
+    seenPair.add(k);
+    edges.push(e);
+  }
+  const adj = new Map<string, string[]>();
+  for (const id of nodeIds) adj.set(id, []);
+  for (const e of edges) adj.get(e.source)!.push(e.target);
+
+  // Back-edge (vòng lặp) = cạnh trỏ tới node đang nằm trên stack DFS. Thứ tự gốc như
+  // buildTree: Start tổng hợp -> node không có dây vào -> phần còn lại.
+  const hasIncoming = new Set(edges.map((e) => e.target));
+  const rootOrder = [
+    ...laid.nodes.filter((n) => n.id === SYNTHETIC_START_ID),
+    ...laid.nodes.filter((n) => n.id !== SYNTHETIC_START_ID && !hasIncoming.has(n.id)),
+    ...laid.nodes.filter((n) => n.id !== SYNTHETIC_START_ID && hasIncoming.has(n.id)),
+  ].map((n) => n.id);
+  const dfsState = new Map<string, number>(); // 0/undef=chưa, 1=trên stack, 2=xong
+  const backEdges = new Set<string>();
+  const visit = (u: string) => {
+    dfsState.set(u, 1);
+    for (const v of adj.get(u)!) {
+      const st = dfsState.get(v) ?? 0;
+      if (st === 1) backEdges.add(key(u, v));
+      else if (st === 0) visit(v);
+    }
+    dfsState.set(u, 2);
+  };
+  for (const r of rootOrder) if ((dfsState.get(r) ?? 0) === 0) visit(r);
+
+  // DAG forward (bỏ back edge).
+  const fout = new Map<string, string[]>();
+  const fpreds = new Map<string, string[]>();
+  for (const id of nodeIds) {
+    fout.set(id, []);
+    fpreds.set(id, []);
+  }
+  for (const e of edges) {
+    if (backEdges.has(key(e.source, e.target))) continue;
+    fout.get(e.source)!.push(e.target);
+    fpreds.get(e.target)!.push(e.source);
+  }
+
+  // Longest-path depth (topo Kahn trên DAG forward).
+  const indeg = new Map<string, number>();
+  for (const id of nodeIds) indeg.set(id, fpreds.get(id)!.length);
+  const depth = new Map<string, number>();
+  const queue: string[] = [];
+  for (const id of nodeIds)
+    if (indeg.get(id) === 0) {
+      queue.push(id);
+      depth.set(id, 0);
+    }
+  const topo: string[] = [];
+  while (queue.length) {
+    const u = queue.shift()!;
+    topo.push(u);
+    for (const v of fout.get(u)!) {
+      depth.set(v, Math.max(depth.get(v) ?? 0, (depth.get(u) ?? 0) + 1));
+      indeg.set(v, indeg.get(v)! - 1);
+      if (indeg.get(v) === 0) queue.push(v);
+    }
+  }
+
+  // Toạ độ mới: X giữ từ cây; Y = longest-path depth.
+  const pos = new Map<string, { x: number; y: number }>();
+  for (const n of laid.nodes)
+    pos.set(n.id, { x: n.position.x, y: (depth.get(n.id) ?? 0) * ROW_STEP });
+
+  // Con cháu forward của 1 node (để dịch cả đuôi khi căn giữa merge).
+  const descendants = (start: string): Set<string> => {
+    const seen = new Set<string>([start]);
+    const stack = [start];
+    while (stack.length) {
+      const u = stack.pop()!;
+      for (const v of fout.get(u)!)
+        if (!seen.has(v)) {
+          seen.add(v);
+          stack.push(v);
+        }
+    }
+    return seen;
+  };
+  // Căn giữa các node MERGE theo tâm cha, xử lý từ NÔNG tới SÂU (cha trước con).
+  for (const m of topo) {
+    const preds = fpreds.get(m)!;
+    if (preds.length < 2) continue;
+    const meanX = preds.reduce((s, p) => s + pos.get(p)!.x, 0) / preds.length;
+    const delta = meanX - pos.get(m)!.x;
+    if (Math.abs(delta) < 1) continue;
+    for (const id of descendants(m)) {
+      const p = pos.get(id)!;
+      pos.set(id, { x: p.x + delta, y: p.y });
+    }
+  }
+
+  // Tách các node CÙNG TẦNG (cùng Y) để KHÔNG đè nhau: sau khi chìm merge + căn giữa,
+  // vài node (nhất là terminal) có thể rơi vào cùng tầng ở cùng vùng X. Sort theo X,
+  // đẩy phải cho đủ khe, rồi dịch cả tầng lại để GIỮ TÂM (không lệch hẳn 1 phía).
+  const SEP = NODE_WIDTH + 56; // khoảng cách tâm–tâm tối thiểu trong 1 tầng
+  const byLayer = new Map<number, string[]>();
+  for (const [id, p] of pos) {
+    const layer = Math.round(p.y / ROW_STEP);
+    const list = byLayer.get(layer);
+    if (list) list.push(id);
+    else byLayer.set(layer, [id]);
+  }
+  for (const ids of byLayer.values()) {
+    if (ids.length < 2) continue;
+    ids.sort((a, b) => pos.get(a)!.x - pos.get(b)!.x);
+    const before = ids.reduce((s, id) => s + pos.get(id)!.x, 0) / ids.length;
+    for (let i = 1; i < ids.length; i++) {
+      const prev = pos.get(ids[i - 1])!.x;
+      const cur = pos.get(ids[i])!;
+      if (cur.x < prev + SEP) pos.set(ids[i], { x: prev + SEP, y: cur.y });
+    }
+    const after = ids.reduce((s, id) => s + pos.get(id)!.x, 0) / ids.length;
+    const shift = before - after; // giữ tâm tầng như trước khi đẩy
+    if (Math.abs(shift) >= 1) for (const id of ids) {
+      const p = pos.get(id)!;
+      pos.set(id, { x: p.x + shift, y: p.y });
+    }
+  }
+
+  return {
+    ...laid,
+    nodes: laid.nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })),
+  };
+}
+
+export async function layout(ir: FlowIR, opts?: LayoutOpts): Promise<FlowIR> {
   if (ir.nodes.length === 0) return ir;
 
   const nodeIds = new Set(ir.nodes.map((n) => n.id));
@@ -238,11 +394,14 @@ export async function layout(ir: FlowIR): Promise<FlowIR> {
     offsetX = shift + maxX + COMPONENT_GAP;
   }
 
-  return {
+  const laid: FlowIR = {
     ...ir,
     nodes: ir.nodes.map((n) => ({
       ...n,
       position: positions.get(n.id) ?? n.position,
     })),
   };
+
+  // Màn CS: nắn thêm cho "thoáng" kiểu PDF (merge chìm xuống dưới + căn giữa).
+  return opts?.cs ? airifyCs(laid, ir.edges) : laid;
 }

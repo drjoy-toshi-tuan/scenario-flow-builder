@@ -1328,6 +1328,82 @@ flow:
   });
 });
 
+describe('auto-layout màn CS (thoáng kiểu PDF: merge chìm xuống + căn giữa)', () => {
+  // 2 nhánh dài–ngắn khác nhau cùng hợp lưu vào `merge` rồi chạy tiếp `tail`.
+  const MERGE = `
+flow:
+  name: "f"
+  start: root
+  nodes:
+    - id: root
+      type: nexus
+      branches:
+        - default: b1
+        - when: "A"
+          to: a1
+    - id: a1
+      type: announce
+      text: x
+      next: a2
+    - id: a2
+      type: announce
+      text: x
+      next: a3
+    - id: a3
+      type: announce
+      text: x
+      next: merge
+    - id: b1
+      type: announce
+      text: x
+      next: merge
+    - id: merge
+      type: interaction
+      announce: "?"
+      next: tail
+    - id: tail
+      type: hangup
+`;
+  const centerX = (ir: Awaited<ReturnType<typeof layout>>, id: string) =>
+    ir.nodes.find((n) => n.id === id)!.position.x + 122;
+  const posY = (ir: Awaited<ReturnType<typeof layout>>, id: string) =>
+    ir.nodes.find((n) => n.id === id)!.position.y;
+
+  it('merge chìm xuống DƯỚI tầng sâu nhất của mọi nhánh nuôi nó', async () => {
+    const ir = await layout(fromYaml(MERGE), { cs: true });
+    // Nhánh dài: a1→a2→a3 (3 tầng); nhánh ngắn: b1 (1 tầng). merge phải nằm dưới a3.
+    expect(posY(ir, 'merge')).toBeGreaterThan(posY(ir, 'a3'));
+    expect(posY(ir, 'merge')).toBeGreaterThan(posY(ir, 'b1'));
+    // tail nối tiếp nằm dưới merge.
+    expect(posY(ir, 'tail')).toBeGreaterThan(posY(ir, 'merge'));
+  });
+
+  it('merge được CĂN GIỮA theo tâm các node cha', async () => {
+    const ir = await layout(fromYaml(MERGE), { cs: true });
+    const mid = (centerX(ir, 'a3') + centerX(ir, 'b1')) / 2;
+    expect(Math.abs(centerX(ir, 'merge') - mid)).toBeLessThan(1);
+  });
+
+  it('không có node nào chồng chéo nhau', async () => {
+    const ir = await layout(fromYaml(MERGE), { cs: true });
+    for (let i = 0; i < ir.nodes.length; i++) {
+      for (let j = i + 1; j < ir.nodes.length; j++) {
+        const a = ir.nodes[i].position;
+        const b = ir.nodes[j].position;
+        const overlap = Math.abs(a.x - b.x) < 244 && Math.abs(a.y - b.y) < 80;
+        expect(overlap, `${ir.nodes[i].id} đè lên ${ir.nodes[j].id}`).toBe(false);
+      }
+    }
+  });
+
+  it('màn TS (không cs): merge KHÔNG chìm xuống (giữ bố cục cây cũ)', async () => {
+    const ir = await layout(fromYaml(MERGE)); // không truyền cs -> đường mặc định
+    // Cây spanning đặt merge ngay dưới nhánh đầu chạm tới (b1 ở tầng 1 -> merge tầng 2),
+    // KHÔNG sâu bằng a3 (tầng 3). Nhờ vậy hành vi màn TS/không-cs giữ nguyên.
+    expect(posY(ir, 'merge')).toBeLessThanOrEqual(posY(ir, 'a3'));
+  });
+});
+
 describe('metadata flow (施設名/シナリオ名/作成者/日時)', () => {
   const WITH_META = `
 flow:

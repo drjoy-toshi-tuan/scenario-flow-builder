@@ -39,7 +39,7 @@ describe('irToReactFlow — stamp điều kiện màn CS', () => {
     const { edges } = irToReactFlow(doc, { cs: true });
     const byId = new Map(edges.map((e) => [e.id, e]));
 
-    // Hearing nhánh failed: nhãn 失敗 luôn hiện.
+    // Hearing chỉ có 2 nhánh (failed + đi tiếp): nhánh failed vẫn hiện nhãn 失敗.
     expect(byId.get('e1')?.label).toBe('失敗');
     expect((byId.get('e1')?.data as RFEdgeData).alwaysLabel).toBe(true);
     // Transfer nhánh next: nhãn 次へ luôn hiện.
@@ -48,6 +48,51 @@ describe('irToReactFlow — stamp điều kiện màn CS', () => {
     // Announce: bỏ hẳn nhãn (kể cả hover).
     expect(byId.get('e3')?.label).toBeUndefined();
     expect((byId.get('e3')?.data as RFEdgeData).alwaysLabel).toBe(false);
+  });
+
+  it('hearing 2 nhánh (failed + 次へ): 次へ ẩn nhãn; failed vẫn hiện', () => {
+    const doc = ir(
+      [node('hear', 'interaction'), node('a', 'announce'), node('end', 'hangup')],
+      [
+        { id: 'nx', source: 'hear', target: 'a', sourceHandle: 'default' },
+        { id: 'fl', source: 'hear', target: 'end', sourceHandle: 'failed' },
+      ],
+    );
+    const { edges } = irToReactFlow(doc, { cs: true });
+    const byId = new Map(edges.map((e) => [e.id, e]));
+    // Đường "đi tiếp" (次へ) bị bỏ nhãn cho gọn.
+    expect(byId.get('nx')?.label).toBeUndefined();
+    expect((byId.get('nx')?.data as RFEdgeData).alwaysLabel).toBe(false);
+    // Nhánh failed vẫn giữ nhãn 失敗.
+    expect(byId.get('fl')?.label).toBe('失敗');
+  });
+
+  it('hearing 3+ nhánh (rẽ nhánh thật): mọi nhánh đều hiện nhãn', () => {
+    const doc = ir(
+      [
+        node('hear', 'interaction', {
+          branches: [
+            { id: 'b0', value: 'はい', label: 'はい' },
+            { id: 'default', value: '', label: 'いいえ' },
+          ],
+        }),
+        node('a', 'announce'),
+        node('b', 'announce'),
+        node('end', 'hangup'),
+      ],
+      [
+        { id: 'e0', source: 'hear', target: 'a', sourceHandle: 'b0' },
+        { id: 'ed', source: 'hear', target: 'b', sourceHandle: 'default' },
+        { id: 'fl', source: 'hear', target: 'end', sourceHandle: 'failed' },
+      ],
+    );
+    const { edges } = irToReactFlow(doc, { cs: true });
+    const byId = new Map(edges.map((e) => [e.id, e]));
+    // 3 handle (failed + はい + いいえ) -> hiện nhãn cho cả nhánh default (いいえ).
+    expect(byId.get('e0')?.label).toBe('はい');
+    expect(byId.get('ed')?.label).toBe('いいえ');
+    expect(byId.get('fl')?.label).toBe('失敗');
+    expect((byId.get('ed')?.data as RFEdgeData).alwaysLabel).toBe(true);
   });
 
   it('màn TS giữ hành vi cũ: announce vẫn có nhãn (hover mới hiện)', () => {
