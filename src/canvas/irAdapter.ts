@@ -30,6 +30,8 @@ export interface RFEdgeData {
   // Độ lệch CHỐNG CHỒNG nhãn tự tính khi nhiều dây (từ nhiều node) cùng chập về
   // 1 đích — xếp so le dọc để các stamp điều kiện không đè lên nhau.
   labelStagger?: { x: number; y: number };
+  // Waypoint người dùng kéo để nắn dây (lưu ở node nguồn data.edgeShapes[handle]).
+  edgeShape?: { x: number; y: number };
   [key: string]: unknown;
 }
 
@@ -47,6 +49,19 @@ function readLabelOffset(
   handle: string,
 ): { x: number; y: number } | undefined {
   const raw = data.labelOffsets;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const v = (raw as Record<string, unknown>)[handle];
+  if (!v || typeof v !== 'object') return undefined;
+  const { x, y } = v as { x?: unknown; y?: unknown };
+  return typeof x === 'number' && typeof y === 'number' ? { x, y } : undefined;
+}
+
+// Đọc waypoint người dùng đã kéo (node.data.edgeShapes = { [handle]: {x,y} }).
+function readShapeOffset(
+  data: Record<string, unknown>,
+  handle: string,
+): { x: number; y: number } | undefined {
+  const raw = data.edgeShapes;
   if (!raw || typeof raw !== 'object') return undefined;
   const v = (raw as Record<string, unknown>)[handle];
   if (!v || typeof v !== 'object') return undefined;
@@ -116,7 +131,16 @@ export function irToReactFlow(ir: FlowIR, opts?: { cs?: boolean }): { nodes: Nod
     // CS: CHỈ node logic / transfer / hearing có stamp điều kiện (luôn hiện);
     // các loại khác bỏ hẳn nhãn — hover chỉ còn nút xoá dây. TS giữ hành vi cũ.
     const csCondition = cs && srcNode != null && CS_CONDITION_SOURCE_TYPES.has(srcNode.type);
-    const label = cs ? (csCondition ? baseLabel : undefined) : baseLabel;
+    // Hearing (聴取) CHỈ có 2 nhánh (失敗 + 1 đường đi tiếp): đường "đi tiếp" là hiển
+    // nhiên nên BỎ nhãn (次へ) cho canvas thoáng — chỉ giữ nhãn 失敗. Từ 3 nhánh trở
+    // lên (聴取 rẽ nhánh thật) mới hiện nhãn cho mọi nhánh. (Theo yêu cầu CS 2026-07.)
+    const hearingContinueUnlabeled =
+      cs &&
+      srcNode?.type === 'interaction' &&
+      handles.length <= 2 &&
+      (e.sourceHandle ?? 'default') !== 'failed';
+    const showCsLabel = csCondition && !hearingContinueUnlabeled;
+    const label = cs ? (showCsLabel ? baseLabel : undefined) : baseLabel;
 
     return {
       id: e.id,
@@ -134,11 +158,13 @@ export function irToReactFlow(ir: FlowIR, opts?: { cs?: boolean }): { nodes: Nod
         condition: e.condition,
         // TS: node condition/script nhãn giá trị nhánh luôn hiện; node khác hover mới hiện.
         // CS: stamp điều kiện của logic/transfer/hearing LUÔN hiện (không cần hover).
-        alwaysLabel: cs ? csCondition && label != null : mode === 'editable',
+        alwaysLabel: cs ? showCsLabel && label != null : mode === 'editable',
         // Độ lệch stamp người dùng đã kéo (nếu có) — lưu ở node nguồn.
         ...(srcNode && label != null
           ? { labelOffset: readLabelOffset(srcNode.data, e.sourceHandle ?? 'default') }
           : {}),
+        // Waypoint người dùng đã kéo để nắn dây (nếu có) — lưu ở node nguồn.
+        ...(srcNode ? { edgeShape: readShapeOffset(srcNode.data, e.sourceHandle ?? 'default') } : {}),
       } satisfies RFEdgeData,
     };
   });

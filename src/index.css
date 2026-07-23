@@ -1632,6 +1632,25 @@ body {
   top: 50%;
   transform: translateY(-50%);
 }
+/* Tay nắm waypoint (nắn dây): chấm tròn nhỏ ở khúc gấp chính của dây. Hiện khi hover/
+   chọn dây; mờ nhẹ khi dây đã nắn tay (để biết có thể chỉnh/reset). Kéo = nắn dây. */
+.edge-waypoint {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--bk-surface);
+  border: 2px solid var(--bk-accent);
+  box-shadow: var(--bk-shadow);
+  cursor: grab;
+  touch-action: none;
+  z-index: 10001;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.edge-waypoint--dragging {
+  cursor: grabbing;
+  background: var(--bk-accent);
+}
 .edge-label {
   /* Màn TS: chip nhãn theo surface như PR #98. Màn CS đảo tông — xem .bk-flow--cs. */
   background: var(--bk-surface);

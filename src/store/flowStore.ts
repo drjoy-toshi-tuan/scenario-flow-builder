@@ -161,6 +161,9 @@ interface FlowState {
   // node NGUỒN (data.labelOffsets[handle]) — round-trip qua YAML như field data khác.
   // Không ghi lịch sử Undo (chỉ là tinh chỉnh hiển thị).
   setEdgeLabelOffset: (edgeId: string, offset: { x: number; y: number }) => void;
+  // Waypoint người dùng kéo để nắn dây (lưu ở node nguồn theo handle, round-trip YAML).
+  // offset = null -> xoá (dây về đường mặc định).
+  setEdgeShape: (edgeId: string, offset: { x: number; y: number } | null) => void;
 
   // Chọn node để mở panel setting (có kiểm tra thay đổi chưa lưu).
   selectNode: (id: string | null) => void;
@@ -807,6 +810,33 @@ export const useFlowStore = create<FlowState>((set, get) => {
                 },
               },
             };
+          }),
+        },
+      });
+    },
+
+    setEdgeShape: (edgeId, offset) => {
+      const { ir } = get();
+      if (!ir) return;
+      const edge = ir.edges.find((e) => e.id === edgeId);
+      if (!edge) return;
+      const handle = edge.sourceHandle ?? 'default';
+      set({
+        ...snapshot(),
+        ir: {
+          ...ir,
+          nodes: ir.nodes.map((n) => {
+            if (n.id !== edge.source) return n;
+            const prev =
+              n.data.edgeShapes && typeof n.data.edgeShapes === 'object'
+                ? { ...(n.data.edgeShapes as Record<string, { x: number; y: number }>) }
+                : {};
+            if (offset === null) delete prev[handle];
+            else prev[handle] = { x: Math.round(offset.x), y: Math.round(offset.y) };
+            const data = { ...n.data };
+            if (Object.keys(prev).length > 0) data.edgeShapes = prev;
+            else delete data.edgeShapes;
+            return { ...n, data };
           }),
         },
       });
