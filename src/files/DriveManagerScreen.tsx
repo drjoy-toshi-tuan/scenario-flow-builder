@@ -1018,9 +1018,10 @@ function DriveInner({
       return;
     }
     // Tầng flow: đích đến đã xác định (bệnh viện + kịch bản hiện tại) -> import
-    // thẳng, tự đánh version V{max+1}, không cần modal. Màn CS VẪN mở modal để còn
-    // chọn môi trường cho bản import (đích cố định sẵn theo path).
-    if (facility && scenario && !csMode) {
+    // thẳng, tự đánh version V{max+1}, không cần modal (đồng bộ với luồng "tạo mới").
+    // Màn CS chỉ mở modal khi cần chọn môi trường (CS_SHOW_ENVIRONMENT); nếu không,
+    // cũng import thẳng vào kịch bản đang đứng như màn TS.
+    if (facility && scenario && !(csMode && CS_SHOW_ENVIRONMENT)) {
       actions.onImport?.(facility.name, scenario.name, content);
       return;
     }
