@@ -8,6 +8,7 @@ import { normalizeSettings, smsCharCount } from './settings';
 import {
   defaultDataFor,
   sourceHandlesFor,
+  csBranchesOf,
   readBranches,
   catchAllDisplay,
   catchAllEditable,
@@ -1586,5 +1587,120 @@ describe('flow.settings round-trip', () => {
     expect(smsCharCount('')).toBe(0);
     expect(smsCharCount('   ')).toBe(0);
     expect(smsCharCount('abc')).toBe(25);
+  });
+});
+
+// Màn CS: node 聴取 (interaction) rẽ nhánh TRỰC TIẾP theo câu trả lời (branches[]) NHƯNG
+// vẫn giữ nhánh 失敗 (field failed). Kiểm tra vòng đời YAML <-> IR không mất nhánh.
+describe('CS hearing-direct branching (interaction branches + failed)', () => {
+  const HEARING_BRANCH = `
+flow:
+  name: cs
+  nodes:
+    - id: youken
+      type: interaction
+      name: 用件確認
+      announce: "ご用件をどうぞ"
+      branches:
+        - when: 予約
+          to: reserve
+          label: 予約
+        - when: 変更
+          to: change
+          label: 変更
+        - default: faq
+          label: その他
+      failed: giveup
+    - id: reserve
+      type: announce
+      text: r
+    - id: change
+      type: announce
+      text: c
+    - id: faq
+      type: announce
+      text: f
+    - id: giveup
+      type: hangup
+      announce: bye
+`;
+
+  it('fromYaml: interaction có branches -> data.branches (giá trị + default) + edge 失敗 riêng', () => {
+    const ir = fromYaml(HEARING_BRANCH);
+    const youken = ir.nodes.find((n) => n.id === 'youken')!;
+    // data.branches giữ nhánh giá trị + catch-all default (KHÔNG gồm failed — failed là field riêng).
+    expect(youken.data.branches).toEqual([
+      { id: 'b0', value: '予約', label: '予約' },
+      { id: 'b1', value: '変更', label: '変更' },
+      { id: 'default', value: '', label: 'その他' },
+    ]);
+    // Edge: mỗi nhánh 1 handle + nhánh failed riêng.
+    const handles = ir.edges
+      .filter((e) => e.source === 'youken')
+      .map((e) => [e.sourceHandle, e.target]);
+    expect(handles).toEqual([
+      ['failed', 'giveup'],
+      ['b0', 'reserve'],
+      ['b1', 'change'],
+      ['default', 'faq'],
+    ]);
+  });
+
+  it('csBranchesOf: LUÔN bổ sung handle 失敗 lên đầu cho interaction rẽ nhánh', () => {
+    const ir = fromYaml(HEARING_BRANCH);
+    const youken = ir.nodes.find((n) => n.id === 'youken')!;
+    // File YAML không ghi nhánh 失敗 trong branches -> csBranchesOf tự bổ sung.
+    expect(csBranchesOf(youken.type, youken.data).map((b) => b.id)).toEqual([
+      'failed',
+      'b0',
+      'b1',
+      'default',
+    ]);
+  });
+
+  it('round-trip: branches[] + failed được giữ nguyên qua toYaml -> fromYaml', () => {
+    const out = toYaml(fromYaml(HEARING_BRANCH));
+    const raw = parse(out) as { flow: { nodes: Record<string, unknown>[] } };
+    const youken = raw.flow.nodes.find((n) => n.id === 'youken')!;
+    expect(youken.failed).toBe('giveup');
+    expect(youken.next).toBeUndefined();
+    expect(youken.branches).toEqual([
+      { when: '予約', to: 'reserve', label: '予約' },
+      { when: '変更', to: 'change', label: '変更' },
+      { default: 'faq', label: 'その他' },
+    ]);
+    // fromYaml lại lần nữa -> IR ổn định.
+    const ir2 = fromYaml(out);
+    const y2 = ir2.nodes.find((n) => n.id === 'youken')!;
+    expect(y2.data.branches).toEqual(fromYaml(HEARING_BRANCH).nodes.find((n) => n.id === 'youken')!.data.branches);
+  });
+
+  it('interaction chỉ có next + failed (KHÔNG rẽ nhánh) vẫn xuất next/failed, không branches[]', () => {
+    const simple = `
+flow:
+  name: cs
+  nodes:
+    - id: h1
+      type: interaction
+      name: 氏名
+      announce: "お名前は"
+      next: h2
+      failed: h2
+    - id: h2
+      type: interaction
+      name: 生年月日
+      announce: "生年月日は"
+      next: done
+      failed: done
+    - id: done
+      type: hangup
+      announce: bye
+`;
+    const out = toYaml(fromYaml(simple));
+    const raw = parse(out) as { flow: { nodes: Record<string, unknown>[] } };
+    const h1 = raw.flow.nodes.find((n) => n.id === 'h1')!;
+    expect(h1.next).toBe('h2');
+    expect(h1.failed).toBe('h2');
+    expect(h1.branches).toBeUndefined();
   });
 });

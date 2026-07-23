@@ -100,20 +100,28 @@ function serializeGraph(
 
     const edges = outgoing(irEdges, node.id);
 
+    // Nhánh 失敗 (handle 'failed') LUÔN là field riêng `failed:` — không nằm trong
+    // branches[]. Tách ra trước để node vừa rẽ nhánh vừa giữ nhánh thất bại cố định
+    // (màn CS: node 聴取 rẽ nhánh theo câu trả lời NHƯNG vẫn có nhánh 失敗).
+    const failedEdge = edges.find((e) => e.sourceHandle === 'failed');
+    const branchEdges = edges.filter((e) => e.sourceHandle !== 'failed');
+
     // Node nhánh tự do (nexus/logic/jump): xuất branches[]. Riêng logic/jump chỉ dùng
     // branches khi thật sự có nhánh tuỳ biến (ngoài catch-all) — module Script thường
-    // chỉ có 1 đường ra thì giữ dạng `next` cho gọn.
+    // chỉ có 1 đường ra thì giữ dạng `next` cho gọn. Node 聴取 (interaction) màn CS cũng
+    // xuất branches[] khi có nhánh giá trị (ngoài default/failed).
     const dataBranches = readDataBranches(node.data);
     const hasCustomBranches =
-      [...dataBranches.keys()].some((id) => id !== 'default') ||
-      edges.some((e) => (e.sourceHandle ?? 'default') !== 'default');
+      [...dataBranches.keys()].some((id) => id !== 'default' && id !== 'failed') ||
+      branchEdges.some((e) => (e.sourceHandle ?? 'default') !== 'default');
     const useBranches =
-      EDITABLE_BRANCH_TYPES.includes(node.type) && (node.type === 'nexus' || hasCustomBranches);
+      (EDITABLE_BRANCH_TYPES.includes(node.type) && (node.type === 'nexus' || hasCustomBranches)) ||
+      (node.type === 'interaction' && hasCustomBranches);
 
     if (useBranches) {
       // Giá trị điều kiện lấy TỪ node.data.branches (nguồn sự thật) theo sourceHandle;
-      // fallback về edge.condition cho dữ liệu cũ.
-      const branches: OutBranch[] = edges.map((e) => {
+      // fallback về edge.condition cho dữ liệu cũ. Nhánh 失敗 đã tách ra field `failed`.
+      const branches: OutBranch[] = branchEdges.map((e) => {
         const handle = e.sourceHandle ?? 'default';
         const info = dataBranches.get(handle);
         const value = info?.value ?? e.condition ?? '';
@@ -129,12 +137,13 @@ function serializeGraph(
         return out;
       });
       if (branches.length > 0) out.branches = branches;
+      // Node 聴取 rẽ nhánh vẫn giữ nhánh 失敗 cố định (field `failed`).
+      if (failedEdge) out.failed = failedEdge.target;
     } else {
       // Node thường: edge default -> next. Node có nhánh thất bại CỐ ĐỊNH
       // (interaction/openai/faq/transfer) — edge handle 'failed' -> field `failed`
       // để không mất nhánh khi round-trip qua YAML.
       const nextEdge = edges.find((e) => (e.sourceHandle ?? 'default') === 'default');
-      const failedEdge = edges.find((e) => e.sourceHandle === 'failed');
       if (nextEdge) out.next = nextEdge.target;
       // Dữ liệu cũ: chỉ có 1 edge với handle lạ (không 'default'/'failed') -> vẫn coi là next.
       else if (!failedEdge && edges[0]) out.next = edges[0].target;

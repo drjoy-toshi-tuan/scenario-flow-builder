@@ -990,18 +990,26 @@ export function csEditableBranchNode(type: NodeType): boolean {
 // Danh sách nhánh CS của node: có data.branches -> dùng thẳng; chưa có -> seed từ
 // bộ cố định của schema (GIỮ id handle 'failed'/'default' để dây cũ không lệch).
 export function csBranchesOf(type: NodeType, data: Record<string, unknown>): DataBranch[] {
-  if (Array.isArray(data.branches) && (data.branches as unknown[]).length > 0) {
-    return readBranches(data);
-  }
   const fixed = BRANCH_SCHEMA[type].fixed ?? [];
-  if (fixed.length > 0) {
-    return fixed.map((f) => {
+  const seedFixed = (): DataBranch[] =>
+    fixed.map((f) => {
       const b: DataBranch = { id: f.id, value: '' };
       if (f.label) b.label = f.label;
       return b;
     });
+  if (!(Array.isArray(data.branches) && (data.branches as unknown[]).length > 0)) {
+    return fixed.length > 0 ? seedFixed() : [{ id: CATCH_ALL_ID, value: '' }];
   }
-  return [{ id: CATCH_ALL_ID, value: '' }];
+  // Có nhánh giá trị (聴取 rẽ nhánh trực tiếp): giữ nguyên các nhánh + đảm bảo handle
+  // CỐ ĐỊNH (vd 失敗) LUÔN có mặt. File YAML chỉ ghi nhánh giá trị + default (失敗 là field
+  // `failed` riêng) nên phải bổ sung handle 失敗 để dây/handle không lệch.
+  const list = readBranches(data); // đảm bảo catch-all 'default'
+  for (const f of seedFixed()) {
+    if (list.some((b) => b.id === f.id)) continue;
+    if (f.id === 'failed') list.unshift(f); // 失敗 lên đầu
+    else list.push(f);
+  }
+  return list;
 }
 
 // Handle output (chấm nối dây ở đáy node) suy ra TỪ IR:

@@ -262,7 +262,14 @@ function parseGraph(
           });
         }
       });
-      if (EDITABLE_BRANCH_TYPES.includes(nodeType) && dataBranches.length > 0) {
+      // Nhánh tự do lưu vào data.branches cho node nhánh (nexus/logic/jump…). Màn CS:
+      // node 聴取 (interaction) cũng rẽ nhánh TRỰC TIẾP theo câu trả lời của người gọi ->
+      // cũng lưu data.branches để CS UI dựng đúng handle. Nhánh 失敗 (failed) vẫn là field
+      // riêng (raw.failed) — csBranchesOf tự bổ sung handle 失敗 khi render.
+      if (
+        (EDITABLE_BRANCH_TYPES.includes(nodeType) || nodeType === 'interaction') &&
+        dataBranches.length > 0
+      ) {
         node.data.branches = dataBranches;
       }
     }
