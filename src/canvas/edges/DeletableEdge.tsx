@@ -19,17 +19,17 @@ import { useT } from '../../ui/i18n';
 // Dây gấp khúc trực giao (orthogonal), góc bo tròn; nếu source & target thẳng hàng
 // thì tự động là đường thẳng đứng.
 //
-// Đường dây được dựng thành DANH SÁCH ĐIỂM (points) cho cả 2 kiểu:
-//   1. Dây đi XUỐNG bình thường (đích thấp hơn nguồn): V-H-V (dọc–ngang–dọc), đoạn
-//      ngang ở giữa hai tầng.
-//   2. Dây VÒNG LÊN TRÊN (retry/loop: đích cao hơn nguồn): thoát ra làn dọc bên
-//      CẠNH của CHẤM output (trái/phải theo phía chấm) rồi vòng lên — KHÔNG cắt chéo
-//      qua các nhánh anh em đi xuống ngay dưới node.
+// Đường dây dựng thành DANH SÁCH ĐIỂM (points) cho cả 2 kiểu:
+//   1. Đi XUỐNG bình thường (đích thấp hơn nguồn): V-H-V (dọc–ngang–dọc), đoạn ngang
+//      ở GIỮA hai tầng.
+//   2. VÒNG LÊN TRÊN (retry/loop: đích cao hơn nguồn): thoát ra làn dọc ĐÚNG PHÍA của
+//      chấm output rồi vòng lên — KHÔNG cắt chéo qua các nhánh anh em đi xuống.
 //
-// WAYPOINT KÉO ĐƯỢC: mỗi dây có 1 điểm điều khiển (control) ở khúc gấp chính. Người
-// dùng kéo control để NẮN dây (đoạn ngang lên/xuống, làn dọc trái/phải) nhằm tránh
-// dây chồng chéo. Offset lưu ở node nguồn (data.edgeShapes[handle]) — round-trip YAML.
-// Double-click control để trả dây về đường mặc định.
+// NẮN DÂY: chỉ đoạn NGANG Ở GIỮA (dây V-H-V đi xuống) kéo được LÊN/XUỐNG — click &
+// giữ ngay trên đoạn ngang đó rồi kéo (con trỏ ns-resize). Độ lệch (chỉ trục Y) lưu ở
+// node nguồn (data.edgeShapes[handle].y), round-trip YAML. Double-click đoạn ngang để
+// trả dây về mặc định. Dây thẳng đứng / dây vòng lên KHÔNG có đoạn ngang giữa nên
+// không kéo (giữ nguyên hình).
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Khoảng đệm dây chừa ra khỏi mép node khi vòng.
@@ -42,9 +42,15 @@ interface Point {
   x: number;
   y: number;
 }
+// Đoạn ngang ở giữa (kéo được lên/xuống): y hiện tại + 2 mút x.
+interface HMid {
+  y: number;
+  x1: number;
+  x2: number;
+}
 interface Route {
   points: Point[];
-  control: Point; // điểm điều khiển (waypoint) hiện tại — nơi vẽ tay nắm kéo
+  hMid: HMid | null; // đoạn ngang giữa kéo được (null nếu dây thẳng / dây vòng)
 }
 
 interface Box {
@@ -98,7 +104,6 @@ function roundedOrthogonalPath(rawPoints: Point[], radius: number): string {
 }
 
 // Điểm GẦN NHẤT trên path SVG so với 1 điểm (toạ độ flow) — lấy mẫu theo độ dài cung.
-// Dùng để ghim nhãn điều kiện LÊN đúng dây khi kéo (không cho rời ra ngoài dây).
 function nearestPointOnPath(path: SVGPathElement, pt: Point): Point {
   const total = path.getTotalLength();
   if (!total) return pt;
@@ -158,12 +163,9 @@ function computeLoopBack(
   sBox: Box | null,
   tBox: Box | null,
   obstacles: Box[],
-  shape: Point,
 ): Route | null {
-  // Chỉ xử lý cấu hình handle chuẩn: nguồn ở ĐÁY (đi xuống), đích ở ĐỈNH (đi vào từ trên).
   if (sourcePosition !== Position.Bottom || targetPosition !== Position.Top) return null;
   if (!sBox || !tBox) return null;
-  // Loop-back = đích nằm cao hơn nguồn (dây phải đi ngược lên trên).
   if (ty >= sy - LOOP_GAP * 2) return null;
 
   const dropY = Math.max(sy, sBox.bottom) + LOOP_GAP;
@@ -171,12 +173,10 @@ function computeLoopBack(
   const laneTop = Math.min(riseY, dropY);
   const laneBottom = Math.max(riseY, dropY);
 
-  // ── Chọn HƯỚNG vòng (trái/phải) ──────────────────────────────────────────
   const gapLeft = sBox.left - tBox.right;
   const gapRight = tBox.left - sBox.right;
-  // Ưu tiên phía CHẤM OUTPUT (handle) khi node có NHIỀU nhánh: chấm lệch TRÁI -> vòng
-  // trái, lệch PHẢI -> vòng phải. Nhờ vậy dây thoát ra ĐÚNG bên của nhánh nó rồi mới
-  // vòng LÊN — KHÔNG cắt chéo qua các nhánh anh em đi xuống ngay dưới node.
+  // Ưu tiên phía CHẤM OUTPUT (handle) khi node có NHIỀU nhánh: dây thoát ra ĐÚNG bên
+  // của nhánh nó rồi mới vòng lên -> không cắt chéo nhánh anh em.
   const handleOffset = sx - sBox.cx;
   const handleSided = Math.abs(handleOffset) > 1;
   let goLeft: boolean;
@@ -190,7 +190,6 @@ function computeLoopBack(
     goLeft = tBox.cx <= sBox.cx;
   }
 
-  // ── Đặt LÀN DỌC ────────────────────────────────────────────────────────────
   const gap = goLeft ? gapLeft : gapRight;
   const gapLaneX = goLeft ? (tBox.right + sBox.left) / 2 : (sBox.right + tBox.left) / 2;
   let laneX: number;
@@ -202,70 +201,42 @@ function computeLoopBack(
       : Math.max(sBox.right, tBox.right) + LOOP_LANE;
   }
 
-  // Waypoint: kéo làn dọc TRÁI/PHẢI (shape.x) + nâng/hạ 2 đoạn ngang (shape.y).
-  const laneXAdj = laneX + shape.x;
-  const dropYAdj = dropY + shape.y;
-  const riseYAdj = riseY + shape.y;
-
   const points: Point[] = [
     { x: sx, y: sy },
-    { x: sx, y: dropYAdj },
-    { x: laneXAdj, y: dropYAdj },
-    { x: laneXAdj, y: riseYAdj },
-    { x: tx, y: riseYAdj },
+    { x: sx, y: dropY },
+    { x: laneX, y: dropY },
+    { x: laneX, y: riseY },
+    { x: tx, y: riseY },
     { x: tx, y: ty },
   ];
-  return { points, control: { x: laneXAdj, y: (dropYAdj + riseYAdj) / 2 } };
+  // Dây vòng lên KHÔNG có đoạn ngang "giữa" đơn nhất -> không cho kéo (giữ auto-route).
+  return { points, hMid: null };
 }
 
-// Đường đi XUỐNG bình thường (đích thấp hơn/ngang nguồn): V-H-V hoặc thẳng đứng.
-function computeDown(sx: number, sy: number, tx: number, ty: number, shape: Point): Route {
+// Đường đi XUỐNG bình thường: V-H-V (đoạn ngang giữa kéo được lên/xuống) hoặc thẳng đứng.
+// offsetY = độ lệch người dùng đã kéo cho đoạn ngang giữa.
+function computeDown(sx: number, sy: number, tx: number, ty: number, offsetY: number): Route {
   const straight = Math.abs(sx - tx) < 2;
-  const baseBarY = (sy + ty) / 2;
-  const baseBendX = straight ? sx : (sx + tx) / 2;
-  const hasShape = shape.x !== 0 || shape.y !== 0;
-
-  if (!hasShape) {
-    const points = straight
-      ? [
-          { x: sx, y: sy },
-          { x: tx, y: ty },
-        ]
-      : [
-          { x: sx, y: sy },
-          { x: sx, y: baseBarY },
-          { x: tx, y: baseBarY },
-          { x: tx, y: ty },
-        ];
-    return { points, control: { x: baseBendX, y: baseBarY } };
+  const barY = (sy + ty) / 2 + offsetY;
+  if (straight) {
+    // Thẳng đứng: không có đoạn ngang giữa -> không kéo được.
+    return {
+      points: [
+        { x: sx, y: sy },
+        { x: tx, y: ty },
+      ],
+      hMid: null,
+    };
   }
-
-  // Có waypoint: nắn dây qua điểm điều khiển C, vẫn VÀO đích theo phương DỌC.
-  const cx = baseBendX + shape.x;
-  const cy = baseBarY + shape.y;
-  const nearTarget = Math.abs(cx - tx) < 2;
-  let points: Point[];
-  if (nearTarget) {
-    // Làn dọc trùng cột đích -> V-H-V gọn tại độ cao cy.
-    points = [
+  return {
+    points: [
       { x: sx, y: sy },
-      { x: sx, y: cy },
-      { x: tx, y: cy },
+      { x: sx, y: barY },
+      { x: tx, y: barY },
       { x: tx, y: ty },
-    ];
-  } else {
-    // Zig-zag qua C rồi hạ xuống trùng cột đích (đoạn cuối dọc -> mũi tên vào từ trên).
-    const ty2 = cy + (ty - cy) * 0.55;
-    points = [
-      { x: sx, y: sy },
-      { x: sx, y: cy },
-      { x: cx, y: cy },
-      { x: cx, y: ty2 },
-      { x: tx, y: ty2 },
-      { x: tx, y: ty },
-    ];
-  }
-  return { points, control: { x: cx, y: cy } };
+    ],
+    hMid: { y: barY, x1: sx, x2: tx },
+  };
 }
 
 export function DeletableEdge({
@@ -291,11 +262,7 @@ export function DeletableEdge({
   const t = useT();
   const hasLabel = typeof label === 'string' && label.length > 0;
   const edgeData = data as RFEdgeData | undefined;
-  // Node condition/script: nhãn giá trị nhánh luôn hiện; các node khác chỉ hiện khi hover.
   const alwaysLabel = edgeData?.alwaysLabel === true;
-  // Đang chọn NHIỀU node (kéo khung / Shift-click): React Flow đánh dấu selected cho cả
-  // các edge nằm trong khung -> nếu để selected bung nút xoá + nhãn thì cả canvas rối
-  // nút thùng rác. Khi ở chế độ chọn nhóm, KHÔNG cho selected của edge kích hoạt toolbar.
   const multiNodeSelection = useStore((s) => {
     let count = 0;
     for (const n of s.nodeLookup.values()) {
@@ -304,21 +271,18 @@ export function DeletableEdge({
     return false;
   });
   const selectionTriggersUi = selected === true && !multiNodeSelection;
-  // Nhãn hiện khi: luôn-hiện (stamp) · hover · hoặc dây đang được CHỌN đơn (bấm vào dây).
   const labelVisible = alwaysLabel || hovered || selectionTriggersUi;
-  // Tay nắm waypoint chỉ hiện khi hover / chọn đơn (tránh rải chấm khắp canvas).
-  const controlsVisible = hovered || selectionTriggersUi;
 
   const { screenToFlowPosition } = useReactFlow();
   const pathRef = useRef<SVGPathElement>(null);
 
-  // ── Waypoint kéo được (nắn dây) ─────────────────────────────────────────────
-  const savedShape = edgeData?.edgeShape ?? { x: 0, y: 0 };
-  const shapeDragging = useRef(false);
-  const shapeStart = useRef<{ shape: Point; flow: Point } | null>(null);
-  const latestShape = useRef<Point | null>(null);
-  const [shapePreview, setShapePreview] = useState<Point | null>(null);
-  const shape = shapePreview ?? savedShape;
+  // ── Nắn dây: kéo đoạn NGANG GIỮA lên/xuống (chỉ trục Y) ─────────────────────
+  const savedShapeY = edgeData?.edgeShape?.y ?? 0;
+  const midDragging = useRef(false);
+  const midStart = useRef<{ y: number; flowY: number } | null>(null);
+  const latestY = useRef<number | null>(null);
+  const [midPreview, setMidPreview] = useState<number | null>(null);
+  const offsetY = midPreview ?? savedShapeY;
 
   // ── Stamp điều kiện kéo được (GHIM trên dây) ────────────────────────────────
   const stagger = edgeData?.labelStagger ?? { x: 0, y: 0 };
@@ -326,11 +290,11 @@ export function DeletableEdge({
   const labelDragging = useRef(false);
   const latestOffset = useRef<Point | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
-  const offsetX = dragOffset ? dragOffset.x : savedOffset.x;
-  const offsetY = dragOffset ? dragOffset.y : savedOffset.y;
+  const labelOffX = dragOffset ? dragOffset.x : savedOffset.x;
+  const labelOffY = dragOffset ? dragOffset.y : savedOffset.y;
 
   const onLabelPointerDown = (e: ReactPointerEvent<HTMLSpanElement>) => {
-    if (!alwaysLabel) return; // chỉ stamp luôn-hiện mới kéo được
+    if (!alwaysLabel) return;
     e.stopPropagation();
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -357,7 +321,6 @@ export function DeletableEdge({
 
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
-  // Các node khác (không phải nguồn/đích) — dùng để không luồn dây xuyên qua chúng.
   const nodeLookup = useStore((s) => s.nodeLookup);
   const obstacles = useMemo(() => {
     const list: Box[] = [];
@@ -380,54 +343,49 @@ export function DeletableEdge({
       boxOf(sourceNode),
       boxOf(targetNode),
       obstacles,
-      shape,
-    ) ?? computeDown(sourceX, sourceY, targetX, targetY, shape);
+    ) ?? computeDown(sourceX, sourceY, targetX, targetY, offsetY);
 
   const edgePath = roundedOrthogonalPath(route.points, LOOP_RADIUS);
   const mid = midpointOf(route.points);
   const labelX = mid.x;
   const labelY = mid.y;
-  const control = route.control;
+  const hMid = route.hMid;
 
-  const onShapePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const onMidPointerDown = (e: ReactPointerEvent<SVGLineElement>) => {
     e.stopPropagation();
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    shapeDragging.current = true;
+    (e.target as SVGLineElement).setPointerCapture(e.pointerId);
+    midDragging.current = true;
     const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    shapeStart.current = { shape: { ...savedShape }, flow };
-    latestShape.current = { ...savedShape };
-    setShapePreview({ ...savedShape });
+    midStart.current = { y: savedShapeY, flowY: flow.y };
+    latestY.current = savedShapeY;
+    setMidPreview(savedShapeY);
   };
-  const onShapePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!shapeDragging.current || !shapeStart.current) return;
+  const onMidPointerMove = (e: ReactPointerEvent<SVGLineElement>) => {
+    if (!midDragging.current || !midStart.current) return;
     const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const next = {
-      x: shapeStart.current.shape.x + (flow.x - shapeStart.current.flow.x),
-      y: shapeStart.current.shape.y + (flow.y - shapeStart.current.flow.y),
-    };
-    latestShape.current = next;
-    setShapePreview(next);
+    const ny = midStart.current.y + (flow.y - midStart.current.flowY);
+    latestY.current = ny;
+    setMidPreview(ny);
   };
-  const onShapePointerUp = () => {
-    if (!shapeDragging.current) return;
-    shapeDragging.current = false;
-    const next = latestShape.current;
-    shapeStart.current = null;
-    latestShape.current = null;
-    setShapePreview(null);
-    if (next) setEdgeShape(id, next);
+  const onMidPointerUp = () => {
+    if (!midDragging.current) return;
+    midDragging.current = false;
+    const ny = latestY.current;
+    midStart.current = null;
+    latestY.current = null;
+    setMidPreview(null);
+    if (ny != null) setEdgeShape(id, { x: 0, y: Math.round(ny) });
   };
-  // Double-click tay nắm -> trả dây về đường mặc định.
-  const onShapeDoubleClick = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const onMidDoubleClick = (e: ReactPointerEvent<SVGLineElement>) => {
     e.stopPropagation();
-    setShapePreview(null);
+    setMidPreview(null);
     setEdgeShape(id, null);
   };
 
   // ── Giữ nhãn LUÔN bám dây khi node di chuyển ────────────────────────────────
-  const wantX = labelX + stagger.x + offsetX;
-  const wantY = labelY + stagger.y + offsetY;
+  const wantX = labelX + stagger.x + labelOffX;
+  const wantY = labelY + stagger.y + labelOffY;
   const hasUserOffset = savedOffset.x !== 0 || savedOffset.y !== 0;
   const [snapped, setSnapped] = useState<Point | null>(null);
   useLayoutEffect(() => {
@@ -439,8 +397,6 @@ export function DeletableEdge({
   }, [edgePath, wantX, wantY, hasUserOffset]);
   const posX = !dragOffset && snapped ? snapped.x : wantX;
   const posY = !dragOffset && snapped ? snapped.y : wantY;
-
-  const shapeCustomized = savedShape.x !== 0 || savedShape.y !== 0;
 
   return (
     <>
@@ -457,27 +413,28 @@ export function DeletableEdge({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       />
-      <EdgeLabelRenderer>
-        {/* Tay nắm waypoint: kéo để nắn dây (đoạn ngang lên/xuống, làn dọc trái/phải);
-            double-click để trả về đường mặc định. Hiện khi hover/chọn, hoặc luôn hiện
-            mờ khi dây đã được nắn tay (để biết có thể chỉnh/reset). */}
-        <div
-          className={`nodrag nopan edge-waypoint${shapePreview ? ' edge-waypoint--dragging' : ''}${
-            shapeCustomized ? ' edge-waypoint--customized' : ''
-          }`}
-          style={{
-            transform: `translate(-50%, -50%) translate(${control.x}px, ${control.y}px)`,
-            opacity: controlsVisible || shapePreview ? 1 : shapeCustomized ? 0.35 : 0,
-            pointerEvents: controlsVisible || shapeCustomized || shapePreview ? 'all' : 'none',
-          }}
-          title={t('edgeWaypointTitle')}
+      {/* Đoạn NGANG GIỮA kéo được lên/xuống: dải trong suốt phủ đúng đoạn ngang, nằm
+          TRÊN path hover nên nhận được kéo. Con trỏ ns-resize báo hiệu kéo dọc. */}
+      {hMid && (
+        <line
+          x1={hMid.x1}
+          y1={hMid.y}
+          x2={hMid.x2}
+          y2={hMid.y}
+          stroke="transparent"
+          strokeWidth={16}
+          style={{ cursor: 'ns-resize' }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          onPointerDown={onShapePointerDown}
-          onPointerMove={onShapePointerMove}
-          onPointerUp={onShapePointerUp}
-          onDoubleClick={onShapeDoubleClick}
-        />
+          onPointerDown={onMidPointerDown}
+          onPointerMove={onMidPointerMove}
+          onPointerUp={onMidPointerUp}
+          onDoubleClick={onMidDoubleClick}
+        >
+          <title>{t('edgeWaypointTitle')}</title>
+        </line>
+      )}
+      <EdgeLabelRenderer>
         <div
           className={`nodrag nopan edge-toolbar${hasLabel ? ' edge-toolbar--labeled' : ''}`}
           style={{

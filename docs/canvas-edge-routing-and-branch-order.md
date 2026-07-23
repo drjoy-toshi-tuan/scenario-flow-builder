@@ -90,17 +90,20 @@ tương ứng với hướng nó cần vòng là dây sẽ đi men theo cạnh r
 Khi convert: đừng bịa nhãn `次へ` cho mọi bước — chỉ đặt `label` cho nhánh MANG NGHĨA
 (`予約` / `変更` / `はい` / `いいえ` / `失敗`…). Đường đi tiếp mặc định để trống label.
 
-## 5. Nắn dây bằng tay (waypoint) — khi auto vẫn chưa ưng
+## 5. Nắn dây bằng tay — khi auto vẫn chưa ưng
 
-Mỗi dây có **1 điểm điều khiển (waypoint)** ở khúc gấp chính (hiện khi hover/chọn dây):
+Dây giữ nguyên 3 khúc (V-H-V). Chỉ **đoạn NGANG ở giữa** kéo được **LÊN/XUỐNG**:
+click & giữ chuột ngay trên đoạn ngang đó rồi kéo (con trỏ đổi thành `ns-resize`).
 
-- **Kéo lên/xuống**: nâng/hạ đoạn NGANG ở giữa.
-- **Kéo trái/phải**: dời làn DỌC sang trái/phải (nắn dây tránh chồng/đi ngầm dưới node).
-- **Double-click**: trả dây về đường mặc định.
+- **Double-click** đoạn ngang: trả dây về mặc định.
+- Dây **thẳng đứng** (nguồn/đích thẳng cột) và dây **vòng lên** (retry/loop) KHÔNG có
+  đoạn ngang giữa đơn nhất nên không kéo — giữ nguyên hình auto-route.
+- Nếu đoạn ngang có nhãn (stamp điều kiện) đè đúng giữa: nắm đoạn ngang ở BÊN CẠNH nhãn
+  để kéo (nhãn nhỏ, dây rộng).
 
-Offset waypoint lưu ở **node nguồn** (`data.edgeShapes[<handle>] = {x,y}`), round-trip
-qua YAML như `labelOffsets`. Vì vậy sau khi convert + chỉnh tay vài dây, bản chỉnh được
-giữ nguyên khi lưu/mở lại. (Kéo node cũng lưu `position`, không auto-layout đè lại.)
+Độ lệch (chỉ trục Y) lưu ở **node nguồn** (`data.edgeShapes[<handle>].y`), round-trip qua
+YAML như `labelOffsets`. Chỉnh tay vài dây rồi lưu -> mở lại giữ nguyên. (Kéo node cũng
+lưu `position`, không auto-layout đè lại.)
 
 ## 6. Auto-layout màn CS (bố cục "thoáng" kiểu PDF)
 
@@ -112,10 +115,22 @@ Khi mở/auto-layout ở **màn CS**, canvas nắn bố cục cho giống bản 
   xếp ở tầng SÂU HƠN tầng sâu nhất trong các nhánh — nên phần đuôi chung
   (質問→氏名→…→終話) nằm hẳn dưới các nhánh, đọc như **1 cột dọc ở giữa**, thay vì bị
   kéo lên ngang hàng nửa chừng theo nhánh đầu tiên chạm tới.
-- **Merge được CĂN GIỮA** theo tâm các node cha (đuôi nằm dưới mọi nhánh nên dịch ngang
-  không đụng nhánh nào).
-- Rank tính theo **đường dài nhất** (longest path); cạnh vòng ngược (retry/loop) không
-  tính vào rank.
+- **Cân đối quanh TRỤC TRUNG TÂM (dùng thuật toán cây)**: X do cây Reingold-Tilford điền
+  (cha căn giữa trên bó con, các nhánh toả RỘNG theo `BRANCH_GAP`, mỗi nhánh là 1 cột
+  dọc) — nên mạch chính (冒頭アナウンス → … → 終話) thẳng trục, nhánh toả đều & rộng 2 bên.
+  Node đích `failed` là terminal bị LOẠI khỏi cây (xếp riêng) nên không làm lệch trục.
+  Đuôi chung sau điểm hợp lưu được dịch về TÂM các nhánh cha; cuối cùng "thẳng cột" các
+  chuỗi tuyến tính (node 1 cha → về đúng cột cha) để đuôi & mọi mạch nối tiếp dọc thẳng.
+  Không phải lúc nào cũng cân tuyệt đối, nhưng cố cân nhất có thể.
+- Rank tính theo **đường dài nhất** (longest path) trên cạnh THƯỜNG + `failed`; cạnh vòng
+  ngược (retry/loop) KHÔNG tính. Node đích của `failed` mà VẪN chạy tiếp (không phải
+  terminal, vd FAQ不一致アナウンス) nhờ vậy chìm xuống dưới nguồn, không nổi lên tầng 0.
+- **Node đích của `failed` (terminal — vd 代表案内 / 聴取失敗)**: vì chấm output `failed`
+  nằm BÊN TRÁI node, node đích cũng đặt BÊN TRÁI — xếp NGANG HÀNG (cùng Y) với node ĐẦU
+  TIÊN (nông nhất) có `failed` đi vào nó, và đẩy ra phía ngoài bên TRÁI, vượt qua mọi
+  node cùng hàng lẫn các node cha `failed` nằm dưới — để dây `failed` (thoát trái, vòng
+  lên bên trái) KHÔNG vắt sang phải cắt chéo node/nhánh khác. (Terminal đến từ nhánh giá
+  trị thường, vd 残薬不足案内 qua `なし`, vẫn nằm trong luồng xuôi bình thường.)
 
 > Màn **TS giữ nguyên** bố cục cây cũ (không áp airify) — thay đổi này CHỈ cho CS.
 > Hệ quả cho convert: **KHÔNG cần set `position`** cho file CS — để trống (0,0), canvas
