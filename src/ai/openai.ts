@@ -90,3 +90,78 @@ export function stripCodeFence(text: string): string {
   const m = /^\s*```[a-zA-Z]*\n([\s\S]*?)\n?```\s*$/.exec(text);
   return m ? m[1] : text;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// chatRaw — gọi proxy cho TOOL-CALLING (Option 3). Khác chatComplete: gửi kèm
+// `tools` và trả về NGUYÊN message (content + tool_calls + raw) để caller chạy vòng
+// lặp gọi tool. messages là mảng message OpenAI thô (gồm cả role 'tool').
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RawToolCall {
+  id: string;
+  name: string;
+  arguments: string; // JSON string (tham số tool)
+}
+
+export interface RawAssistantMessage {
+  content: string;
+  toolCalls: RawToolCall[];
+  raw: unknown; // message assistant nguyên bản — nối lại vào messages ở lượt sau
+}
+
+export async function chatRaw(
+  messages: unknown[],
+  opts: { tools?: unknown[]; signal?: AbortSignal } = {},
+): Promise<RawAssistantMessage> {
+  if (!AI_PROXY_URL) throw new AiError('AI proxy chưa được cấu hình.', 'no-config');
+  const idToken = getStoredIdToken();
+  if (!idToken) throw new AiError('Chưa đăng nhập — không thể gọi AI.', 'no-auth');
+
+  const payload: Record<string, unknown> = { model: OPENAI_MODEL, messages };
+  if (!isReasoningModel(OPENAI_MODEL)) payload.temperature = 0.2;
+  if (opts.tools && opts.tools.length) {
+    payload.tools = opts.tools;
+    payload.tool_choice = 'auto';
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify(payload),
+      signal: opts.signal,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    throw new AiError('Không kết nối được AI proxy.', 'network');
+  }
+  if (res.status === 401) {
+    throw new AiError('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại để dùng AI.', 'unauthorized');
+  }
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const body = (await res.json()) as { error?: { message?: string } };
+      detail = body.error?.message ?? '';
+    } catch {
+      // ignore
+    }
+    throw new AiError(detail || `AI proxy lỗi (${res.status}).`, 'http');
+  }
+  const body = (await res.json()) as {
+    choices?: Array<{
+      message?: {
+        content?: string | null;
+        tool_calls?: Array<{ id: string; function?: { name?: string; arguments?: string } }>;
+      };
+    }>;
+  };
+  const msg = body.choices?.[0]?.message;
+  const toolCalls: RawToolCall[] = (msg?.tool_calls ?? []).map((c) => ({
+    id: c.id,
+    name: c.function?.name ?? '',
+    arguments: c.function?.arguments ?? '{}',
+  }));
+  return { content: msg?.content ?? '', toolCalls, raw: msg ?? { role: 'assistant', content: '' } };
+}

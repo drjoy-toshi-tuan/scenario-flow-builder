@@ -95,15 +95,18 @@ export function FlowActionsBar() {
   return (
     <div className="flex items-center gap-0.5">
       {/* Nút AI Chat (✨) — NGAY TRƯỚC Auto Layout, dùng chung CS/TS. Màu tím; có
-          nền tím nhạt khi panel đang mở. Ẩn hiệu ứng hover-bg mix --bk-text mặc định. */}
-      <HoverLabelButton
-        label={t('aiChatOpen')}
-        className={`${ACTION_BTN} !text-[#d946ef] ${aiOpen ? 'bg-[color-mix(in_srgb,#d946ef_16%,transparent)]' : ''}`}
-        disabled={aiDisabled}
-        onClick={toggleAi}
-      >
-        <AiSparkleIcon size={20} />
-      </HoverLabelButton>
+          nền tím nhạt khi panel đang mở. data-ai-toggle: để click-outside của panel
+          bỏ qua nút này (không thì bấm nút vừa đóng vừa mở lại). */}
+      <span data-ai-toggle>
+        <HoverLabelButton
+          label={t('aiChatOpen')}
+          className={`${ACTION_BTN} !text-[#d946ef] ${aiOpen ? 'bg-[color-mix(in_srgb,#d946ef_16%,transparent)]' : ''}`}
+          disabled={aiDisabled}
+          onClick={toggleAi}
+        >
+          <AiSparkleIcon size={20} />
+        </HoverLabelButton>
+      </span>
 
       <HoverLabelButton
         label={t('autoLayout')}

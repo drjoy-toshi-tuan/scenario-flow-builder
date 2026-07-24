@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAiChatStore, type ChatMsg } from '../store/aiChatStore';
 import { useFlowStore } from '../store/flowStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import { useAuth } from '../auth/useAuth';
 import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
@@ -9,9 +10,9 @@ import { describeOp, type EditOp, type OpKind } from '../ai/editOps';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Panel AI Chat — dock bên phải canvas (dùng chung CS/TS). Trò chuyện để sửa flow
-// đang mở: AI trả lời (typing) kèm "đề xuất thay đổi" (edit-ops) chờ Áp dụng/Bỏ.
-// Màu chủ đạo tím #d946ef (đồng bộ nút AI Generate). Avatar AI = logo OpenAI (tím,
-// thô); avatar user = ảnh Google (cắt tròn). Gửi bằng Shift+Enter.
+// đang mở: AI dùng tool-calling dựng "đề xuất thay đổi" (edit-ops) chờ Áp dụng/Bỏ.
+// Mở panel có hiệu ứng phóng ra; click ra ngoài tự đóng. Divider hệ thống khi đổi
+// màn (CS: từng tab; TS/CS đổi luồng). Gửi bằng Shift+Enter.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AI_PURPLE = '#d946ef';
@@ -60,7 +61,6 @@ function OpsCard({ msg }: { msg: ChatMsg }) {
   const rejectOps = useAiChatStore((s) => s.rejectOps);
   const ops = msg.ops ?? [];
 
-  // Nhãn hiển thị cho 1 tham chiếu: node hiện có -> label; node MỚI (tempId) -> label op; else ref thô.
   const tempLabels = new Map<string, string>();
   for (const op of ops) if (op.op === 'addNode' && op.tempId) tempLabels.set(op.tempId, op.label || op.nodeType);
   const labelOf = (ref: string) =>
@@ -129,22 +129,32 @@ function OpsCard({ msg }: { msg: ChatMsg }) {
   );
 }
 
-// 1 bong bóng chat (user hoặc assistant).
+// 1 dòng chat: system divider / user / assistant.
 function MessageRow({ msg, picture, name }: { msg: ChatMsg; picture?: string; name: string }) {
   const t = useT();
+
+  if (msg.role === 'system') {
+    // Divider hệ thống: canh giữa, chữ xám (contrast 2 theme), format "— nội dung —".
+    return (
+      <div className="flex items-center gap-2 py-0.5 text-[11px] font-semibold text-[var(--bk-text-faint)]">
+        <span className="h-px flex-1 bg-[var(--bk-border)]" />
+        <span className="shrink-0">— {msg.text} —</span>
+        <span className="h-px flex-1 bg-[var(--bk-border)]" />
+      </div>
+    );
+  }
+
   if (msg.role === 'user') {
     return (
       <div className="flex flex-row-reverse gap-2.5">
         <UserAvatar picture={picture} name={name} />
-        <div
-          className="whitespace-pre-wrap rounded-[13px] rounded-tr-[5px] px-3 py-2 text-[13px] font-semibold leading-relaxed"
-          style={{ background: 'rgba(255,140,48,.16)', color: '#9a3412' }}
-        >
+        <div className="bk-user-bubble whitespace-pre-wrap rounded-[13px] rounded-tr-[5px] px-3 py-2 text-[13px] font-semibold leading-relaxed">
           {msg.text}
         </div>
       </div>
     );
   }
+
   // assistant
   return (
     <div className="flex gap-2.5">
@@ -170,6 +180,15 @@ function MessageRow({ msg, picture, name }: { msg: ChatMsg; picture?: string; na
   );
 }
 
+// Nhãn tab CS -> key i18n (cho divider khi đổi tab).
+const TAB_KEY: Record<string, TKey> = {
+  announce: 'ctAnnounce',
+  general: 'ctGeneral',
+  status: 'ctStatus',
+  clinicalDept: 'ctClinicalDept',
+  courseList: 'ctCourseList',
+};
+
 export function AiChatPanel() {
   const t = useT();
   const { user } = useAuth();
@@ -179,18 +198,48 @@ export function AiChatPanel() {
   const closePanel = useAiChatStore((s) => s.closePanel);
   const send = useAiChatStore((s) => s.send);
   const stop = useAiChatStore((s) => s.stop);
+  const pushDivider = useAiChatStore((s) => s.pushDivider);
   const resetConversation = useAiChatStore((s) => s.resetConversation);
 
-  // Đổi flow/file -> xoá hội thoại (context cũ không còn đúng flow đang mở).
+  const mode = useWorkspaceStore((s) => s.mode);
+  const canvasTab = useFlowStore((s) => s.canvasTab);
   const activeFlowId = useFlowStore((s) => s.activeFlowId);
   const scenarioId = useFlowStore((s) => s.ir?.meta.id);
+  const subName = useFlowStore((s) => s.ir?.subflows?.find((sf) => sf.id === s.activeFlowId)?.name);
+
+  const flowDisplay = activeFlowId === 'main' ? 'Main Flow' : subName || activeFlowId;
+  const screenKey =
+    mode === 'cs' ? `cs:${canvasTab}${canvasTab === 'flow' ? `:${activeFlowId}` : ''}` : `ts:${activeFlowId}`;
+  const screenLabel =
+    mode === 'cs'
+      ? canvasTab === 'flow'
+        ? `${t('ctFlow')} · ${flowDisplay}`
+        : t(TAB_KEY[canvasTab] ?? 'ctFlow')
+      : flowDisplay;
+
+  // Reset khi đổi CS/TS hoặc đổi file; divider khi đổi màn trong cùng mode/file.
+  const modeRef = useRef(mode);
+  const scenarioRef = useRef(scenarioId);
+  const screenRef = useRef(screenKey);
+  const hasMessages = messages.length > 0;
   useEffect(() => {
-    resetConversation();
-  }, [activeFlowId, scenarioId, resetConversation]);
+    if (modeRef.current !== mode || scenarioRef.current !== scenarioId) {
+      resetConversation();
+      modeRef.current = mode;
+      scenarioRef.current = scenarioId;
+      screenRef.current = screenKey;
+      return;
+    }
+    if (screenRef.current !== screenKey) {
+      if (hasMessages) pushDivider(screenLabel);
+      screenRef.current = screenKey;
+    }
+  }, [mode, scenarioId, screenKey, screenLabel, hasMessages, resetConversation, pushDivider]);
 
   const [input, setInput] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const busy = status !== 'idle';
 
   // Textarea auto-grow tới ~150px rồi cuộn trong ô.
@@ -207,6 +256,19 @@ export function AiChatPanel() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, status]);
 
+  // Click ra ngoài panel -> đóng (bỏ qua nút toggle ✨ trên thanh công cụ).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (panelRef.current?.contains(target)) return;
+      if (target.closest('[data-ai-toggle]')) return;
+      closePanel();
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open, closePanel]);
+
   if (!open) return null;
 
   const submit = () => {
@@ -217,7 +279,10 @@ export function AiChatPanel() {
   };
 
   return (
-    <aside className="flex h-full w-[400px] shrink-0 flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)]">
+    <aside
+      ref={panelRef}
+      className="bk-ai-panel--in flex h-full w-[400px] shrink-0 flex-col border-l border-[var(--bk-border)] bg-[var(--bk-surface)]"
+    >
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2.5 border-b border-[var(--bk-border)] px-4 py-3">
         <span
@@ -254,7 +319,7 @@ export function AiChatPanel() {
           <MessageRow key={m.id} msg={m} picture={user?.picture} name={user?.name ?? ''} />
         ))}
 
-        {/* Đang suy nghĩ (chưa có message assistant) -> spinner 3 chấm */}
+        {/* Đang suy nghĩ -> spinner 3 chấm */}
         {status === 'thinking' && (
           <div className="flex gap-2.5">
             <OpenAiAvatar />
@@ -267,10 +332,7 @@ export function AiChatPanel() {
 
       {/* Ô nhập */}
       <div className="shrink-0 border-t border-[var(--bk-border)] px-3.5 pb-2 pt-2.5">
-        <div
-          className="flex flex-col gap-3 rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2.5 transition focus-within:border-[var(--bk-accent)]"
-          style={{ ['--tw-ring' as string]: AI_PURPLE }}
-        >
+        <div className="flex flex-col gap-3 rounded-2xl border border-[var(--bk-border)] bg-[var(--bk-surface-2)] px-3 py-2.5 transition focus-within:border-[var(--bk-accent)]">
           <textarea
             ref={taRef}
             rows={1}
@@ -297,14 +359,14 @@ export function AiChatPanel() {
               </kbd>{' '}
               {t('aiChatSendSuffix')}
             </span>
+            {/* Nút gửi/dừng: CÙNG kiểu — icon xám, hover đổi icon sang tím (không nền). */}
             {busy ? (
               <button
                 type="button"
                 onClick={stop}
                 aria-label={t('aiChatStop')}
                 title={t('aiChatStop')}
-                className="flex h-[26px] w-[26px] items-center justify-center rounded-lg text-white transition hover:brightness-95"
-                style={{ background: AI_BTN }}
+                className="bk-ai-send flex h-[26px] w-[26px] items-center justify-center rounded-lg"
               >
                 <Icon icon="mingcute:square-line" width={16} height={16} />
               </button>
@@ -315,14 +377,7 @@ export function AiChatPanel() {
                 disabled={!input.trim()}
                 aria-label={t('aiChatSend')}
                 title={t('aiChatSend')}
-                className="flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[var(--bk-text-faint)] transition hover:text-white disabled:opacity-40"
-                style={{ ['--hbg' as string]: AI_BTN }}
-                onMouseEnter={(e) => {
-                  if (!e.currentTarget.disabled) e.currentTarget.style.background = AI_BTN;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                }}
+                className="bk-ai-send flex h-[26px] w-[26px] items-center justify-center rounded-lg disabled:opacity-40"
               >
                 <Icon icon="fluent:arrow-enter-left-24-filled" width={16} height={16} />
               </button>

@@ -1752,6 +1752,50 @@ input[type='search']::-webkit-search-decoration {
   animation: bk-ai-caret 1s step-end infinite;
 }
 
+/* Panel AI Chat: phóng ra khi mở (giống panel menu), gốc từ góc trên-phải. */
+@keyframes bk-ai-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bk-ai-panel--in {
+  animation: bk-ai-panel-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+  transform-origin: top right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bk-ai-panel--in {
+    animation: none;
+  }
+}
+
+/* Bong bóng chat của user — cam nhạt "trong". Dark: nâng contrast (nền đậm hơn +
+   chữ cam sáng) để không bị mờ như trước. */
+.bk-user-bubble {
+  background: rgba(255, 140, 48, 0.16);
+  color: #9a3412;
+}
+.dark .bk-user-bubble {
+  background: color-mix(in srgb, #ff8c30 26%, transparent);
+  color: #ffd7b0;
+}
+
+/* Nút gửi / dừng của AI Chat: icon xám; hover -> icon TÍM (không đổi nền/thành nút). */
+.bk-ai-send {
+  color: var(--bk-text-faint);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.bk-ai-send:hover:not(:disabled) {
+  color: #d946ef;
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    Scrollbar kiểu Claude — MẢNH, thumb bo tròn có viền trong suốt tạo padding.
    Áp GLOBAL (mọi vùng scroll của app: panel AI Chat, danh sách flow, modal,
