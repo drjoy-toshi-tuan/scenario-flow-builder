@@ -1,4 +1,5 @@
 import type { FlowIR, FlowNode, FlowEdge } from '../ir/types';
+import { validateFlow } from '../ir/validate';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // "Flow digest" — biểu diễn GỌN của TOÀN BỘ kịch bản (main + mọi sub flow) để gửi
@@ -93,6 +94,17 @@ export function buildFlowDigest(doc: FlowIR, activeFlowId: string): string {
   out.push('EDGES:');
   if (open.edges.length === 0) out.push('- (none)');
   for (const e of open.edges) out.push(edgeLine(e));
+
+  // Cảnh báo nối dây thiếu (bất biến: mỗi node nối đủ handle ra bắt buộc). Giúp AI
+  // biết CHÍNH XÁC chỗ nào còn hở dây (vd interaction thiếu nhánh failed) để vá.
+  const violations = validateFlow(open.nodes, open.edges);
+  if (violations.length) {
+    out.push('');
+    out.push('INCOMPLETE WIRING (open flow) — every handle below MUST be connected with add_edge:');
+    for (const v of violations) {
+      out.push(`- ${v.nodeId} [${v.nodeType}] "${v.nodeLabel}" is missing an edge for handle: ${v.handle}`);
+    }
+  }
 
   // Các flow khác — chỉ liệt kê node để AI biết chúng tồn tại. Muốn sửa phải mở flow đó.
   if (others.length) {

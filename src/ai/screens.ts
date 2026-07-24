@@ -3,6 +3,23 @@ import { ensureSettings } from '../ir/settings';
 import { buildFlowDigest } from './flowDigest';
 import { announceTextOf } from './context';
 import { FLOW_TOOLS, ANNOUNCE_TOOLS } from './tools';
+import { FIXED_REQUIRED_HANDLES, EDITABLE_BRANCH_TYPES } from '../ir/branchRules';
+
+// Luật handle cho prompt — SINH từ nguồn ir/branchRules (không viết tay, không lệch).
+// Gom các node type có cùng bộ handle bắt buộc để câu chữ gọn.
+const HANDLE_RULES: string = (() => {
+  const groups = new Map<string, string[]>();
+  for (const [type, handles] of Object.entries(FIXED_REQUIRED_HANDLES)) {
+    const key = (handles as readonly string[]).join(' AND ');
+    const arr = groups.get(key) ?? [];
+    arr.push(type);
+    groups.set(key, arr);
+  }
+  const lines = [...groups.entries()].map(([handles, types]) => `- ${types.join(', ')}: must wire ${handles}`);
+  lines.push(`- ${EDITABLE_BRANCH_TYPES.join(', ')}: wire exactly one edge per branch in data.branches`);
+  lines.push('- hangup: no outgoing edge');
+  return `HANDLE RULES (wire EVERY required output handle — leaving one unwired, e.g. an interaction with a "default" edge but no "failed" edge, is INCOMPLETE; the CONTEXT lists any INCOMPLETE WIRING to fix):\n${lines.join('\n')}`;
+})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bối cảnh AI THEO TỪNG MÀN. Mỗi màn (CS: Flow Diagram / Announce List / General /
@@ -41,7 +58,7 @@ RULES:
     mode === 'cs'
       ? `\nCS SCREEN NOTE: This is the CS design view. Node labels/wording are Japanese and polite (敬語). Branch conditions on 分岐ロジック are business-friendly; keep labels short and in Japanese.`
       : `\nTS SCREEN NOTE: This is the TS engineering view. Branch conditions/handles map closely to the Brekeke implementation; you may use raw handles/conditions.`;
-  return base + modeNote;
+  return `${base}\n${HANDLE_RULES}${modeNote}`;
 }
 
 const ANNOUNCE_SPEC = `SCREEN: Announce List — manages only the SPOKEN WORDING of the flow. You can ONLY edit wording of EXISTING nodes via update_node (announce node → data.text, interaction node → data.announce). Keep caller-facing Japanese natural and polite (敬語). Do NOT add or remove nodes, and do NOT change flow structure on this screen — if the user asks for that, tell them to use the Flow Diagram screen.
