@@ -1378,10 +1378,15 @@ flow:
     expect(posY(ir, 'tail')).toBeGreaterThan(posY(ir, 'merge'));
   });
 
-  it('merge được CĂN GIỮA theo tâm các node cha', async () => {
+  it('merge cân đối giữa 2 nhánh cha (nằm trong khoảng giữa chúng)', async () => {
     const ir = await layout(fromYaml(MERGE), { cs: true });
-    const mid = (centerX(ir, 'a3') + centerX(ir, 'b1')) / 2;
-    expect(Math.abs(centerX(ir, 'merge') - mid)).toBeLessThan(1);
+    const lo = Math.min(centerX(ir, 'a3'), centerX(ir, 'b1'));
+    const hi = Math.max(centerX(ir, 'a3'), centerX(ir, 'b1'));
+    // Cân đối toàn cục: merge nằm GIỮA 2 nhánh cha (không lệch hẳn về 1 bên).
+    expect(centerX(ir, 'merge')).toBeGreaterThanOrEqual(lo - 1);
+    expect(centerX(ir, 'merge')).toBeLessThanOrEqual(hi + 1);
+    // Mạch đuôi thẳng trục: tail ngay dưới merge.
+    expect(Math.abs(centerX(ir, 'tail') - centerX(ir, 'merge'))).toBeLessThan(1);
   });
 
   it('không có node nào chồng chéo nhau', async () => {
@@ -1401,6 +1406,38 @@ flow:
     // Cây spanning đặt merge ngay dưới nhánh đầu chạm tới (b1 ở tầng 1 -> merge tầng 2),
     // KHÔNG sâu bằng a3 (tầng 3). Nhờ vậy hành vi màn TS/không-cs giữ nguyên.
     expect(posY(ir, 'merge')).toBeLessThanOrEqual(posY(ir, 'a3'));
+  });
+
+  // Node ĐÍCH của failed (terminal): nằm ngang hàng node ĐẦU TIÊN có failed vào, đẩy phải.
+  const FAILED_TERM = `
+flow:
+  name: "f"
+  start: root
+  nodes:
+    - id: root
+      type: interaction
+      announce: "?"
+      next: mid
+      failed: term
+    - id: mid
+      type: interaction
+      announce: "?"
+      next: leaf
+      failed: term
+    - id: leaf
+      type: hangup
+    - id: term
+      type: hangup
+`;
+
+  it('node đích của failed (terminal) nằm NGANG HÀNG node đầu tiên có failed vào + đẩy phải', async () => {
+    const ir = await layout(fromYaml(FAILED_TERM), { cs: true });
+    // term nhận failed từ root (tầng 0) và mid (tầng 1) -> ngang hàng root (nông nhất).
+    expect(posY(ir, 'term')).toBe(posY(ir, 'root'));
+    // Đẩy sang TRÁI (chấm failed bên trái), vượt qua cả root lẫn mid -> dây failed
+    // thoát trái vòng lên không vắt sang phải cắt node.
+    expect(centerX(ir, 'term')).toBeLessThan(centerX(ir, 'root'));
+    expect(centerX(ir, 'term')).toBeLessThan(centerX(ir, 'mid'));
   });
 });
 

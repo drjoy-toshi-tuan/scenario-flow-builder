@@ -65,10 +65,14 @@ function buildTree(
   outgoing: Map<string, FlowEdge[]>,
   nonFailedIncoming: Map<string, number>,
   visited: Set<string>,
+  exclude: Set<string>,
 ): TreeNode {
   visited.add(id);
   const node: TreeNode = { id, down: [], side: [], failedSlot: false };
-  const edges = outgoing.get(id) ?? [];
+  // `exclude`: các node KHÔNG dựng vào cây (màn CS: node đích failed là terminal — vd
+  // 代表案内/聴取失敗 — được xếp riêng ngang hàng nguồn ở airifyCs). Bỏ hẳn các cạnh tới
+  // chúng để cây KHÔNG chừa chỗ -> trục chính không bị lệch vì các "ngõ cụt" này.
+  const edges = (outgoing.get(id) ?? []).filter((e) => !exclude.has(e.target));
   // Đang trong chuỗi ngang mà chỉ có 1 lối ra -> tiếp tục chạy ngang; rẽ nhiều
   // nhánh thì quay về xếp dọc xuống dưới.
   const freshCount = edges.filter((e) => !visited.has(e.target)).length;
@@ -91,11 +95,11 @@ function buildTree(
   // giành (nếu duyệt dọc trước, con dưới đi sâu rồi kéo node ngang tụt xuống hàng dưới).
   for (const { edge } of classified.filter((c) => c.toSide)) {
     if (visited.has(edge.target)) continue;
-    node.side.push(buildTree(edge.target, 'side', outgoing, nonFailedIncoming, visited));
+    node.side.push(buildTree(edge.target, 'side', outgoing, nonFailedIncoming, visited, exclude));
   }
   for (const { edge } of classified.filter((c) => !c.wantSide)) {
     if (visited.has(edge.target)) continue;
-    node.down.push(buildTree(edge.target, 'down', outgoing, nonFailedIncoming, visited));
+    node.down.push(buildTree(edge.target, 'down', outgoing, nonFailedIncoming, visited, exclude));
   }
   const downIds = new Set(node.down.map((child) => child.id));
   node.failedSlot = edges.some(
@@ -205,7 +209,7 @@ export interface LayoutOpts {
 // ─────────────────────────────────────────────────────────────────────────────
 function airifyCs(laid: FlowIR, rawEdges: FlowEdge[]): FlowIR {
   const nodeIds = new Set(laid.nodes.map((n) => n.id));
-  const key = (s: string, t: string) => `${s} ${t}`;
+  const key = (s: string, t: string) => `${s}|${t}`;
   // Cạnh forward duy nhất (bỏ self-loop, node treo, và edge trùng source→target vd
   // next+failed cùng đích -> KHÔNG tính là 2 nhánh cha).
   const seenPair = new Set<string>();
@@ -217,9 +221,26 @@ function airifyCs(laid: FlowIR, rawEdges: FlowEdge[]): FlowIR {
     seenPair.add(k);
     edges.push(e);
   }
+  const isFailed = (e: FlowEdge) => (e.sourceHandle ?? '') === 'failed';
+  // adj cho DFS/rank tính CẢ cạnh failed: node đích của failed mà VẪN chạy tiếp (không
+  // phải terminal, vd FAQ不一致アナウンス) phải chìm xuống DƯỚI nguồn — không thành "root"
+  // nổi lên tầng 0. Riêng node đích của failed & là TERMINAL (代表案内/聴取失敗) tuy có
+  // rank nhưng được xếp lại ngang hàng nguồn ở pass cuối (loại khỏi cân đối bên dưới).
   const adj = new Map<string, string[]>();
   for (const id of nodeIds) adj.set(id, []);
   for (const e of edges) adj.get(e.source)!.push(e.target);
+  // Số cạnh RA (mọi loại) của từng node -> node không có cạnh ra = terminal (hangup).
+  const outAll = new Map<string, number>();
+  for (const id of nodeIds) outAll.set(id, 0);
+  for (const e of edges) outAll.set(e.source, (outAll.get(e.source) ?? 0) + 1);
+  // Nguồn của các nhánh failed trỏ VÀO từng node (để xếp node đích ngang hàng nguồn).
+  const failedInto = new Map<string, string[]>();
+  for (const e of edges)
+    if (isFailed(e)) {
+      const list = failedInto.get(e.target);
+      if (list) list.push(e.source);
+      else failedInto.set(e.target, [e.source]);
+    }
 
   // Back-edge (vòng lặp) = cạnh trỏ tới node đang nằm trên stack DFS. Thứ tự gốc như
   // buildTree: Start tổng hợp -> node không có dây vào -> phần còn lại.
@@ -265,10 +286,8 @@ function airifyCs(laid: FlowIR, rawEdges: FlowEdge[]): FlowIR {
       queue.push(id);
       depth.set(id, 0);
     }
-  const topo: string[] = [];
   while (queue.length) {
     const u = queue.shift()!;
-    topo.push(u);
     for (const v of fout.get(u)!) {
       depth.set(v, Math.max(depth.get(v) ?? 0, (depth.get(u) ?? 0) + 1));
       indeg.set(v, indeg.get(v)! - 1);
@@ -281,43 +300,58 @@ function airifyCs(laid: FlowIR, rawEdges: FlowEdge[]): FlowIR {
   for (const n of laid.nodes)
     pos.set(n.id, { x: n.position.x, y: (depth.get(n.id) ?? 0) * ROW_STEP });
 
-  // Con cháu forward của 1 node (để dịch cả đuôi khi căn giữa merge).
+  // Khe ngang tối thiểu giữa 2 node CÙNG HÀNG: node NẰM NGANG cần thoáng hơn hẳn khe dọc
+  // (node rộng 244 nên sát nhau nhìn rất chật) -> để rộng gấp ~2 lần khe dọc.
+  const SEP = NODE_WIDTH + LAYER_GAP * 2;
+
+  // Node ĐÍCH của nhánh failed & là terminal (không có cạnh ra, vd 代表案内 / 聴取失敗):
+  // sẽ xếp riêng ở pass cuối (ngang hàng nguồn) -> LOẠI khỏi cân đối/tách tầng bên dưới.
+  const failedTerminals = new Set<string>();
+  const topSourceOf = new Map<string, string>();
+  for (const [tgt, sources] of failedInto) {
+    if ((outAll.get(tgt) ?? 0) !== 0) continue; // chỉ terminal
+    let top = sources[0];
+    for (const s of sources) if ((depth.get(s) ?? 0) < (depth.get(top) ?? 0)) top = s;
+    failedTerminals.add(tgt);
+    topSourceOf.set(tgt, top);
+  }
+
+  const setX = (id: string, x: number) => pos.set(id, { x, y: pos.get(id)!.y });
+
+  // ── Căn giữa ĐUÔI HỢP LƯU (merge) theo tâm các nhánh cha ───────────────────
+  // GIỮ X của cây (đã toả nhánh RỘNG theo BRANCH_GAP + cột thẳng + đối xứng quanh cha).
+  // Cây đặt node hợp lưu dưới nhánh ĐẦU TIÊN chạm tới (lệch 1 bên); ở đây dịch cả CỤM
+  // ĐUÔI phía sau nó sang TÂM các nhánh cha để nằm chính giữa. Đuôi nằm DƯỚI mọi nhánh
+  // (rank longest-path) nên dịch ngang không đụng nhánh nào. Xử lý từ NÔNG tới SÂU.
   const descendants = (start: string): Set<string> => {
     const seen = new Set<string>([start]);
     const stack = [start];
     while (stack.length) {
       const u = stack.pop()!;
-      for (const v of fout.get(u)!)
-        if (!seen.has(v)) {
-          seen.add(v);
-          stack.push(v);
-        }
+      for (const v of fout.get(u)!) if (!seen.has(v)) { seen.add(v); stack.push(v); }
     }
     return seen;
   };
-  // Căn giữa các node MERGE theo tâm cha, xử lý từ NÔNG tới SÂU (cha trước con).
-  for (const m of topo) {
-    const preds = fpreds.get(m)!;
-    if (preds.length < 2) continue;
+  const byDepth = [...nodeIds].sort((a, b) => (depth.get(a) ?? 0) - (depth.get(b) ?? 0));
+  for (const m of byDepth) {
+    if (failedTerminals.has(m)) continue;
+    const preds = fpreds.get(m)!.filter((p) => !failedTerminals.has(p));
+    if (preds.length < 2) continue; // chỉ điểm hợp lưu (≥2 nhánh cha)
     const meanX = preds.reduce((s, p) => s + pos.get(p)!.x, 0) / preds.length;
     const delta = meanX - pos.get(m)!.x;
     if (Math.abs(delta) < 1) continue;
-    for (const id of descendants(m)) {
-      const p = pos.get(id)!;
-      pos.set(id, { x: p.x + delta, y: p.y });
-    }
+    for (const id of descendants(m)) if (!failedTerminals.has(id)) setX(id, pos.get(id)!.x + delta);
   }
 
-  // Tách các node CÙNG TẦNG (cùng Y) để KHÔNG đè nhau: sau khi chìm merge + căn giữa,
-  // vài node (nhất là terminal) có thể rơi vào cùng tầng ở cùng vùng X. Sort theo X,
-  // đẩy phải cho đủ khe, rồi dịch cả tầng lại để GIỮ TÂM (không lệch hẳn 1 phía).
-  const SEP = NODE_WIDTH + 56; // khoảng cách tâm–tâm tối thiểu trong 1 tầng
+  // Tách node CÙNG TẦNG cho không đè nhau (giữ thứ tự trái→phải + giữ tâm tầng). Nhánh
+  // của cây đã cách nhau ≥ BRANCH_GAP nên bước này chỉ nới các node bị chìm về chung tầng.
   const byLayer = new Map<number, string[]>();
   for (const [id, p] of pos) {
-    const layer = Math.round(p.y / ROW_STEP);
-    const list = byLayer.get(layer);
+    if (failedTerminals.has(id)) continue;
+    const L = Math.round(p.y / ROW_STEP);
+    const list = byLayer.get(L);
     if (list) list.push(id);
-    else byLayer.set(layer, [id]);
+    else byLayer.set(L, [id]);
   }
   for (const ids of byLayer.values()) {
     if (ids.length < 2) continue;
@@ -325,14 +359,63 @@ function airifyCs(laid: FlowIR, rawEdges: FlowEdge[]): FlowIR {
     const before = ids.reduce((s, id) => s + pos.get(id)!.x, 0) / ids.length;
     for (let i = 1; i < ids.length; i++) {
       const prev = pos.get(ids[i - 1])!.x;
-      const cur = pos.get(ids[i])!;
-      if (cur.x < prev + SEP) pos.set(ids[i], { x: prev + SEP, y: cur.y });
+      if (pos.get(ids[i])!.x < prev + SEP) setX(ids[i], prev + SEP);
     }
     const after = ids.reduce((s, id) => s + pos.get(id)!.x, 0) / ids.length;
-    const shift = before - after; // giữ tâm tầng như trước khi đẩy
-    if (Math.abs(shift) >= 1) for (const id of ids) {
-      const p = pos.get(id)!;
-      pos.set(id, { x: p.x + shift, y: p.y });
+    const shift = before - after;
+    if (Math.abs(shift) >= 1) for (const id of ids) setX(id, pos.get(id)!.x + shift);
+  }
+
+  // ── Thẳng CỘT các chuỗi tuyến tính ─────────────────────────────────────────
+  // Sau tách tầng, 1 node có thể lệch khỏi cha (vd 質問 bị đẩy để né 残薬不足案内 nhưng
+  // 氏名/生年月日… ở dưới thì không). Node có ĐÚNG 1 cha forward -> kéo về đúng cột cha
+  // NẾU hàng của nó còn trống chỗ đó -> đuôi & mọi chuỗi nối tiếp thành cột dọc thẳng.
+  for (const id of byDepth) {
+    if (failedTerminals.has(id)) continue;
+    const preds = fpreds.get(id)!.filter((p) => !failedTerminals.has(p));
+    if (preds.length !== 1) continue;
+    const px = pos.get(preds[0])!.x;
+    if (Math.abs(px - pos.get(id)!.x) < 1) continue;
+    const row = Math.round(pos.get(id)!.y / ROW_STEP);
+    let conflict = false;
+    for (const [oid, op] of pos) {
+      if (oid === id || failedTerminals.has(oid)) continue;
+      if (Math.round(op.y / ROW_STEP) === row && Math.abs(op.x - px) < SEP) {
+        conflict = true;
+        break;
+      }
+    }
+    if (!conflict) setX(id, px);
+  }
+
+  // ── Xếp node ĐÍCH của failed (terminal) ─────────────────────────────────────
+  // Chấm output của nhánh failed nằm BÊN TRÁI node -> node đích của failed cũng đặt
+  // BÊN TRÁI: NGANG HÀNG (cùng Y) với node ĐẦU TIÊN (nông nhất) có failed đi vào, và
+  // đẩy ra phía NGOÀI bên TRÁI — vượt qua mọi node cùng hàng LẪN các node cha failed
+  // nằm dưới — để dây failed (thoát trái, vòng lên bên trái) KHÔNG vắt sang phải cắt
+  // chéo node/nhánh khác. Nhiều terminal cùng hàng xếp chồng dần ra trái.
+  const termsByRow = new Map<number, string[]>();
+  for (const t of failedTerminals) {
+    const row = Math.round(pos.get(topSourceOf.get(t)!)!.y / ROW_STEP);
+    pos.set(t, { x: pos.get(t)?.x ?? 0, y: row * ROW_STEP });
+    const list = termsByRow.get(row);
+    if (list) list.push(t);
+    else termsByRow.set(row, [t]);
+  }
+  for (const [row, terms] of termsByRow) {
+    let leftmost = Infinity;
+    for (const [id, p] of pos) {
+      if (failedTerminals.has(id)) continue;
+      if (Math.round(p.y / ROW_STEP) === row) leftmost = Math.min(leftmost, p.x);
+    }
+    if (!Number.isFinite(leftmost)) leftmost = 0;
+    // Xếp theo độ nông của nguồn (ổn định) rồi đẩy dần ra TRÁI.
+    terms.sort((a, b) => (depth.get(topSourceOf.get(a)!) ?? 0) - (depth.get(topSourceOf.get(b)!) ?? 0));
+    let x = leftmost;
+    for (const t of terms) {
+      const srcMinX = Math.min(...(failedInto.get(t)!.map((s) => pos.get(s)!.x)));
+      x = Math.min(x, srcMinX) - SEP;
+      pos.set(t, { x, y: pos.get(t)!.y });
     }
   }
 
@@ -364,6 +447,20 @@ export async function layout(ir: FlowIR, opts?: LayoutOpts): Promise<FlowIR> {
     }
   }
 
+  // Màn CS: node ĐÍCH của nhánh failed & là TERMINAL (không có cạnh ra — vd 代表案内 /
+  // 聴取失敗) KHÔNG dựng vào cây (airifyCs xếp riêng, ngang hàng nguồn). Loại khỏi cây để
+  // cây không chừa chỗ cho các "ngõ cụt" này -> mạch chính thẳng trục, cân đối.
+  const excludeFromTree = new Set<string>();
+  if (opts?.cs) {
+    const hasOut = new Set<string>();
+    for (const [src, list] of outgoing) if (list.some((e) => e.target !== src)) hasOut.add(src);
+    for (const edge of ir.edges) {
+      if ((edge.sourceHandle ?? '') !== 'failed') continue;
+      if (!nodeIds.has(edge.target)) continue;
+      if (!hasOut.has(edge.target)) excludeFromTree.add(edge.target);
+    }
+  }
+
   // Thứ tự chọn gốc cây: node Start tổng hợp -> node không có dây vào -> phần còn
   // lại (cụm toàn vòng lặp), giữ nguyên thứ tự khai báo trong IR.
   const rootCandidates = [
@@ -376,8 +473,8 @@ export async function layout(ir: FlowIR, opts?: LayoutOpts): Promise<FlowIR> {
   const positions = new Map<string, { x: number; y: number }>();
   let offsetX = 0; // mép trái dành cho cụm (component) tiếp theo
   for (const candidate of rootCandidates) {
-    if (visited.has(candidate.id)) continue;
-    const tree = buildTree(candidate.id, 'down', outgoing, nonFailedIncoming, visited);
+    if (visited.has(candidate.id) || excludeFromTree.has(candidate.id)) continue;
+    const tree = buildTree(candidate.id, 'down', outgoing, nonFailedIncoming, visited, excludeFromTree);
     const sub = layoutSubtree(tree);
 
     let minX = Infinity;
