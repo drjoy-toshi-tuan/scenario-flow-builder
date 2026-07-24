@@ -105,7 +105,7 @@ describe('irToReactFlow — stamp điều kiện màn CS', () => {
     expect((edges[0].data as RFEdgeData).alwaysLabel).toBe(false);
   });
 
-  it('nhiều stamp chập về 1 đích -> stagger dọc so le, không trùng nhau', () => {
+  it('nhiều stamp chập về 1 đích -> mỗi dây vẫn có nhãn (neo sát output nguồn, không stagger)', () => {
     const doc = ir(
       [node('h1', 'interaction'), node('h2', 'interaction'), node('end', 'hangup')],
       [
@@ -114,13 +114,12 @@ describe('irToReactFlow — stamp điều kiện màn CS', () => {
       ],
     );
     const { edges } = irToReactFlow(doc, { cs: true });
-    const s1 = (edges[0].data as RFEdgeData).labelStagger;
-    const s2 = (edges[1].data as RFEdgeData).labelStagger;
-    expect(s1).toBeDefined();
-    expect(s2).toBeDefined();
-    expect(s1!.y).not.toBe(s2!.y);
-    // So le quanh tâm: tổng độ lệch = 0 (không kéo cả cụm lệch hẳn 1 phía).
-    expect(s1!.y + s2!.y).toBe(0);
+    // Cả 2 dây failed vẫn có stamp 失敗 luôn hiện.
+    expect((edges[0].data as RFEdgeData).alwaysLabel).toBe(true);
+    expect((edges[1].data as RFEdgeData).alwaysLabel).toBe(true);
+    // Không còn stagger: nhãn neo sát chấm output từng node (xem DeletableEdge.labelAnchor).
+    expect((edges[0].data as RFEdgeData).labelStagger).toBeUndefined();
+    expect((edges[1].data as RFEdgeData).labelStagger).toBeUndefined();
   });
 
   it('offset stamp người dùng kéo (data.labelOffsets[handle]) truyền xuống edge', () => {

@@ -37,6 +37,7 @@ const LOOP_LANE = 44; // làn dọc cách mép ngoài node (khi phải vòng RA 
 const LOOP_GAP = 22; // đệm trên/dưới node trước khi rẽ ngang
 const LOOP_RADIUS = 14; // bo góc gấp khúc (khớp smooth-step)
 const LANE_MIN_GAP = 28; // khe ngang tối thiểu giữa 2 node để luồn dây VÀO GIỮA khe
+const LABEL_DROP = 22; // nhãn điều kiện đặt cách chấm output nguồn ~22px (sát nhưng không dính)
 
 interface Point {
   x: number;
@@ -123,7 +124,22 @@ function nearestPointOnPath(path: SVGPathElement, pt: Point): Point {
   return best;
 }
 
-// Điểm ở giữa (theo độ dài cung) của đường gấp khúc — để đặt nhãn/nút xoá.
+// Neo NHÃN điều kiện: đặt trên đoạn ĐẦU TIÊN (từ chấm output nguồn đi ra), cách
+// nguồn LABEL_DROP px. Ưu điểm so với đặt ở giữa dây:
+//   - Bám node NGUỒN -> không "xô dịch" khi di chuyển node đích / nhiều node.
+//   - Sát chấm output (trực quan cho biết nhánh nào), nằm ở đoạn CHỈ có dây này
+//     (trước điểm hội tụ) nên không đè nhãn/dây khác.
+//   - Ở khe ngay dưới node nguồn -> không rơi trúng node khác sau auto-layout.
+function labelAnchor(points: Point[]): Point {
+  const a = points[0];
+  const b = points[1] ?? points[0];
+  const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+  if (segLen < 1) return a;
+  const d = Math.min(LABEL_DROP, segLen / 2);
+  return { x: a.x + ((b.x - a.x) / segLen) * d, y: a.y + ((b.y - a.y) / segLen) * d };
+}
+
+// Điểm ở giữa (theo độ dài cung) của đường gấp khúc — để đặt nút xoá (dây không nhãn).
 function midpointOf(points: Point[]): Point {
   let total = 0;
   for (let i = 1; i < points.length; i++) {
@@ -285,7 +301,9 @@ export function DeletableEdge({
   const offsetY = midPreview ?? savedShapeY;
 
   // ── Stamp điều kiện kéo được (GHIM trên dây) ────────────────────────────────
-  const stagger = edgeData?.labelStagger ?? { x: 0, y: 0 };
+  // Neo nhãn theo chấm output nguồn đã tách sẵn từng stamp (mỗi nhãn ở 1 output
+  // riêng) nên KHÔNG cần stagger chống chồng theo điểm hội tụ nữa.
+  const stagger = { x: 0, y: 0 };
   const savedOffset = edgeData?.labelOffset ?? { x: 0, y: 0 };
   const labelDragging = useRef(false);
   const latestOffset = useRef<Point | null>(null);
@@ -346,9 +364,11 @@ export function DeletableEdge({
     ) ?? computeDown(sourceX, sourceY, targetX, targetY, offsetY);
 
   const edgePath = roundedOrthogonalPath(route.points, LOOP_RADIUS);
-  const mid = midpointOf(route.points);
-  const labelX = mid.x;
-  const labelY = mid.y;
+  // Dây CÓ nhãn (stamp điều kiện) -> neo sát chấm output nguồn (ổn định, không đè
+  // node/điểm hội tụ). Dây KHÔNG nhãn -> nút xoá đặt giữa dây cho dễ trỏ.
+  const anchor = hasLabel ? labelAnchor(route.points) : midpointOf(route.points);
+  const labelX = anchor.x;
+  const labelY = anchor.y;
   const hMid = route.hMid;
 
   const onMidPointerDown = (e: ReactPointerEvent<SVGLineElement>) => {

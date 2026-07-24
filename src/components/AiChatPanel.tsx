@@ -136,9 +136,9 @@ function MessageRow({ msg, picture, name }: { msg: ChatMsg; picture?: string; na
   if (msg.role === 'system') {
     // Divider hệ thống: canh giữa, chữ xám (contrast 2 theme), format "— nội dung —".
     return (
-      <div className="flex items-center gap-2 py-0.5 text-[11px] font-semibold text-[var(--bk-text-faint)]">
+      <div className="flex items-center gap-2.5 py-0.5 text-[11px] font-semibold text-[var(--bk-text-faint)]">
         <span className="h-px flex-1 bg-[var(--bk-border)]" />
-        <span className="shrink-0">— {msg.text} —</span>
+        <span className="shrink-0">{msg.text}</span>
         <span className="h-px flex-1 bg-[var(--bk-border)]" />
       </div>
     );

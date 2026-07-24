@@ -27,9 +27,6 @@ export interface RFEdgeData {
   // Độ lệch nhãn do NGƯỜI DÙNG kéo stamp (lưu ở node nguồn data.labelOffsets[handle],
   // round-trip qua YAML) — cộng vào vị trí mặc định giữa dây.
   labelOffset?: { x: number; y: number };
-  // Độ lệch CHỐNG CHỒNG nhãn tự tính khi nhiều dây (từ nhiều node) cùng chập về
-  // 1 đích — xếp so le dọc để các stamp điều kiện không đè lên nhau.
-  labelStagger?: { x: number; y: number };
   // Waypoint người dùng kéo để nắn dây (lưu ở node nguồn data.edgeShapes[handle]).
   edgeShape?: { x: number; y: number };
   [key: string]: unknown;
@@ -169,29 +166,9 @@ export function irToReactFlow(ir: FlowIR, opts?: { cs?: boolean }): { nodes: Nod
     };
   });
 
-  // CS: nhiều dây (từ nhiều node) chập về CÙNG 1 đích -> các stamp luôn-hiện dễ đè
-  // lên nhau quanh điểm hội tụ. Xếp so le dọc quanh tâm (bước 22px) làm vị trí MẶC
-  // ĐỊNH; người dùng vẫn kéo từng stamp để tự sắp (labelOffset cộng thêm).
-  if (cs) {
-    const byTarget = new Map<string, Edge[]>();
-    for (const edge of edges) {
-      const d = edge.data as RFEdgeData;
-      if (d.alwaysLabel && edge.label != null) {
-        const list = byTarget.get(edge.target) ?? [];
-        list.push(edge);
-        byTarget.set(edge.target, list);
-      }
-    }
-    for (const list of byTarget.values()) {
-      if (list.length < 2) continue;
-      list.forEach((edge, i) => {
-        (edge.data as RFEdgeData).labelStagger = {
-          x: 0,
-          y: i * 22 - ((list.length - 1) * 22) / 2,
-        };
-      });
-    }
-  }
+  // Nhãn điều kiện được neo SÁT chấm output nguồn (xem DeletableEdge.labelAnchor):
+  // mỗi stamp ở 1 output riêng nên không còn chồng nhau quanh điểm hội tụ -> bỏ hẳn
+  // bước "stagger so le" trước đây (từng cần khi nhãn đặt ở giữa dây).
 
   return { nodes, edges };
 }
