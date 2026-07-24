@@ -59,13 +59,6 @@ function errorKeyOf(e: unknown): string {
   return 'aiErrCall';
 }
 
-// Tên flow đang mở (main / tên sub flow) — cho digest & divider.
-function activeFlowName(): string {
-  const { ir, activeFlowId } = useFlowStore.getState();
-  if (activeFlowId === 'main') return 'Main Flow';
-  return (ir?.subflows ?? []).find((s) => s.id === activeFlowId)?.name ?? activeFlowId;
-}
-
 export const useAiChatStore = create<AiChatState>((set, get) => {
   const patchMsg = (id: string, patch: Partial<ChatMsg>) =>
     set({ messages: get().messages.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
@@ -121,11 +114,14 @@ export const useAiChatStore = create<AiChatState>((set, get) => {
         .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.text }));
 
       // Bối cảnh RIÊNG theo màn đang mở (spec + context + tool khác nhau mỗi màn).
+      // Dùng assembleDoc() để AI thấy CẢ sub flow (main + mọi sub, bản sửa hiện tại),
+      // không chỉ flow đang mở — tránh "mù" node ở sub flow khác.
+      const doc = useFlowStore.getState().assembleDoc() ?? ir;
       const screen = buildScreenContext(
         useWorkspaceStore.getState().mode,
         useFlowStore.getState().canvasTab,
-        ir,
-        activeFlowName(),
+        doc,
+        useFlowStore.getState().activeFlowId,
       );
       const msgs = buildChatMessages(screen.spec, screen.context, screen.screenName, history);
 

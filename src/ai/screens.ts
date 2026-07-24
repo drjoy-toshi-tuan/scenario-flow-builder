@@ -35,7 +35,8 @@ RULES:
 - Give every new node a unique "ref" in add_node and reuse it as source/target in add_edge.
 - ALWAYS wire new nodes into the flow with add_edge; never leave nodes unconnected.
 - Decompose multi-step requests into multiple tool calls (several nodes + edges in one turn).
-- Never touch the start node; positions are automatic.`;
+- Never touch the start node; positions are automatic.
+- You may only edit the OPEN flow. Nodes listed under "OTHER FLOWS" are read-only here; if the user asks to change one, name the flow it lives in and tell them to open that flow first.`;
   const modeNote =
     mode === 'cs'
       ? `\nCS SCREEN NOTE: This is the CS design view. Node labels/wording are Japanese and polite (敬語). Branch conditions on 分岐ロジック are business-friendly; keep labels short and in Japanese.`
@@ -43,7 +44,9 @@ RULES:
   return base + modeNote;
 }
 
-const ANNOUNCE_SPEC = `SCREEN: Announce List — manages only the SPOKEN WORDING of the flow. You can ONLY edit wording of EXISTING nodes via update_node (announce node → data.text, interaction node → data.announce). Keep caller-facing Japanese natural and polite (敬語). Do NOT add or remove nodes, and do NOT change flow structure on this screen — if the user asks for that, tell them to use the Flow Diagram screen.`;
+const ANNOUNCE_SPEC = `SCREEN: Announce List — manages only the SPOKEN WORDING of the flow. You can ONLY edit wording of EXISTING nodes via update_node (announce node → data.text, interaction node → data.announce). Keep caller-facing Japanese natural and polite (敬語). Do NOT add or remove nodes, and do NOT change flow structure on this screen — if the user asks for that, tell them to use the Flow Diagram screen.
+- Nodes are listed per flow. You may only edit nodes in the OPEN flow; for nodes in another flow, tell the user to open that flow first.
+- "(empty)" marks a node whose wording is blank. When asked to fill blanks, fill every "(empty)" node in the OPEN flow with natural 敬語 that fits its role in the flow.`;
 
 const GENERAL_SPEC = `SCREEN: General Settings — scenario-wide settings: representative/direct phone, 050 numbers (master/demo), SMS number, working days & hours, rest period, silent-detection seconds, no-answer timeout. No editing tools are available on this screen; help the user by reading/advising and, if they want to change a value, tell them to edit it on this General Settings form.`;
 
@@ -62,12 +65,29 @@ function clip(v: unknown, max = 140): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
-// Announce List: chỉ node announce/interaction của flow đang mở (id để update_node).
-function announceContext(ir: FlowIR): string {
-  const rows = ir.nodes
-    .filter((n) => n.type === 'announce' || n.type === 'interaction')
-    .map((n) => `- ${n.id} [${n.type}] "${n.label}" :: ${clip(announceTextOf(n)) || '(empty)'}`);
-  return `ANNOUNCE / INTERACTION NODES (open flow):\n${rows.length ? rows.join('\n') : '- (none)'}`;
+// Tên flow đang mở (main / tên sub flow) suy từ doc + activeFlowId.
+function openFlowName(doc: FlowIR, activeFlowId: string): string {
+  if (activeFlowId === 'main') return 'Main Flow';
+  return (doc.subflows ?? []).find((s) => s.id === activeFlowId)?.name ?? 'Main Flow';
+}
+
+// Announce List: node announce/interaction của MỌI flow (nhóm theo flow), kèm id để
+// update_node. Đánh dấu flow đang mở (sửa được) vs flow khác (mở mới sửa được).
+function announceContext(doc: FlowIR, activeFlowId: string): string {
+  const flows = [
+    { id: 'main', name: 'Main Flow', nodes: doc.nodes },
+    ...(doc.subflows ?? []).map((s) => ({ id: s.id, name: s.name, nodes: s.nodes })),
+  ];
+  const blocks: string[] = [];
+  for (const f of flows) {
+    const rows = f.nodes
+      .filter((n) => n.type === 'announce' || n.type === 'interaction')
+      .map((n) => `- ${n.id} [${n.type}] "${n.label}" :: ${clip(announceTextOf(n)) || '(empty)'}`);
+    if (!rows.length) continue;
+    const mark = f.id === activeFlowId ? ' (OPEN — editable)' : ' (open this flow to edit)';
+    blocks.push(`FLOW "${f.name}"${mark}:\n${rows.join('\n')}`);
+  }
+  return `ANNOUNCE / INTERACTION NODES (all flows):\n${blocks.length ? blocks.join('\n\n') : '- (none)'}`;
 }
 
 function daysSummary(s: ScenarioSettings): string {
@@ -107,41 +127,43 @@ function synonymContext(ir: FlowIR, kind: 'clinicalDept' | 'courseList'): string
 }
 
 // ── Điều phối: (mode, tab) -> bối cảnh màn ───────────────────────────────────
+// doc: tài liệu ĐẦY ĐỦ (assembleDoc — main + mọi sub flow); activeFlowId: flow đang mở.
 export function buildScreenContext(
   mode: WorkMode,
   canvasTab: string,
-  ir: FlowIR,
-  flowName: string,
+  doc: FlowIR,
+  activeFlowId: string,
 ): ScreenContext {
+  const flowName = openFlowName(doc, activeFlowId);
   // TS: chỉ có Flow Designer (canvas).
   if (mode === 'ts') {
     return {
       screenName: `TS screen · Flow Designer · ${flowName}`,
       spec: flowSpec('ts'),
-      context: buildFlowDigest(ir, flowName),
+      context: buildFlowDigest(doc, activeFlowId),
       tools: FLOW_TOOLS,
     };
   }
   // CS: theo tab.
   switch (canvasTab) {
     case 'announce':
-      return { screenName: 'CS screen · Announce List', spec: ANNOUNCE_SPEC, context: announceContext(ir), tools: ANNOUNCE_TOOLS };
+      return { screenName: 'CS screen · Announce List', spec: ANNOUNCE_SPEC, context: announceContext(doc, activeFlowId), tools: ANNOUNCE_TOOLS };
     case 'general':
-      return { screenName: 'CS screen · General Settings', spec: GENERAL_SPEC, context: generalContext(ir), tools: [] };
+      return { screenName: 'CS screen · General Settings', spec: GENERAL_SPEC, context: generalContext(doc), tools: [] };
     case 'status':
-      return { screenName: 'CS screen · Status Settings', spec: STATUS_SPEC, context: statusContext(ir), tools: [] };
+      return { screenName: 'CS screen · Status Settings', spec: STATUS_SPEC, context: statusContext(doc), tools: [] };
     case 'clinicalDept':
       return {
         screenName: 'CS screen · Clinical Department List',
         spec: synonymSpec('clinicalDept'),
-        context: synonymContext(ir, 'clinicalDept'),
+        context: synonymContext(doc, 'clinicalDept'),
         tools: [],
       };
     case 'courseList':
       return {
         screenName: 'CS screen · Course List',
         spec: synonymSpec('courseList'),
-        context: synonymContext(ir, 'courseList'),
+        context: synonymContext(doc, 'courseList'),
         tools: [],
       };
     case 'flow':
@@ -149,7 +171,7 @@ export function buildScreenContext(
       return {
         screenName: `CS screen · Flow Diagram · ${flowName}`,
         spec: flowSpec('cs'),
-        context: buildFlowDigest(ir, flowName),
+        context: buildFlowDigest(doc, activeFlowId),
         tools: FLOW_TOOLS,
       };
   }

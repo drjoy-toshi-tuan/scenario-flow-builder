@@ -1,72 +1,107 @@
 import type { FlowIR, FlowNode, FlowEdge } from '../ir/types';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// "Flow digest" — biểu diễn GỌN của flow đang mở để gửi cho AI (memory ảo).
-// Thay vì nhét cả YAML dài dòng, chỉ tóm tắt: danh sách node (id · type · label ·
-// nội dung chính) + danh sách dây (nguồn → đích [handle/điều kiện]). Ít token hơn
-// YAML nhiều lần mà vẫn đủ để AI hiểu cấu trúc và tham chiếu node theo id.
+// "Flow digest" — biểu diễn GỌN của TOÀN BỘ kịch bản (main + mọi sub flow) để gửi
+// cho AI. Trước đây chỉ digest flow đang mở nên AI "mù" các node ở sub flow khác
+// (vd 聴取失敗 nằm ở sub flow không mở -> AI tưởng không có, không xử lý được).
 //
-// Hàm THUẦN (không React). buildFlowDigest tính lại rẻ; caller có thể memoize theo
-// version IR nếu cần.
+// Chiến lược token: FLOW ĐANG MỞ digest ĐẦY ĐỦ (node + brief + dây) vì đó là thứ
+// AI được sửa; các FLOW KHÁC chỉ liệt kê node (id · type · label · trạng thái điền)
+// để AI BIẾT node tồn tại ở đâu và chỉ người dùng mở đúng flow — KHÔNG bung dây.
+//
+// Hàm THUẦN (không React). Nhận "doc" đầy đủ (từ assembleDoc) + activeFlowId.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_TEXT = 120; // cắt bớt announce/prompt/script dài cho gọn token
 
-function clip(v: unknown): string {
-  if (typeof v !== 'string') return '';
+function clip(v: string): string {
   const s = v.replace(/\s+/g, ' ').trim();
   return s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}…` : s;
 }
 
-// Nội dung "chính" của 1 node theo loại — chỉ field đáng để AI biết.
-function nodeBrief(n: FlowNode): string {
+// Nội dung "chính" của 1 node theo loại:
+//   null  = loại node KHÔNG có field văn bản chính (nexus/save/hangup/start) -> không hiện ::
+//   ''    = CÓ field nhưng đang TRỐNG -> hiện "(empty)" (tín hiệu để AI điền)
+//   chuỗi = nội dung (đã clip)
+function primaryText(n: FlowNode): string | null {
   const d = n.data ?? {};
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   switch (n.type) {
     case 'announce':
-      return clip(d.text);
+      return str(d.text);
     case 'interaction':
-      return clip(d.announce);
+      return str(d.announce);
     case 'openai':
-      return clip(d.prompt);
+      return str(d.prompt);
     case 'logic':
     case 'classifier':
     case 'normalization':
-      return clip((d.moduleType as string) || (d.script as string) || (d.description as string));
+      return str(d.moduleType || d.script || d.description);
     case 'jump':
-      return typeof d.subflow === 'string' ? `→ ${d.subflow}` : '';
+      return typeof d.subflow === 'string' && d.subflow ? `→ ${d.subflow}` : '';
     case 'transfer':
-      return clip(d.number || d.destination);
+      return str(d.number || d.destination);
     default:
-      return '';
+      return null; // nexus / save / hangup / start
   }
 }
 
-function digestGraph(nodes: FlowNode[], edges: FlowEdge[]): string {
-  const lines: string[] = [];
-  lines.push('NODES:');
-  for (const n of nodes) {
-    const brief = nodeBrief(n);
-    lines.push(`- ${n.id} [${n.type}] "${n.label}"${brief ? ` :: ${brief}` : ''}`);
-  }
-  lines.push('EDGES:');
-  if (edges.length === 0) lines.push('- (none)');
-  for (const e of edges) {
-    const parts: string[] = [];
-    if (e.sourceHandle) parts.push(`handle=${e.sourceHandle}`);
-    if (e.condition) parts.push(`cond=${clip(e.condition)}`);
-    const meta = parts.length ? ` (${parts.join(', ')})` : '';
-    lines.push(`- ${e.source} -> ${e.target}${meta}`);
-  }
-  return lines.join('\n');
+function nodeLine(n: FlowNode): string {
+  const pt = primaryText(n);
+  const brief = pt === null ? '' : pt === '' ? ' :: (empty)' : ` :: ${clip(pt)}`;
+  return `- ${n.id} [${n.type}] "${n.label}"${brief}`;
 }
 
-// Digest của flow ĐANG MỞ (ir.nodes/edges = graph active). Kèm tên flow + danh sách
-// tên sub flow để AI biết bối cảnh (node Jump trỏ theo tên).
-export function buildFlowDigest(ir: FlowIR, activeFlowName: string): string {
-  const head: string[] = [];
-  head.push(`SCENARIO: ${ir.meta.name}${ir.meta.facility ? ` (facility: ${ir.meta.facility})` : ''}`);
-  head.push(`OPEN FLOW: ${activeFlowName}`);
-  const subNames = (ir.subflows ?? []).map((s) => s.name).filter(Boolean);
-  if (subNames.length) head.push(`SUB FLOWS: ${subNames.join(', ')}`);
-  return `${head.join('\n')}\n\n${digestGraph(ir.nodes, ir.edges)}`;
+function edgeLine(e: FlowEdge): string {
+  const parts: string[] = [];
+  if (e.sourceHandle) parts.push(`handle=${e.sourceHandle}`);
+  if (e.condition) parts.push(`cond=${clip(e.condition)}`);
+  const meta = parts.length ? ` (${parts.join(', ')})` : '';
+  return `- ${e.source} -> ${e.target}${meta}`;
+}
+
+interface FlowGraph {
+  id: string;
+  name: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
+// Gom main + tất cả sub flow thành danh sách phẳng (doc = kết quả assembleDoc).
+function allFlows(doc: FlowIR): FlowGraph[] {
+  return [
+    { id: 'main', name: 'Main Flow', nodes: doc.nodes, edges: doc.edges },
+    ...(doc.subflows ?? []).map((s) => ({ id: s.id, name: s.name, nodes: s.nodes, edges: s.edges })),
+  ];
+}
+
+// Digest toàn kịch bản. doc: tài liệu đầy đủ (assembleDoc); activeFlowId: flow đang mở.
+export function buildFlowDigest(doc: FlowIR, activeFlowId: string): string {
+  const flows = allFlows(doc);
+  const open = flows.find((f) => f.id === activeFlowId) ?? flows[0];
+  const others = flows.filter((f) => f !== open);
+
+  const out: string[] = [];
+  out.push(`SCENARIO: ${doc.meta.name}${doc.meta.facility ? ` (facility: ${doc.meta.facility})` : ''}`);
+  out.push(`OPEN FLOW: ${open.name}`);
+  out.push(`ALL FLOWS: ${flows.map((f) => f.name).join(', ')}`);
+  out.push('');
+
+  // Flow đang mở — đầy đủ (đây là flow AI được sửa).
+  out.push(`OPEN FLOW "${open.name}" — NODES:`);
+  for (const n of open.nodes) out.push(nodeLine(n));
+  out.push('EDGES:');
+  if (open.edges.length === 0) out.push('- (none)');
+  for (const e of open.edges) out.push(edgeLine(e));
+
+  // Các flow khác — chỉ liệt kê node để AI biết chúng tồn tại. Muốn sửa phải mở flow đó.
+  if (others.length) {
+    out.push('');
+    out.push('OTHER FLOWS (read-only here — to edit a node in one, tell the user to open that flow first):');
+    for (const f of others) {
+      out.push(`FLOW "${f.name}":`);
+      for (const n of f.nodes) out.push(nodeLine(n));
+    }
+  }
+  return out.join('\n');
 }
