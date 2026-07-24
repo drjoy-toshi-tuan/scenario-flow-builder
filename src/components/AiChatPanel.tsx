@@ -7,6 +7,7 @@ import { useT, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { AiSparkleIcon } from './AiSparkleIcon';
 import { describeOp, type EditOp, type OpKind } from '../ai/editOps';
+import { validateFlow } from '../ir/validate';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Panel AI Chat — dock bên phải canvas (dùng chung CS/TS). Trò chuyện để sửa flow
@@ -66,6 +67,9 @@ function OpsCard({ msg }: { msg: ChatMsg }) {
   const labelOf = (ref: string) =>
     ir?.nodes.find((n) => n.id === ref)?.label ?? tempLabels.get(ref) ?? ref;
 
+  // Số op XOÁ trong lô — để cảnh báo nổi bật (AI đôi khi xoá node ngoài yêu cầu).
+  const removeCount = ops.filter((op) => describeOp(op, labelOf).kind === 'remove').length;
+
   return (
     <div className="mt-2 overflow-hidden rounded-xl border border-[var(--bk-border)] bg-[var(--bk-surface)]">
       <div
@@ -92,6 +96,14 @@ function OpsCard({ msg }: { msg: ChatMsg }) {
           );
         })}
       </div>
+      {msg.opsState === 'pending' && removeCount > 0 && (
+        <div
+          className="border-t border-[var(--bk-border)] px-3 py-2 text-[11px] font-bold"
+          style={{ color: '#ef4444', background: 'rgba(239,68,68,.08)' }}
+        >
+          {t('aiChatDeleteWarn', { n: removeCount })}
+        </div>
+      )}
       {msg.opsState === 'pending' ? (
         <div className="flex gap-2 border-t border-[var(--bk-border)] px-3 py-2.5">
           <button
@@ -203,6 +215,7 @@ export function AiChatPanel() {
 
   const mode = useWorkspaceStore((s) => s.mode);
   const canvasTab = useFlowStore((s) => s.canvasTab);
+  const ir = useFlowStore((s) => s.ir);
   const activeFlowId = useFlowStore((s) => s.activeFlowId);
   const scenarioId = useFlowStore((s) => s.ir?.meta.id);
   const subName = useFlowStore((s) => s.ir?.subflows?.find((sf) => sf.id === s.activeFlowId)?.name);
@@ -271,6 +284,9 @@ export function AiChatPanel() {
 
   if (!open) return null;
 
+  // Cảnh báo (KHÔNG chặn) số chỗ chưa nối dây của flow đang mở — nhắc user/AI vá.
+  const wiringCount = ir ? validateFlow(ir.nodes, ir.edges).length : 0;
+
   const submit = () => {
     const text = input.trim();
     if (!text || busy) return;
@@ -329,6 +345,16 @@ export function AiChatPanel() {
           </div>
         )}
       </div>
+
+      {/* Cảnh báo còn hở dây (chỉ hiện khi có; không chặn thao tác). */}
+      {wiringCount > 0 && (
+        <div
+          className="shrink-0 border-t border-[var(--bk-border)] px-4 py-2 text-[11.5px] font-semibold"
+          style={{ color: '#d97706', background: 'rgba(217,119,6,.10)' }}
+        >
+          {t('aiChatWiringWarn', { n: wiringCount })}
+        </div>
+      )}
 
       {/* Ô nhập */}
       <div className="shrink-0 border-t border-[var(--bk-border)] px-3.5 pb-2 pt-2.5">

@@ -53,7 +53,8 @@ RULES:
 - ALWAYS wire new nodes into the flow with add_edge; never leave nodes unconnected.
 - Decompose multi-step requests into multiple tool calls (several nodes + edges in one turn).
 - Never touch the start node; positions are automatic.
-- You may only edit the OPEN flow. Nodes listed under "OTHER FLOWS" are read-only here; if the user asks to change one, name the flow it lives in and tell them to open that flow first.`;
+- You may only edit the OPEN flow. Nodes listed under "OTHER FLOWS" are read-only here; if the user asks to change one, name the flow it lives in and tell them to open that flow first.
+- Make the MINIMAL change the user asked for. Only remove a node or edge when the user explicitly asked to delete it. For edit/rename/reword/reconnect requests, NEVER remove unrelated nodes or edges — change only what was asked and leave everything else intact.`;
   const modeNote =
     mode === 'cs'
       ? `\nCS SCREEN NOTE: This is the CS design view. Node labels/wording are Japanese and polite (敬語). Branch conditions on 分岐ロジック are business-friendly; keep labels short and in Japanese.`
