@@ -58,7 +58,11 @@ RULES:
   const modeNote =
     mode === 'cs'
       ? `\nCS SCREEN NOTE: This is the CS design view. Node labels/wording are Japanese and polite (敬語). Branch conditions on 分岐ロジック are business-friendly; keep labels short and in Japanese.`
-      : `\nTS SCREEN NOTE: This is the TS engineering view. Branch conditions/handles map closely to the Brekeke implementation; you may use raw handles/conditions.`;
+      : `\nTS SCREEN NOTE: This is the TS engineering view — the FULL node model (modules, schemas, many properties). Branch conditions/handles map closely to the Brekeke implementation; you may use raw handles/conditions.
+- logic / classifier / normalization nodes run a MODULE (data.moduleType); each module has its OWN fixed set of output branches. The digest shows each node's "module=" and "handles:[…]" — wire exactly those handles and do NOT invent branch names for a module node.
+- Modules: Script (custom JS via $runner/$ivr; calls $ivr.setResult with codes SUCCESS / NO_RESULT / INVALID / TIMEOUT / ERROR), Incoming Classifier, Date Of Call Classifier, Clinic Days Classifier, Clinical Department Classifier, Phone Type Classifier, Null Check, Context Match Router, Module Result Binder, Phone Normalization, DOB Re-confirmation.
+- To configure a module node, set the module's properties (shown as "props{…}" per node in the digest) instead of leaving them blank; don't change data.moduleType unless asked.
+- openai node: author its prompt in data.prompt; logic Script node: JavaScript in data.script.`;
   return `${base}\n${HANDLE_RULES}${modeNote}`;
 }
 
@@ -158,7 +162,7 @@ export function buildScreenContext(
     return {
       screenName: `TS screen · Flow Designer · ${flowName}`,
       spec: flowSpec('ts'),
-      context: buildFlowDigest(doc, activeFlowId),
+      context: buildFlowDigest(doc, activeFlowId, false),
       tools: FLOW_TOOLS,
     };
   }
@@ -189,7 +193,7 @@ export function buildScreenContext(
       return {
         screenName: `CS screen · Flow Diagram · ${flowName}`,
         spec: flowSpec('cs'),
-        context: buildFlowDigest(doc, activeFlowId),
+        context: buildFlowDigest(doc, activeFlowId, true),
         tools: FLOW_TOOLS,
       };
   }

@@ -22,8 +22,14 @@ interface DataBranchLike {
   id?: unknown;
 }
 
-// Các handle RA mà 1 node BẮT BUỘC phải nối.
-function requiredHandles(n: FlowNode): string[] {
+// Hàm suy "handle RA bắt buộc" của 1 node — cho phép TIÊM từ ngoài (DI).
+export type RequiredHandlesFn = (n: FlowNode) => readonly string[];
+
+// Mặc định THUẦN (chỉ dựa ir/branchRules): đủ cho TS/CS đơn giản + test độc lập.
+// TS có node module (classifier/normalization/CMR…) với nhánh sinh từ property —
+// nhánh thật do ui/effectiveBranches quyết định; caller nên TIÊM resolver dựa trên
+// sourceHandlesFor (xem ui/nodeSchema.requiredHandleIds) để chính xác cho TS.
+export function defaultRequiredHandles(n: FlowNode): string[] {
   const fixed = FIXED_REQUIRED_HANDLES[n.type];
   if (fixed) return [...fixed];
   if (EDITABLE_BRANCH_TYPES.includes(n.type)) {
@@ -35,8 +41,13 @@ function requiredHandles(n: FlowNode): string[] {
   return []; // hangup / loại khác: không bắt buộc nhánh ra
 }
 
-// Vi phạm nối dây của 1 flow (nodes/edges của đúng flow đó).
-export function validateFlow(nodes: FlowNode[], edges: FlowEdge[]): FlowViolation[] {
+// Vi phạm nối dây của 1 flow (nodes/edges của đúng flow đó). requiredHandles: cách
+// suy handle bắt buộc (mặc định thuần; TS truyền resolver module-aware).
+export function validateFlow(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  requiredHandles: RequiredHandlesFn = defaultRequiredHandles,
+): FlowViolation[] {
   const wired = new Map<string, Set<string>>();
   for (const e of edges) {
     let set = wired.get(e.source);

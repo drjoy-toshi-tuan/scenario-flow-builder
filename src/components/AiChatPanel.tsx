@@ -8,6 +8,7 @@ import { Icon } from '../ui/icons';
 import { AiSparkleIcon } from './AiSparkleIcon';
 import { describeOp, type EditOp, type OpKind } from '../ai/editOps';
 import { validateFlow } from '../ir/validate';
+import { requiredHandleIds } from '../ui/nodeSchema';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Panel AI Chat — dock bên phải canvas (dùng chung CS/TS). Trò chuyện để sửa flow
@@ -285,7 +286,9 @@ export function AiChatPanel() {
   if (!open) return null;
 
   // Cảnh báo (KHÔNG chặn) số chỗ chưa nối dây của flow đang mở — nhắc user/AI vá.
-  const wiringCount = ir ? validateFlow(ir.nodes, ir.edges).length : 0;
+  // Resolver module-aware (đúng cho node module TS).
+  const cs = mode === 'cs';
+  const wiringCount = ir ? validateFlow(ir.nodes, ir.edges, (n) => requiredHandleIds(n, cs)).length : 0;
 
   const submit = () => {
     const text = input.trim();

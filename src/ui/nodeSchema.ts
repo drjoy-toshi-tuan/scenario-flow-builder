@@ -1031,6 +1031,13 @@ export function sourceHandlesFor(node: FlowNode, cs = false): BranchDescriptor[]
   return effectiveBranches(node.type, node.data).map(toHandle);
 }
 
+// Handle RA bắt buộc phải nối của 1 node = mọi handle output node hiển thị
+// (sourceHandlesFor đã lo module cố định / CMR sinh từ Pair / clinical từ property).
+// Dùng làm resolver cho ir/validate.validateFlow (chính xác cho node module TS).
+export function requiredHandleIds(node: FlowNode, cs = false): string[] {
+  return sourceHandlesFor(node, cs).map((h) => h.id);
+}
+
 // Sinh dữ liệu mặc định khi thêm node mới (tham số + nhánh tự do nếu có).
 // Field có showIf chỉ seed khi điều kiện đúng với data đang dựng — tránh rải
 // tham số của module chưa chọn (vd tham số CDC trên node logic đang là Script).

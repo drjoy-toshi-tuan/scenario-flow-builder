@@ -18,6 +18,7 @@ const doc: FlowIR = {
   nodes: [
     node('n1', 'announce', '案内', { text: 'こんにちは' }),
     node('n2', 'interaction', '聴取', { announce: '' }), // trống -> (empty)
+    node('n3', 'logic', '分岐', { moduleType: 'Script', branches: [{ id: 'b0', value: 'ok' }], threshold: '0.7' }),
   ],
   edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
   subflows: [
@@ -32,25 +33,41 @@ const doc: FlowIR = {
 
 describe('buildFlowDigest', () => {
   it('main mở: digest đầy đủ flow đang mở + liệt kê sub flow khác', () => {
-    const out = buildFlowDigest(doc, 'main');
+    const out = buildFlowDigest(doc, 'main', false);
     expect(out).toContain('OPEN FLOW: Main Flow');
     expect(out).toContain('ALL FLOWS: Main Flow, 予約');
-    // flow đang mở có cả brief lẫn dây
     expect(out).toContain('- n1 [announce] "案内" :: こんにちは');
     expect(out).toContain('- n1 -> n2');
-    // field trống được đánh dấu (empty)
     expect(out).toContain('- n2 [interaction] "聴取" :: (empty)');
-    // sub flow khác được liệt kê (để AI biết 聴取失敗 tồn tại ở đâu)
     expect(out).toContain('OTHER FLOWS');
     expect(out).toContain('FLOW "予約":');
     expect(out).toContain('- s1n1 [announce] "聴取失敗" :: (empty)');
   });
 
+  it('interaction hiện handle failed+default (mọi mode)', () => {
+    const out = buildFlowDigest(doc, 'main', false);
+    expect(out).toMatch(/- n2 \[interaction].*handles:\[failed, default]/);
+    // announce chỉ có default -> KHÔNG hiện handles (tầm thường)
+    expect(out).not.toMatch(/- n1 \[announce].*handles:/);
+  });
+
+  it('TS: node module hiện module= + props{…}', () => {
+    const out = buildFlowDigest(doc, 'main', false);
+    expect(out).toContain('module=Script');
+    expect(out).toContain('threshold=0.7');
+    expect(out).toMatch(/- n3 \[logic][^\n]*handles:\[[^\n]*b0/);
+  });
+
+  it('CS: KHÔNG lộ chi tiết module/property (giữ nhẹ)', () => {
+    const out = buildFlowDigest(doc, 'main', true);
+    expect(out).not.toContain('module=Script');
+    expect(out).not.toContain('props{');
+  });
+
   it('sub flow mở: flow đó thành OPEN, main thành OTHER', () => {
-    const out = buildFlowDigest(doc, 'sub_yoyaku');
+    const out = buildFlowDigest(doc, 'sub_yoyaku', false);
     expect(out).toContain('OPEN FLOW: 予約');
     expect(out).toContain('OPEN FLOW "予約" — NODES:');
-    // main giờ nằm ở OTHER FLOWS
     const otherIdx = out.indexOf('OTHER FLOWS');
     expect(otherIdx).toBeGreaterThan(-1);
     expect(out.indexOf('FLOW "Main Flow":')).toBeGreaterThan(otherIdx);

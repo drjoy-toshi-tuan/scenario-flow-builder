@@ -1,29 +1,29 @@
 import type { FlowIR, FlowNode, FlowEdge } from '../ir/types';
 import { validateFlow } from '../ir/validate';
+import { sourceHandlesFor, logicModuleOf, requiredHandleIds } from '../ui/nodeSchema';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// "Flow digest" — biểu diễn GỌN của TOÀN BỘ kịch bản (main + mọi sub flow) để gửi
-// cho AI. Trước đây chỉ digest flow đang mở nên AI "mù" các node ở sub flow khác
-// (vd 聴取失敗 nằm ở sub flow không mở -> AI tưởng không có, không xử lý được).
+// "Flow digest" — biểu diễn GỌN của TOÀN BỘ kịch bản (main + mọi sub flow) cho AI.
+// FLOW ĐANG MỞ digest ĐẦY ĐỦ (node + brief + handle ra + dây); các FLOW KHÁC chỉ
+// liệt kê node để AI BIẾT node tồn tại ở đâu (không bung chi tiết).
 //
-// Chiến lược token: FLOW ĐANG MỞ digest ĐẦY ĐỦ (node + brief + dây) vì đó là thứ
-// AI được sửa; các FLOW KHÁC chỉ liệt kê node (id · type · label · trạng thái điền)
-// để AI BIẾT node tồn tại ở đâu và chỉ người dùng mở đúng flow — KHÔNG bung dây.
+// TS phức tạp (node có MODULE + nhiều property, nhánh sinh từ property) nên ở mode
+// TS mỗi node kèm: module đang dùng + các property đã đặt. Handle ra luôn hiện (mọi
+// mode) để AI biết CHÍNH XÁC nhánh nào phải nối. Validator dùng resolver
+// requiredHandleIds (module-aware) thay vì luật thô.
 //
-// Hàm THUẦN (không React). Nhận "doc" đầy đủ (từ assembleDoc) + activeFlowId.
+// Hàm THUẦN (không React). Nhận "doc" đầy đủ (assembleDoc) + activeFlowId + cs.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_TEXT = 120; // cắt bớt announce/prompt/script dài cho gọn token
+const MAX_TEXT = 120;
 
 function clip(v: string): string {
   const s = v.replace(/\s+/g, ' ').trim();
   return s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}…` : s;
 }
 
-// Nội dung "chính" của 1 node theo loại:
-//   null  = loại node KHÔNG có field văn bản chính (nexus/save/hangup/start) -> không hiện ::
-//   ''    = CÓ field nhưng đang TRỐNG -> hiện "(empty)" (tín hiệu để AI điền)
-//   chuỗi = nội dung (đã clip)
+// null = loại không có field văn bản chính (không hiện ::); '' = có nhưng TRỐNG
+// (hiện "(empty)"); chuỗi = nội dung.
 function primaryText(n: FlowNode): string | null {
   const d = n.data ?? {};
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -43,14 +43,54 @@ function primaryText(n: FlowNode): string | null {
     case 'transfer':
       return str(d.number || d.destination);
     default:
-      return null; // nexus / save / hangup / start
+      return null;
   }
 }
 
-function nodeLine(n: FlowNode): string {
+// Handle ra của node (bỏ qua nếu tầm thường = chỉ mỗi 'default', hoặc không có).
+function handlesStr(n: FlowNode, cs: boolean): string {
+  const ids = sourceHandlesFor(n, cs).map((h) => h.id);
+  if (ids.length === 0) return '';
+  if (ids.length === 1 && ids[0] === 'default') return '';
+  return ` handles:[${ids.join(', ')}]`;
+}
+
+// TS: module đang dùng + property đã đặt (bỏ field nhiễu/đã hiện ở brief). Giúp AI
+// hiểu schema node phức tạp (classifier/normalization/CMR…) để sửa đúng.
+const NOISE_KEYS = new Set([
+  'branches',
+  'description',
+  'text',
+  'announce',
+  'prompt',
+  'script',
+  'moduleType',
+  'position',
+]);
+function tsDetailStr(n: FlowNode): string {
+  const d = n.data ?? {};
+  let out = '';
+  if (n.type === 'logic' || n.type === 'classifier' || n.type === 'normalization') {
+    out += ` module=${logicModuleOf(d)}`;
+  }
+  const props: string[] = [];
+  for (const [k, v] of Object.entries(d)) {
+    if (NOISE_KEYS.has(k) || v == null || v === '') continue;
+    if (typeof v === 'object') props.push(`${k}=[…]`);
+    else props.push(`${k}=${clip(String(v))}`);
+    if (props.length >= 10) break;
+  }
+  if (props.length) out += ` props{${props.join('; ')}}`;
+  return out;
+}
+
+// 1 dòng node. detail=true (flow đang mở): kèm handle + (TS) module/property.
+function nodeLine(n: FlowNode, cs: boolean, detail: boolean): string {
   const pt = primaryText(n);
   const brief = pt === null ? '' : pt === '' ? ' :: (empty)' : ` :: ${clip(pt)}`;
-  return `- ${n.id} [${n.type}] "${n.label}"${brief}`;
+  if (!detail) return `- ${n.id} [${n.type}] "${n.label}"${brief}`;
+  const extra = cs ? '' : tsDetailStr(n);
+  return `- ${n.id} [${n.type}] "${n.label}"${brief}${handlesStr(n, cs)}${extra}`;
 }
 
 function edgeLine(e: FlowEdge): string {
@@ -68,7 +108,6 @@ interface FlowGraph {
   edges: FlowEdge[];
 }
 
-// Gom main + tất cả sub flow thành danh sách phẳng (doc = kết quả assembleDoc).
 function allFlows(doc: FlowIR): FlowGraph[] {
   return [
     { id: 'main', name: 'Main Flow', nodes: doc.nodes, edges: doc.edges },
@@ -76,8 +115,8 @@ function allFlows(doc: FlowIR): FlowGraph[] {
   ];
 }
 
-// Digest toàn kịch bản. doc: tài liệu đầy đủ (assembleDoc); activeFlowId: flow đang mở.
-export function buildFlowDigest(doc: FlowIR, activeFlowId: string): string {
+// Digest toàn kịch bản. doc: assembleDoc; activeFlowId: flow đang mở; cs: mode CS?
+export function buildFlowDigest(doc: FlowIR, activeFlowId: string, cs = false): string {
   const flows = allFlows(doc);
   const open = flows.find((f) => f.id === activeFlowId) ?? flows[0];
   const others = flows.filter((f) => f !== open);
@@ -88,16 +127,14 @@ export function buildFlowDigest(doc: FlowIR, activeFlowId: string): string {
   out.push(`ALL FLOWS: ${flows.map((f) => f.name).join(', ')}`);
   out.push('');
 
-  // Flow đang mở — đầy đủ (đây là flow AI được sửa).
   out.push(`OPEN FLOW "${open.name}" — NODES:`);
-  for (const n of open.nodes) out.push(nodeLine(n));
+  for (const n of open.nodes) out.push(nodeLine(n, cs, true));
   out.push('EDGES:');
   if (open.edges.length === 0) out.push('- (none)');
   for (const e of open.edges) out.push(edgeLine(e));
 
-  // Cảnh báo nối dây thiếu (bất biến: mỗi node nối đủ handle ra bắt buộc). Giúp AI
-  // biết CHÍNH XÁC chỗ nào còn hở dây (vd interaction thiếu nhánh failed) để vá.
-  const violations = validateFlow(open.nodes, open.edges);
+  // Cảnh báo nối dây thiếu — resolver module-aware (chính xác cho node TS).
+  const violations = validateFlow(open.nodes, open.edges, (n) => requiredHandleIds(n, cs));
   if (violations.length) {
     out.push('');
     out.push('INCOMPLETE WIRING (open flow) — every handle below MUST be connected with add_edge:');
@@ -106,13 +143,12 @@ export function buildFlowDigest(doc: FlowIR, activeFlowId: string): string {
     }
   }
 
-  // Các flow khác — chỉ liệt kê node để AI biết chúng tồn tại. Muốn sửa phải mở flow đó.
   if (others.length) {
     out.push('');
     out.push('OTHER FLOWS (read-only here — to edit a node in one, tell the user to open that flow first):');
     for (const f of others) {
       out.push(`FLOW "${f.name}":`);
-      for (const n of f.nodes) out.push(nodeLine(n));
+      for (const n of f.nodes) out.push(nodeLine(n, cs, false));
     }
   }
   return out.join('\n');
