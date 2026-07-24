@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileManagerMenu } from './FileManagerMenu';
 import { DriveConnectPanel } from './DriveConnectPanel';
 import { buildBlankFlow, FlowStructureBadge, isValidFlowYaml } from './flowShared';
-import { useT, type TKey } from '../ui/i18n';
+import { useT, useLang, type TKey } from '../ui/i18n';
 import { Icon } from '../ui/icons';
 import { BrandLockup } from '../ui/BrandLockup';
 import { WorkspaceStamp } from '../ui/WorkspaceStamp';
@@ -895,6 +895,7 @@ function DriveInner({
   } | null;
 }) {
   const t = useT();
+  const { lang } = useLang();
   // Màn CS quản lý シナリオ設計書 (Flow Diagram): tên riêng, không cột deploy, môi
   // trường gắn THEO từng バージョン (stamp + sửa được), chọn env khi tạo/import.
   const csMode = useWorkspaceStore((s) => s.mode === 'cs');
@@ -1744,7 +1745,7 @@ function DriveInner({
                                   className="inline-flex shrink-0 items-center text-amber-600 dark:text-amber-300"
                                   title={t('dmLatestBadge')}
                                 >
-                                  <NewBadgeIcon width={20} height={20} />
+                                  <NewBadgeIcon lang={lang} width={20} height={20} />
                                 </span>
                               )}
                             </div>
